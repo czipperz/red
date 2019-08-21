@@ -1,5 +1,6 @@
 #include "buffer.hpp"
 
+#include <cz/assert.hpp>
 #include <cz/defer.hpp>
 
 namespace red {

@@ -1,10 +1,7 @@
 #pragma once
 
-#include <stdint.h>
-#include <stdio.h>
-#include <cz/assert.hpp>
-#include <cz/string.hpp>
-#include <cz/vector.hpp>
+#include <stddef.h>
+#include <cz/mem/allocator.hpp>
 #include "result.hpp"
 
 namespace red {
