@@ -8,6 +8,7 @@ struct Result {
     enum Type {
         Success,
         ErrorSystem,
+        ErrorFile,
     } type;
     union ErrorValue {
         int system;
