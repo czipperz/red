@@ -6,7 +6,7 @@
 
 namespace red {
 
-struct Buffer {
+struct FileBuffer {
     static constexpr const size_t buffer_size_bits = 13;
     static constexpr const size_t buffer_size = 1 << buffer_size_bits;
 
