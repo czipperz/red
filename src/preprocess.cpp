@@ -14,6 +14,15 @@ Result Preprocessor::create(C* c, const char* cstr_file_name) {
     return Result::ok();
 }
 
+void Preprocessor::destroy(C* c) {
+    for (size_t i = 0; i < file_buffers.len(); ++i) {
+        file_buffers[i].drop(c->allocator, c->allocator);
+    }
+    file_buffers.drop(c->allocator);
+    file_names.drop(c->allocator);
+    include_stack.drop(c->allocator);
+}
+
 char Preprocessor::next(C* c, FileIndex* index) {
     return 0;
 }
