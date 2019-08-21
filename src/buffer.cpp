@@ -4,44 +4,88 @@
 
 namespace red {
 
-Result read_file(const char* cstr_file_name,
-                 cz::mem::Allocator allocator,
-                 cz::mem::Allocator backlog_allocator,
-                 cz::Vector<char*>* backlog,
-                 cz::String* last) {
+Result Buffer::read(const char* cstr_file_name,
+                    cz::mem::Allocator buffer_allocator,
+                    cz::mem::Allocator buffers_allocator) {
     FILE* file = fopen(cstr_file_name, "r");
     if (!file) {
         return Result::last_system_error();
     }
     CZ_DEFER(fclose(file));
 
-    const size_t alignment = 1;
+    const size_t buffer_alignment = 1;
 
-    char* buffer = static_cast<char*>(allocator.alloc({buffer_size, alignment}).buffer);
-    size_t len = fread(buffer, 1, buffer_size, file);
+    size_t buffers_capacity = 8;
+    buffers = static_cast<char**>(
+        buffers_allocator.alloc({buffers_capacity * sizeof(char*), alignof(char*)}).buffer);
+    buffers_len = 0;
+
     while (1) {
-        if (len == buffer_size) {
-            char* buffer2 = static_cast<char*>(allocator.alloc({buffer_size, alignment}).buffer);
-            size_t len2 = fread(buffer2, 1, buffer_size, file);
-            if (len2 != 0) {
-                backlog->reserve(backlog_allocator, 1);
-                backlog->push(buffer);
-                buffer = buffer2;
-                len = len2;
-                continue;
+        // read a chunk into a new buffer
+        char* buffer =
+            static_cast<char*>(buffer_allocator.alloc({buffer_size, buffer_alignment}).buffer);
+        size_t len = fread(buffer, 1, buffer_size, file);
+
+        // empty chunk means eof so stop
+        if (len == 0) {
+            if (buffers_len == 0) {
+                last_len = 0;
+            } else {
+                last_len = buffer_size;
             }
+            buffer_allocator.dealloc({buffer, buffer_size});
+            break;
         }
 
-        *last = cz::String{buffer, len, buffer_size};
+        // reserve a spot
+        if (buffers_len + 1 == buffers_capacity) {
+            size_t new_cap = buffers_capacity * 2;
+            char** new_buffers =
+                static_cast<char**>(buffers_allocator
+                                        .realloc({buffers, buffers_capacity * sizeof(char*)},
+                                                 {new_cap * sizeof(char*), alignof(char*)})
+                                        .buffer);
+            CZ_ASSERT(new_buffers);
 
-        if (feof(file)) {
-            return Result::ok();
-        } else {
-            return {Result::ErrorFile};
+            buffers = new_buffers;
+            buffers_capacity = new_cap;
+        }
+
+        // put the buffer in the spot
+        buffers[buffers_len] = buffer;
+        ++buffers_len;
+
+        // test if we are done reading
+        if (len != buffer_size) {
+            last_len = len;
+            break;
         }
     }
 
-    return Result::ok();
+    // we most likely overallocated so shrink to size
+    char** shrunk_buffers =
+        static_cast<char**>(buffers_allocator
+                                .realloc({buffers, buffers_capacity * sizeof(char*)},
+                                         {buffers_len * sizeof(char*), alignof(char*)})
+                                .buffer);
+    CZ_ASSERT(shrunk_buffers);
+    buffers = shrunk_buffers;
+
+    if (feof(file)) {
+        return Result::ok();
+    } else {
+        return {Result::ErrorFile};
+    }
+}
+
+void Buffer::drop(cz::mem::Allocator buffer_allocator, cz::mem::Allocator buffers_allocator) {
+    for (size_t i = 0; i + 1 < buffers_len; ++i) {
+        buffer_allocator.dealloc({buffers[i], buffer_size});
+    }
+    if (buffers_len > 0) {
+        buffer_allocator.dealloc({buffers[buffers_len - 1], last_len});
+    }
+    buffers_allocator.dealloc({buffers, buffers_len * sizeof(char*)});
 }
 
 }

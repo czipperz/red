@@ -7,20 +7,15 @@
 namespace red {
 
 Result compile_file(C* c, const char* file_name) {
-    cz::SmallVector<char*, 1> backlog;
-    CZ_DEFER(backlog.drop(c->allocator));
-    CZ_DEFER(for (size_t i = 0; i < backlog.len(); ++i) {
-        c->allocator.dealloc({backlog[i], buffer_size});
-    });
+    Buffer buffer;
+    CZ_DEFER(buffer.drop(c->allocator, c->allocator));
+    CZ_TRY(buffer.read(file_name, c->allocator, c->allocator));
 
-    cz::String last;
-    CZ_DEFER(last.drop(c->allocator));
-
-    CZ_TRY(read_file(file_name, c->allocator, c->allocator, &backlog, &last));
-
-    Buffers file_buffers;
-    file_buffers.backlog = backlog;
-    file_buffers.last = last;
+    FILE* file = fopen("test_copy.txt", "w");
+    CZ_DEFER(fclose(file));
+    for (size_t i = 0; i < buffer.len(); ++i) {
+        putc(buffer.get(i), file);
+    }
 
     return Result::ok();
 }
