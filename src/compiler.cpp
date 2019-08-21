@@ -2,19 +2,21 @@
 
 #include <cz/defer.hpp>
 #include <cz/try.hpp>
-#include "file_buffer.hpp"
+#include "preprocess.hpp"
 
 namespace red {
 
 Result compile_file(C* c, const char* file_name) {
-    FileBuffer file_buffer;
-    CZ_TRY(file_buffer.read(file_name, c->allocator, c->allocator));
-    CZ_DEFER(file_buffer.drop(c->allocator, c->allocator));
+    Preprocessor preprocessor;
+    CZ_DEFER(preprocessor.destroy(c));
+    CZ_TRY(preprocessor.create(c, file_name));
 
     FILE* file = fopen("test_copy.txt", "w");
     CZ_DEFER(fclose(file));
-    for (size_t i = 0; i < file_buffer.len(); ++i) {
-        putc(file_buffer.get(i), file);
+
+    FileIndex file_index;
+    for (char ch; (ch = preprocessor.next(c, &file_index)) != '\0';) {
+        putc(ch, file);
     }
 
     return Result::ok();
