@@ -1,15 +1,25 @@
 #pragma once
 
+#include <errno.h>
+
 namespace red {
 
 struct Result {
     enum Type {
         Success,
-        Error,
-    };
-    Type type;
+        ErrorSystem,
+    } type;
+    union ErrorValue {
+        int system;
+    } error;
 
-    static constexpr Result ok() { return Result{Success}; }
+    static constexpr Result ok() { return {Success, {}}; }
+    static Result last_system_error() {
+        Result result;
+        result.type = ErrorSystem;
+        result.error.system = errno;
+        return result;
+    }
     constexpr bool is_ok() const { return !is_err(); }
     constexpr bool is_err() const { return type != Success; }
 };
