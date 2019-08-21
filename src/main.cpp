@@ -18,8 +18,8 @@ static void log(void*, cz::log::LogInfo info) {
 
 int main(int argc, char** argv) {
     char* program_name = argv[0];
-    argc++;
-    argv--;
+    argc--;
+    argv++;
 
     cz::mem::AlignedBuffer<4096> temp_buffer;
     cz::mem::TempArena temp;
