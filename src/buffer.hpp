@@ -9,7 +9,8 @@
 
 namespace red {
 
-constexpr const size_t buffer_size = 1 << 13;
+constexpr const size_t buffer_size_bits = 13;
+constexpr const size_t buffer_size = 1 << buffer_size_bits;
 
 struct Buffers {
     static constexpr const size_t inner_mask = buffer_size - 1;
@@ -19,7 +20,7 @@ struct Buffers {
     cz::Str last;
 
     char get(size_t index) {
-        const size_t outer = index & outer_mask;
+        const size_t outer = (index & outer_mask) >> buffer_size_bits;
         const size_t inner = index & inner_mask;
 
         if (outer < backlog.len) {
