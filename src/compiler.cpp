@@ -8,8 +8,8 @@ namespace red {
 
 Result compile_file(C* c, const char* file_name) {
     FileBuffer file_buffer;
-    CZ_DEFER(file_buffer.drop(c->allocator, c->allocator));
     CZ_TRY(file_buffer.read(file_name, c->allocator, c->allocator));
+    CZ_DEFER(file_buffer.drop(c->allocator, c->allocator));
 
     FILE* file = fopen("test_copy.txt", "w");
     CZ_DEFER(fclose(file));

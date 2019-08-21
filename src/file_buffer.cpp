@@ -52,29 +52,47 @@ Result FileBuffer::read(const char* cstr_file_name,
             buffers_capacity = new_cap;
         }
 
-        // put the buffer in the spot
-        buffers[buffers_len] = buffer;
-        ++buffers_len;
-
-        // test if we are done reading
-        if (len != buffer_size) {
+        if (len == buffer_size) {
+            // put the buffer in the spot and continue reading
+            buffers[buffers_len] = buffer;
+            ++buffers_len;
+        } else {
+            // shrink the last string to size
             last_len = len;
+            char* shrunk_buffer = static_cast<char*>(
+                buffer_allocator.realloc({buffer, buffer_size}, {last_len, buffer_alignment})
+                    .buffer);
+            CZ_ASSERT(shrunk_buffer);
+            buffer = shrunk_buffer;
+
+            // put it in the spot and stop reading
+            buffers[buffers_len] = buffer;
+            ++buffers_len;
             break;
         }
     }
 
-    // we most likely overallocated so shrink to size
-    char** shrunk_buffers =
-        static_cast<char**>(buffers_allocator
-                                .realloc({buffers, buffers_capacity * sizeof(char*)},
-                                         {buffers_len * sizeof(char*), alignof(char*)})
-                                .buffer);
-    CZ_ASSERT(shrunk_buffers);
-    buffers = shrunk_buffers;
-
     if (feof(file)) {
+        // we most likely overallocated so shrink to size
+        char** shrunk_buffers =
+            static_cast<char**>(buffers_allocator
+                                    .realloc({buffers, buffers_capacity * sizeof(char*)},
+                                             {buffers_len * sizeof(char*), alignof(char*)})
+                                    .buffer);
+        CZ_ASSERT(shrunk_buffers);
+        buffers = shrunk_buffers;
+
         return Result::ok();
     } else {
+        // clean up
+        for (size_t i = 0; i + 1 < buffers_len; ++i) {
+            buffer_allocator.dealloc({buffers[i], buffer_size});
+        }
+        if (buffers_len > 0) {
+            buffer_allocator.dealloc({buffers[buffers_len - 1], last_len});
+        }
+        buffers_allocator.dealloc({buffers, buffers_len * sizeof(char*)});
+
         return {Result::ErrorFile};
     }
 }
