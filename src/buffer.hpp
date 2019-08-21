@@ -31,11 +31,14 @@ struct Buffers {
             return '\0';
         }
     }
+
+    constexpr size_t len() const { return backlog.len * buffer_size + last.len; }
 };
 
-Result read_file(cz::mem::Allocator,
-                 const char* cstr_file_name,
+Result read_file(const char* cstr_file_name,
+                 cz::mem::Allocator allocator,
+                 cz::mem::Allocator backlog_allocator,
                  cz::Vector<char*>* backlog,
-                 cz::Slice<char>* last);
+                 cz::String* last);
 
 }

@@ -4,11 +4,11 @@
 
 namespace red {
 
-Result read_file(cz::mem::Allocator allocator,
-                 const char* cstr_file_name,
+Result read_file(const char* cstr_file_name,
+                 cz::mem::Allocator allocator,
                  cz::mem::Allocator backlog_allocator,
                  cz::Vector<char*>* backlog,
-                 cz::Slice<char>* last) {
+                 cz::String* last) {
     FILE* file = fopen(cstr_file_name, "r");
     if (!file) {
         return Result::last_system_error();
@@ -32,8 +32,7 @@ Result read_file(cz::mem::Allocator allocator,
             }
         }
 
-        last->elems = buffer;
-        last->len = len;
+        *last = cz::String{buffer, len, buffer_size};
 
         if (feof(file)) {
             return Result::ok();
