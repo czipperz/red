@@ -107,11 +107,37 @@ TEST_CASE("next_character() backslash trigraph newline") {
     file_buffer.buffers = &buffer;
     file_buffer.buffers_len = 1;
     file_buffer.last_len = strlen(buffer);
+
     size_t index = 0;
     char ch = red::next_character(file_buffer, &index);
 
     REQUIRE(ch == 'a');
     REQUIRE(index == 5);
+}
+
+TEST_CASE("next_character() trigraph interrupted by backslash newline isn't a trigraph") {
+    red::FileBuffer file_buffer;
+    char* buffer = (char*)"??""\\\n>a";
+    file_buffer.buffers = &buffer;
+    file_buffer.buffers_len = 1;
+    file_buffer.last_len = strlen(buffer);
+
+    size_t index = 0;
+    char ch = red::next_character(file_buffer, &index);
+    REQUIRE(ch == '?');
+    REQUIRE(index == 1);
+
+    ch = red::next_character(file_buffer, &index);
+    REQUIRE(ch == '?');
+    REQUIRE(index == 2);
+
+    ch = red::next_character(file_buffer, &index);
+    REQUIRE(ch == '>');
+    REQUIRE(index == 5);
+
+    ch = red::next_character(file_buffer, &index);
+    REQUIRE(ch == 'a');
+    REQUIRE(index == 6);
 }
 
 TEST_CASE("next_character() backslash newline repeatedly handled") {
