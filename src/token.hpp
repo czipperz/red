@@ -17,6 +17,8 @@ struct Token {
         LessEqual,
         GreaterThan,
         GreaterEqual,
+        Hash,
+        HashHash,
         Label,
     } type;
     size_t start, end;

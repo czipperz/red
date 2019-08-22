@@ -75,6 +75,16 @@ top:
             }
             break;
         }
+        case '#': {
+            size_t index_clone = *index;
+            if (next_character(file_buffer, &index_clone) == '#') {
+                token_out->type = Token::HashHash;
+                *index = index_clone;
+            } else {
+                token_out->type = Token::Hash;
+            }
+            break;
+        }
         default:
             if (isspace(c)) {
                 goto top;

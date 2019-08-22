@@ -124,3 +124,33 @@ TEST_CASE("next_token() break token with whitespace") {
     CHECK(token.start == 2);
     CHECK(token.end == 3);
 }
+
+TEST_CASE("next_token() hash") {
+    red::FileBuffer file_buffer;
+    char* buffer = (char*)"#i";
+    file_buffer.buffers = &buffer;
+    file_buffer.buffers_len = 1;
+    file_buffer.last_len = strlen(buffer);
+
+    size_t index = 0;
+    red::Token token;
+    REQUIRE(next_token(file_buffer, &index, &token));
+    CHECK(token.type == red::Token::Hash);
+    CHECK(token.start == 0);
+    CHECK(token.end == 1);
+}
+
+TEST_CASE("next_token() hash hash") {
+    red::FileBuffer file_buffer;
+    char* buffer = (char*)"##";
+    file_buffer.buffers = &buffer;
+    file_buffer.buffers_len = 1;
+    file_buffer.last_len = strlen(buffer);
+
+    size_t index = 0;
+    red::Token token;
+    REQUIRE(next_token(file_buffer, &index, &token));
+    CHECK(token.type == red::Token::HashHash);
+    CHECK(token.start == 0);
+    CHECK(token.end == 2);
+}
