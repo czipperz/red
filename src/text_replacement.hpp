@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include "file_buffer.hpp"
 
 namespace red {
