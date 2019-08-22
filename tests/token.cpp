@@ -74,3 +74,33 @@ TEST_CASE("next_token() parenthesized label") {
     CHECK(token.start == 4);
     CHECK(token.end == 5);
 }
+
+TEST_CASE("next_token() digraph") {
+    red::FileBuffer file_buffer;
+    char* buffer = (char*)"<::><%%>";
+    file_buffer.buffers = &buffer;
+    file_buffer.buffers_len = 1;
+    file_buffer.last_len = strlen(buffer);
+
+    size_t index = 0;
+    red::Token token;
+    REQUIRE(next_token(file_buffer, &index, &token));
+    CHECK(token.type == red::Token::OpenSquare);
+    CHECK(token.start == 0);
+    CHECK(token.end == 2);
+
+    REQUIRE(next_token(file_buffer, &index, &token));
+    CHECK(token.type == red::Token::CloseSquare);
+    CHECK(token.start == 2);
+    CHECK(token.end == 4);
+
+    REQUIRE(next_token(file_buffer, &index, &token));
+    CHECK(token.type == red::Token::OpenCurly);
+    CHECK(token.start == 4);
+    CHECK(token.end == 6);
+
+    REQUIRE(next_token(file_buffer, &index, &token));
+    CHECK(token.type == red::Token::CloseCurly);
+    CHECK(token.start == 6);
+    CHECK(token.end == 8);
+}

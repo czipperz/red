@@ -29,8 +29,15 @@ bool next_token(const FileBuffer& file_buffer, size_t* index, Token* token_out) 
             break;
         case '<': {
             size_t index_clone = *index;
-            if (next_character(file_buffer, &index_clone) == '=') {
+            char next = next_character(file_buffer, &index_clone);
+            if (next == '=') {
                 token_out->type = Token::LessEqual;
+                *index = index_clone;
+            } else if (next == ':') {
+                token_out->type = Token::OpenSquare;
+                *index = index_clone;
+            } else if (next == '%') {
+                token_out->type = Token::OpenCurly;
                 *index = index_clone;
             } else {
                 token_out->type = Token::LessThan;
@@ -44,6 +51,26 @@ bool next_token(const FileBuffer& file_buffer, size_t* index, Token* token_out) 
                 *index = index_clone;
             } else {
                 token_out->type = Token::GreaterThan;
+            }
+            break;
+        }
+        case ':': {
+            size_t index_clone = *index;
+            if (next_character(file_buffer, &index_clone) == '>') {
+                token_out->type = Token::CloseSquare;
+                *index = index_clone;
+            } else {
+                return false;
+            }
+            break;
+        }
+        case '%': {
+            size_t index_clone = *index;
+            if (next_character(file_buffer, &index_clone) == '>') {
+                token_out->type = Token::CloseCurly;
+                *index = index_clone;
+            } else {
+                return false;
             }
             break;
         }
