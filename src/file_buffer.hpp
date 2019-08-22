@@ -23,7 +23,7 @@ struct FileBuffer {
 
     void drop(cz::mem::Allocator buffer_allocator, cz::mem::Allocator buffers_allocator);
 
-    char get(size_t index) {
+    char get(size_t index) const {
         const size_t outer = (index & outer_mask) >> buffer_size_bits;
         const size_t inner = index & inner_mask;
 
