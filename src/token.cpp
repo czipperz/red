@@ -6,6 +6,7 @@
 namespace red {
 
 bool next_token(const FileBuffer& file_buffer, size_t* index, Token* token_out) {
+top:
     size_t start = *index;
     char c = next_character(file_buffer, index);
     switch (c) {
@@ -75,6 +76,9 @@ bool next_token(const FileBuffer& file_buffer, size_t* index, Token* token_out) 
             break;
         }
         default:
+            if (isspace(c)) {
+                goto top;
+            }
             if (isalpha(c) || c == '_') {
                 while (1) {
                     size_t index_clone = *index;

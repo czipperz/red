@@ -104,3 +104,23 @@ TEST_CASE("next_token() digraph") {
     CHECK(token.start == 6);
     CHECK(token.end == 8);
 }
+
+TEST_CASE("next_token() break token with whitespace") {
+    red::FileBuffer file_buffer;
+    char* buffer = (char*)"a b";
+    file_buffer.buffers = &buffer;
+    file_buffer.buffers_len = 1;
+    file_buffer.last_len = strlen(buffer);
+
+    size_t index = 0;
+    red::Token token;
+    REQUIRE(next_token(file_buffer, &index, &token));
+    CHECK(token.type == red::Token::Label);
+    CHECK(token.start == 0);
+    CHECK(token.end == 1);
+
+    REQUIRE(next_token(file_buffer, &index, &token));
+    CHECK(token.type == red::Token::Label);
+    CHECK(token.start == 2);
+    CHECK(token.end == 3);
+}
