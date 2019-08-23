@@ -24,6 +24,11 @@ struct Token {
     size_t start, end;
 };
 
-bool next_token(const FileBuffer& file_buffer, size_t* index, Token* token_out);
+/**
+ * at_bol is an out variable but is only set to true.  Set it to true before
+ * calling if at the bof otherwise false.  This dictates whether (when not in a
+ * macro) Token::Hash starts a macro.
+ */
+bool next_token(const FileBuffer& file_buffer, size_t* index, Token* token_out, bool* at_bol);
 
 }

@@ -5,7 +5,7 @@
 
 namespace red {
 
-bool next_token(const FileBuffer& file_buffer, size_t* index, Token* token_out) {
+bool next_token(const FileBuffer& file_buffer, size_t* index, Token* token_out, bool* at_bol) {
 top:
     size_t start = *index;
     char c = next_character(file_buffer, index);
@@ -87,6 +87,10 @@ top:
         }
         default:
             if (isspace(c)) {
+                if (c == '\n') {
+                    *at_bol = true;
+                    goto top;
+                }
                 goto top;
             }
             if (isalpha(c) || c == '_') {
