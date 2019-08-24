@@ -5,12 +5,17 @@
 #include <czt/mock_allocate.hpp>
 #include "token.hpp"
 
-TEST_CASE("next_token() basic symbol") {
+red::FileBuffer mem_buffer(char** buffers) {
     red::FileBuffer file_buffer;
-    char* buffer = (char*)"<";
-    file_buffer.buffers = &buffer;
+    file_buffer.buffers = buffers;
     file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    file_buffer.last_len = strlen(buffers[0]);
+    return file_buffer;
+}
+
+TEST_CASE("next_token() basic symbol") {
+    char* buffer = (char*)"<";
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -26,11 +31,8 @@ TEST_CASE("next_token() basic symbol") {
 }
 
 TEST_CASE("next_token() basic label") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"abc";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -48,11 +50,8 @@ TEST_CASE("next_token() basic label") {
 }
 
 TEST_CASE("next_token() underscores in label") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"_ab_c";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -70,11 +69,8 @@ TEST_CASE("next_token() underscores in label") {
 }
 
 TEST_CASE("next_token() parenthesized label") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"(abc)";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -105,11 +101,8 @@ TEST_CASE("next_token() parenthesized label") {
 }
 
 TEST_CASE("next_token() digraph") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"<::><%%>";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -142,11 +135,8 @@ TEST_CASE("next_token() digraph") {
 }
 
 TEST_CASE("next_token() break token with whitespace") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"a b";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -171,11 +161,8 @@ TEST_CASE("next_token() break token with whitespace") {
 }
 
 TEST_CASE("next_token() hash") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"#i";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -190,11 +177,8 @@ TEST_CASE("next_token() hash") {
 }
 
 TEST_CASE("next_token() hash hash") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"##";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -209,11 +193,8 @@ TEST_CASE("next_token() hash hash") {
 }
 
 TEST_CASE("next_token() doesn't set is_bol when no newline") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"#";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -230,11 +211,8 @@ TEST_CASE("next_token() doesn't set is_bol when no newline") {
 }
 
 TEST_CASE("next_token() hit newline sets is_bol") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"\n#";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -249,11 +227,8 @@ TEST_CASE("next_token() hit newline sets is_bol") {
 }
 
 TEST_CASE("next_token() on error index is set after whitespace") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)" $";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
@@ -265,11 +240,8 @@ TEST_CASE("next_token() on error index is set after whitespace") {
 }
 
 TEST_CASE("next_token() string") {
-    red::FileBuffer file_buffer;
     char* buffer = (char*)"\"abc\"";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
 
     size_t index = 0;
     red::Token token;
