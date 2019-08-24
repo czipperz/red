@@ -3,6 +3,7 @@
 #include <cz/vector.hpp>
 #include "context.hpp"
 #include "file_buffer.hpp"
+#include "token.hpp"
 
 namespace red {
 
@@ -19,7 +20,10 @@ struct Preprocessor {
     Result create(C* c, const char* cstr_file_name);
     void destroy(C* c);
 
-    char next(C* c, FileIndex* index_out);
+    Result next(C* c,
+                FileIndex* index_out,
+                Token* token_out,
+                cz::mem::Allocated<cz::String>* label_value);
 };
 
 }

@@ -1,5 +1,7 @@
 #include "preprocess.hpp"
 
+#include <cz/assert.hpp>
+
 namespace red {
 
 Result Preprocessor::create(C* c, const char* cstr_file_name) {
@@ -26,24 +28,39 @@ void Preprocessor::destroy(C* c) {
     include_stack.drop(c->allocator);
 }
 
-char Preprocessor::next(C* c, FileIndex* index_out) {
+Result Preprocessor::next(C* c,
+                          FileIndex* index_out,
+                          Token* token_out,
+                          cz::mem::Allocated<cz::String>* label_value) {
     if (include_stack.len() == 0) {
-        *index_out = {0, file_buffers[0].len()};
-        return '\0';
+        return Result::done();
     }
 
     FileIndex* point = &include_stack.last();
     while (point->index == file_buffers[point->file].len()) {
-        if (include_stack.len() <= 1) {
-            *index_out = {0, file_buffers[0].len()};
-            return '\0';
+    pop_include:
+        CZ_DEBUG_ASSERT(include_stack.len() >= 1);
+        if (include_stack.len() == 1) {
+            include_stack.pop();
+            return Result::done();
         }
 
         include_stack.pop();
         point = &include_stack.last();
     }
 
-    return file_buffers[point->file].get(point->index++);
+    bool at_bol = false;
+    Token token;
+    if (next_token(file_buffers[point->file], &point->index, &token, &at_bol, label_value)) {
+        *token_out = token;
+        return Result::ok();
+    } else {
+        CZ_DEBUG_ASSERT(point->index <= file_buffers[point->file].len());
+        if (point->index < file_buffers[point->file].len()) {
+            return {Result::ErrorInvalidInput};
+        }
+        goto pop_include;
+    }
 }
 
 }

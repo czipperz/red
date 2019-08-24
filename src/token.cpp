@@ -5,7 +5,11 @@
 
 namespace red {
 
-bool next_token(const FileBuffer& file_buffer, size_t* index, Token* token_out, bool* at_bol) {
+bool next_token(const FileBuffer& file_buffer,
+                size_t* index,
+                Token* token_out,
+                bool* at_bol,
+                cz::mem::Allocated<cz::String>* label_value) {
 top:
     size_t start = *index;
     char c = next_character(file_buffer, index);
@@ -94,7 +98,12 @@ top:
                 goto top;
             }
             if (isalpha(c) || c == '_') {
+                label_value->object.clear();
+
                 while (1) {
+                    label_value->object.reserve(label_value->allocator, 1);
+                    label_value->object.push(c);
+
                     size_t index_clone = *index;
                     c = next_character(file_buffer, &index_clone);
                     if (isalnum(c) || c == '_') {
