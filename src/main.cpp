@@ -1,4 +1,5 @@
 #include <cz/assert.hpp>
+#include <cz/logger.hpp>
 #include <cz/mem/heap.hpp>
 #include <cz/slice.hpp>
 #include "compiler.hpp"
@@ -17,11 +18,11 @@ static void log(void*, cz::log::LogInfo info) {
     cz::io::write(cz::io::file_writer(out), info.level, ": ", info.message, '\n');
 }
 
-static int run_main(C* c, char* program_name, int argc, char** argv) {
+static Result run_main(C* c, char* program_name, int argc, char** argv) {
     for (size_t i = 0; i < argc; ++i) {
-        compile_file(c, argv[i]);
+        CZ_TRY(compile_file(c, argv[i]));
     }
-    return 0;
+    return Result::ok();
 }
 
 int main(int argc, char** argv) {
@@ -40,7 +41,13 @@ int main(int argc, char** argv) {
     context.max_log_level = cz::log::LogLevel::Debug;
 
     try {
-        return run_main(&context, program_name, argc, argv);
+        Result result = run_main(&context, program_name, argc, argv);
+        if (result.is_err()) {
+            CZ_LOG(&context, Error, "Error code ", result.type);
+            return 1;
+        } else {
+            return 0;
+        }
     } catch (cz::PanicReachedException& e) {
         e.log(&context);
         return 1;
