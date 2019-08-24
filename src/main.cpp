@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
         }
     } catch (cz::PanicReachedException& e) {
         e.log(&context);
-        return 1;
+        return 2;
     }
 }
 
