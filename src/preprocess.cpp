@@ -1,6 +1,7 @@
 #include "preprocess.hpp"
 
 #include <cz/assert.hpp>
+#include <cz/logger.hpp>
 
 namespace red {
 
@@ -57,6 +58,8 @@ Result Preprocessor::next(C* c,
     } else {
         CZ_DEBUG_ASSERT(point->index <= file_buffers[point->file].len());
         if (point->index < file_buffers[point->file].len()) {
+            CZ_LOG(c, Error, "Invalid input: ", file_buffers[point->file].get(point->index), " at ",
+                   point->index);
             return {Result::ErrorInvalidInput};
         }
         goto pop_include;
