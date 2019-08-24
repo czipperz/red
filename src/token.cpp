@@ -88,6 +88,21 @@ top:
             }
             break;
         }
+        case '"': {
+            label_value->object.clear();
+
+            *index = point;
+            c = next_character(file_buffer, &point);
+            while (c != '"') {
+                label_value->object.reserve(label_value->allocator, 1);
+                label_value->object.push(c);
+
+                *index = point;
+                c = next_character(file_buffer, &point);
+            }
+            token_out->type = Token::String;
+            break;
+        }
         default:
             if (isspace(c)) {
                 if (c == '\n') {

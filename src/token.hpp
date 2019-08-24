@@ -20,6 +20,7 @@ struct Token {
         GreaterEqual,
         Hash,
         HashHash,
+        String,
         Label,
     } type;
     size_t start, end;

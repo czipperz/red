@@ -263,3 +263,23 @@ TEST_CASE("next_token() on error index is set after whitespace") {
     REQUIRE_FALSE(next_token(file_buffer, &index, &token, &is_bol, &label_value));
     REQUIRE(index == 1);
 }
+
+TEST_CASE("next_token() string") {
+    red::FileBuffer file_buffer;
+    char* buffer = (char*)"\"abc\"";
+    file_buffer.buffers = &buffer;
+    file_buffer.buffers_len = 1;
+    file_buffer.last_len = strlen(buffer);
+
+    size_t index = 0;
+    red::Token token;
+    bool is_bol = false;
+    cz::mem::Allocated<cz::String> label_value;
+    label_value.allocator = cz::mem::heap_allocator();
+    CZ_DEFER(label_value.object.drop(label_value.allocator));
+    REQUIRE(next_token(file_buffer, &index, &token, &is_bol, &label_value));
+    CHECK(token.type == red::Token::String);
+    CHECK(token.start == 0);
+    CHECK(token.end == 5);
+    CHECK(label_value.object == "abc");
+}
