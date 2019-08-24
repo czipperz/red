@@ -10,9 +10,10 @@ bool next_token(const FileBuffer& file_buffer,
                 Token* token_out,
                 bool* at_bol,
                 cz::mem::Allocated<cz::String>* label_value) {
+    size_t point = *index;
 top:
-    size_t start = *index;
-    char c = next_character(file_buffer, index);
+    const size_t start = point;
+    char c = next_character(file_buffer, &point);
     switch (c) {
         case '(':
             token_out->type = Token::OpenParen;
@@ -33,59 +34,57 @@ top:
             token_out->type = Token::CloseSquare;
             break;
         case '<': {
-            size_t index_clone = *index;
-            char next = next_character(file_buffer, &index_clone);
+            *index = point;
+            char next = next_character(file_buffer, &point);
             if (next == '=') {
                 token_out->type = Token::LessEqual;
-                *index = index_clone;
             } else if (next == ':') {
                 token_out->type = Token::OpenSquare;
-                *index = index_clone;
             } else if (next == '%') {
                 token_out->type = Token::OpenCurly;
-                *index = index_clone;
             } else {
                 token_out->type = Token::LessThan;
+                point = *index;
             }
             break;
         }
         case '>': {
-            size_t index_clone = *index;
-            if (next_character(file_buffer, &index_clone) == '=') {
+            *index = point;
+            if (next_character(file_buffer, &point) == '=') {
                 token_out->type = Token::GreaterEqual;
-                *index = index_clone;
             } else {
                 token_out->type = Token::GreaterThan;
+                point = *index;
             }
             break;
         }
         case ':': {
-            size_t index_clone = *index;
-            if (next_character(file_buffer, &index_clone) == '>') {
+            *index = point;
+            if (next_character(file_buffer, &point) == '>') {
                 token_out->type = Token::CloseSquare;
-                *index = index_clone;
             } else {
+                point = start;
                 return false;
             }
             break;
         }
         case '%': {
-            size_t index_clone = *index;
-            if (next_character(file_buffer, &index_clone) == '>') {
+            *index = point;
+            if (next_character(file_buffer, &point) == '>') {
                 token_out->type = Token::CloseCurly;
-                *index = index_clone;
             } else {
+                point = start;
                 return false;
             }
             break;
         }
         case '#': {
-            size_t index_clone = *index;
-            if (next_character(file_buffer, &index_clone) == '#') {
+            *index = point;
+            if (next_character(file_buffer, &point) == '#') {
                 token_out->type = Token::HashHash;
-                *index = index_clone;
             } else {
                 token_out->type = Token::Hash;
+                point = *index;
             }
             break;
         }
@@ -93,10 +92,10 @@ top:
             if (isspace(c)) {
                 if (c == '\n') {
                     *at_bol = true;
-                    goto top;
                 }
                 goto top;
             }
+
             if (isalpha(c) || c == '_') {
                 label_value->object.clear();
 
@@ -104,24 +103,24 @@ top:
                     label_value->object.reserve(label_value->allocator, 1);
                     label_value->object.push(c);
 
-                    size_t index_clone = *index;
-                    c = next_character(file_buffer, &index_clone);
-                    if (isalnum(c) || c == '_') {
-                        *index = index_clone;
-                    } else {
+                    *index = point;
+                    c = next_character(file_buffer, &point);
+                    if (!isalnum(c) && c != '_') {
+                        point = *index;
                         break;
                     }
                 }
 
                 token_out->type = Token::Label;
-                token_out->start = start;
-                token_out->end = *index;
-                return true;
+                break;
             }
+
             return false;
     }
+
     token_out->start = start;
-    token_out->end = *index;
+    token_out->end = point;
+    *index = point;
     return true;
 }
 

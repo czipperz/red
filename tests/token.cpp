@@ -167,6 +167,7 @@ TEST_CASE("next_token() break token with whitespace") {
     CHECK(token.end == 3);
     CHECK(is_bol == false);
     CHECK(label_value.object == "b");
+    CHECK(index == token.end);
 }
 
 TEST_CASE("next_token() hash") {
