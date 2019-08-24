@@ -5,16 +5,13 @@
 
 namespace red {
 
-Result Preprocessor::create(C* c, const char* cstr_file_name) {
+Result Preprocessor::create(C* c, const char* file_name, FileBuffer file_buffer) {
     file_buffers.reserve(c->allocator, 1);
     file_names.reserve(c->allocator, 1);
     include_stack.reserve(c->allocator, 1);
 
-    FileBuffer buffer;
-    CZ_TRY(buffer.read(cstr_file_name, c->allocator, c->allocator));
-
-    file_buffers.push(buffer);
-    file_names.push(cstr_file_name);
+    file_buffers.push(file_buffer);
+    file_names.push(file_name);
     include_stack.push({0, 0});
 
     return Result::ok();
