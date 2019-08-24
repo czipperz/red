@@ -93,6 +93,7 @@ top:
                 if (c == '\n') {
                     *at_bol = true;
                 }
+                *index = point;
                 goto top;
             }
 

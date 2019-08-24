@@ -247,3 +247,19 @@ TEST_CASE("next_token() hit newline sets is_bol") {
     CHECK(token.end == 2);
     CHECK(is_bol == true);
 }
+
+TEST_CASE("next_token() on error index is set after whitespace") {
+    red::FileBuffer file_buffer;
+    char* buffer = (char*)" $";
+    file_buffer.buffers = &buffer;
+    file_buffer.buffers_len = 1;
+    file_buffer.last_len = strlen(buffer);
+
+    size_t index = 0;
+    red::Token token;
+    bool is_bol = false;
+    cz::mem::Allocated<cz::String> label_value;
+    label_value.allocator = cz::test::panic_allocator();
+    REQUIRE_FALSE(next_token(file_buffer, &index, &token, &is_bol, &label_value));
+    REQUIRE(index == 1);
+}
