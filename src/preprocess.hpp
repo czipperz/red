@@ -17,7 +17,7 @@ struct Preprocessor {
     cz::SmallVector<const char*, 0> file_names;
     cz::SmallVector<FileIndex, 0> include_stack;
 
-    Result create(C* c, const char* file_name, FileBuffer file_contents);
+    Result push(C* c, const char* file_name, FileBuffer file_contents);
     void destroy(C* c);
 
     Result next(C* c,

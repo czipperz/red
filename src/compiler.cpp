@@ -8,11 +8,12 @@ namespace red {
 
 Result compile_file(C* c, const char* file_name) {
     FileBuffer file_buffer;
+    // this must be the same as in preprocess when we include a file
     CZ_TRY(file_buffer.read(file_name, c->allocator, c->allocator));
 
     Preprocessor preprocessor;
     CZ_DEFER(preprocessor.destroy(c));
-    CZ_TRY(preprocessor.create(c, file_name, file_buffer));
+    CZ_TRY(preprocessor.push(c, file_name, file_buffer));
 
     FileIndex file_index;
     Result result;
