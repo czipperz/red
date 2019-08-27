@@ -115,6 +115,84 @@ static Result process_include(C* c,
     return p->next(c, index_out, token_out, label_value);
 }
 
+static Result process_token(C* c,
+                            Preprocessor* p,
+                            FileIndex* index_out,
+                            Token* token,
+                            cz::mem::Allocated<cz::String>* label_value,
+                            bool at_bol);
+
+static Result process_pragma(C* c,
+                             Preprocessor* p,
+                             FileIndex* index_out,
+                             Token* token_out,
+                             cz::mem::Allocated<cz::String>* label_value) {
+    FileIndex* point = &p->include_stack.last();
+    bool at_bol = false;
+    Token token;
+    if (!next_token(p->file_buffers[point->file], &point->index, &token, &at_bol, label_value)) {
+        // ignore #pragma
+        return p->next(c, index_out, token_out, label_value);
+    }
+
+    if (at_bol) {
+        // #pragma is ignored
+        process_token(c, p, index_out, token_out, label_value, at_bol);
+    }
+
+    if (token.type == Token::Label && label_value->object == "once") {
+        p->file_pragma_once[point->file] = true;
+
+        at_bol = false;
+        if (!next_token(p->file_buffers[point->file], &point->index, &token, &at_bol,
+                        label_value)) {
+            // #pragma once \EOF
+            return p->next(c, index_out, token_out, label_value);
+        }
+
+        if (!at_bol) {
+            CZ_PANIC("#pragma once has trailing tokens");  // @UserError
+        }
+
+        // done processing the #pragma once so get the next token
+        return process_token(c, p, index_out, token_out, label_value, at_bol);
+    }
+
+    CZ_PANIC("#pragma unhandled");  // @UserError
+}
+
+static Result process_token(C* c,
+                            Preprocessor* p,
+                            FileIndex* index_out,
+                            Token* token_out,
+                            cz::mem::Allocated<cz::String>* label_value,
+                            bool at_bol) {
+top:
+    FileIndex* point = &p->include_stack.last();
+    if (at_bol && token_out->type == Token::Hash) {
+        at_bol = false;
+        if (next_token(p->file_buffers[point->file], &point->index, token_out, &at_bol,
+                       label_value)) {
+            if (at_bol) {
+                // #\n is ignored
+                goto top;
+            }
+
+            if (token_out->type == Token::Label) {
+                if (label_value->object == "include") {
+                    return process_include(c, p, index_out, token_out, label_value);
+                }
+                if (label_value->object == "pragma") {
+                    return process_pragma(c, p, index_out, token_out, label_value);
+                }
+            }
+
+            CZ_PANIC("user error: unknown preprocessor attribute");  // @UserError
+        }
+    }
+    return Result::ok();
+}
+
 Result Preprocessor::next(C* c,
                           FileIndex* index_out,
                           Token* token_out,
@@ -137,57 +215,8 @@ Result Preprocessor::next(C* c,
     }
 
     bool at_bol = point->index == 0;
-    Token token;
-    if (next_token(file_buffers[point->file], &point->index, &token, &at_bol, label_value)) {
-    process_token:
-        if (at_bol && token.type == Token::Hash) {
-            at_bol = false;
-            if (next_token(file_buffers[point->file], &point->index, &token, &at_bol,
-                           label_value)) {
-                if (at_bol) {
-                    // we read an actual token on the next line
-                    goto process_token;
-                }
-
-                if (token.type == Token::Label) {
-                    if (label_value->object == "include") {
-                        return process_include(c, this, index_out, token_out, label_value);
-                    }
-                    if (label_value->object == "pragma") {
-                        at_bol = false;
-                        if (next_token(file_buffers[point->file], &point->index, &token, &at_bol,
-                                       label_value)) {
-                            if (at_bol) {
-                                // #pragma is ignored
-                                goto process_token;
-                            }
-
-                            if (token.type == Token::Label && label_value->object == "once") {
-                                file_pragma_once[point->file] = true;
-
-                                at_bol = false;
-                                if (next_token(file_buffers[point->file], &point->index, &token,
-                                               &at_bol, label_value)) {
-                                    if (!at_bol) {
-                                        CZ_PANIC("#pragma once has trailing tokens");  // @UserError
-                                    }
-
-                                    return Result::ok();
-                                } else {
-                                    return Result::done();
-                                }
-                            }
-
-                            CZ_PANIC("#pragma unhandled");  // @UserError
-                        }
-                    }
-                }
-
-                CZ_PANIC("user error: unknown preprocessor attribute");  // @UserError
-            }
-        }
-        *token_out = token;
-        return Result::ok();
+    if (next_token(file_buffers[point->file], &point->index, token_out, &at_bol, label_value)) {
+        return process_token(c, this, index_out, token_out, label_value, at_bol);
     } else {
         CZ_DEBUG_ASSERT(point->index <= file_buffers[point->file].len());
         if (point->index < file_buffers[point->file].len()) {
