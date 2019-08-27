@@ -10,11 +10,13 @@ namespace red {
 Result Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
     file_buffers.reserve(c->allocator, 1);
     file_names.reserve(c->allocator, 1);
+    file_pragma_once.reserve(c->allocator, 1);
     include_stack.reserve(c->allocator, 1);
 
     include_stack.push({file_buffers.len()});
     file_buffers.push(file_buffer);
     file_names.push(file_name);
+    file_pragma_once.push(false);
 
     return Result::ok();
 }
@@ -151,9 +153,37 @@ Result Preprocessor::next(C* c,
                     if (label_value->object == "include") {
                         return process_include(c, this, index_out, token_out, label_value);
                     }
+                    if (label_value->object == "pragma") {
+                        at_bol = false;
+                        if (next_token(file_buffers[point->file], &point->index, &token, &at_bol,
+                                       label_value)) {
+                            if (at_bol) {
+                                // #pragma is ignored
+                                goto process_token;
+                            }
+
+                            if (token.type == Token::Label && label_value->object == "once") {
+                                file_pragma_once[point->file] = true;
+
+                                at_bol = false;
+                                if (next_token(file_buffers[point->file], &point->index, &token,
+                                               &at_bol, label_value)) {
+                                    if (!at_bol) {
+                                        CZ_PANIC("#pragma once has trailing tokens");  // @UserError
+                                    }
+
+                                    return Result::ok();
+                                } else {
+                                    return Result::done();
+                                }
+                            }
+
+                            CZ_PANIC("#pragma unhandled");  // @UserError
+                        }
+                    }
                 }
 
-                CZ_PANIC("user error: unknown preprocessor attribute");
+                CZ_PANIC("user error: unknown preprocessor attribute");  // @UserError
             }
         }
         *token_out = token;

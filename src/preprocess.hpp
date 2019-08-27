@@ -15,6 +15,7 @@ struct FileIndex {
 struct Preprocessor {
     cz::SmallVector<FileBuffer, 0> file_buffers;
     cz::SmallVector<const char*, 0> file_names;
+    cz::SmallVector<bool, 0> file_pragma_once;
     cz::SmallVector<FileIndex, 0> include_stack;
 
     Result push(C* c, const char* file_name, FileBuffer file_contents);
