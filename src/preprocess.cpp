@@ -86,16 +86,21 @@ static Result process_include(C* c,
     if (ch == '"') {
         label_value->object.reserve(label_value->allocator, 1);
         label_value->object[label_value->object.len()] = '\0';
-        // these buffers are probably going to change
-        CZ_TRY(file_buffer.read(label_value->object.buffer(), c->allocator, c->allocator));
 
+        // these allocators are probably going to change
+        auto result = file_buffer.read(label_value->object.buffer(), c->allocator, c->allocator);
+        if (result.is_ok()) {
+            label_value->object.reserve(label_value->allocator, 1);
+            label_value->object[label_value->object.len()] = '\0';
+        }
+    }
+
+    if (file_buffer.len() == 0) {
         memmove(label_value->object.buffer(), label_value->object.buffer() + offset,
                 label_value->object.len() - offset);
         label_value->object.set_len(label_value->object.len() - offset);
+        CZ_PANIC("Unimplemented #include system lookups");
     }
-
-    label_value->object.reserve(label_value->allocator, 1);
-    label_value->object[label_value->object.len()] = '\0';
 
     // @LEAK: we are going to just leak this memory until we get a multi arena rolling
     cz::String file_name;
