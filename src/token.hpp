@@ -18,10 +18,23 @@ struct Token {
         LessEqual,
         GreaterThan,
         GreaterEqual,
+        Set,
+        Equals,
+        Dot,
+        Comma,
+        Plus,
+        Minus,
+        Divide,
+        Star,
+        Semicolon,
+        Not,
+        Namespace,
+        Colon,
         Hash,
         HashHash,
         String,
         Label,
+        Integer,
     } type;
     size_t start, end;
 };

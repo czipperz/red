@@ -1,6 +1,7 @@
 #include "token.hpp"
 
 #include <ctype.h>
+#include <cz/assert.hpp>
 #include "text_replacement.hpp"
 
 namespace red {
@@ -60,11 +61,14 @@ top:
         }
         case ':': {
             *index = point;
-            if (next_character(file_buffer, &point) == '>') {
+            char next = next_character(file_buffer, &point);
+            if (next == '>') {
                 token_out->type = Token::CloseSquare;
+            } else if (next == ':') {
+                token_out->type = Token::Namespace;
             } else {
-                point = start;
-                return false;
+                token_out->type = Token::Colon;
+                point = *index;
             }
             break;
         }
@@ -78,6 +82,39 @@ top:
             }
             break;
         }
+        case '=':
+            *index = point;
+            if (next_character(file_buffer, &point) == '=') {
+                token_out->type = Token::Equals;
+            } else {
+                token_out->type = Token::Set;
+                point = *index;
+            }
+            break;
+        case '.':
+            token_out->type = Token::Dot;
+            break;
+        case ',':
+            token_out->type = Token::Comma;
+            break;
+        case '+':
+            token_out->type = Token::Plus;
+            break;
+        case '-':
+            token_out->type = Token::Minus;
+            break;
+        case '/':
+            token_out->type = Token::Divide;
+            break;
+        case '*':
+            token_out->type = Token::Star;
+            break;
+        case ';':
+            token_out->type = Token::Semicolon;
+            break;
+        case '!':
+            token_out->type = Token::Not;
+            break;
         case '#': {
             *index = point;
             if (next_character(file_buffer, &point) == '#') {
@@ -93,13 +130,19 @@ top:
 
             *index = point;
             c = next_character(file_buffer, &point);
-            while (c != '"') {
+            while (c && c != '"') {
                 label_value->object.reserve(label_value->allocator, 1);
                 label_value->object.push(c);
 
                 *index = point;
                 c = next_character(file_buffer, &point);
             }
+
+            if (!c) {
+                CZ_PANIC("Error: Unterminated string");  // @UserError
+                return false;
+            }
+
             token_out->type = Token::String;
             break;
         }
@@ -128,6 +171,25 @@ top:
                 }
 
                 token_out->type = Token::Label;
+                break;
+            }
+
+            if (isdigit(c)) {
+                label_value->object.clear();
+
+                while (1) {
+                    label_value->object.reserve(label_value->allocator, 1);
+                    label_value->object.push(c);
+
+                    *index = point;
+                    c = next_character(file_buffer, &point);
+                    if (!isdigit(c)) {
+                        point = *index;
+                        break;
+                    }
+                }
+
+                token_out->type = Token::Integer;
                 break;
             }
 
