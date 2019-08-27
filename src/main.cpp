@@ -7,15 +7,27 @@
 
 namespace red {
 
-static void log(void*, cz::log::LogInfo info) {
-    FILE* out;
-    if (info.level < cz::log::LogLevel::Warning) {
-        out = stderr;
+static FILE* choose_file(cz::log::LogLevel level) {
+    if (level < cz::log::LogLevel::Warning) {
+        return stderr;
     } else {
-        out = stdout;
+        return stdout;
     }
+}
 
-    cz::io::write(cz::io::file_writer(out), info.level, ": ", info.message, '\n');
+static cz::io::Result log_prefix(void*, const cz::log::LogInfo& info) {
+    FILE* out = choose_file(info.level);
+    return cz::io::write(cz::io::file_writer(out), info.level, ": ");
+}
+
+static cz::io::Result log_chunk(void*, const cz::log::LogInfo& info, cz::Str chunk) {
+    FILE* out = choose_file(info.level);
+    return cz::io::write(cz::io::file_writer(out), chunk);
+}
+
+static cz::io::Result log_suffix(void*, const cz::log::LogInfo& info) {
+    FILE* out = choose_file(info.level);
+    return cz::io::write(cz::io::file_writer(out), '\n');
 }
 
 static Result run_main(C* c) {
@@ -37,7 +49,8 @@ int main(int argc, char** argv) {
     Context context;
     context.allocator = cz::mem::heap_allocator();
     context.temp = &temp;
-    context.logger = {log, NULL};
+    static const cz::log::Logger::VTable log_vtable = {log_prefix, log_chunk, log_suffix};
+    context.logger = {&log_vtable, NULL};
     context.max_log_level = cz::log::LogLevel::Debug;
     context.program_name = program_name;
     CZ_DEFER(context.options.destroy(&context));

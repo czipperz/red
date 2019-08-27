@@ -119,7 +119,8 @@ Result write(Writer writer, red::FileBuffer file_buffer) {
         CZ_TRY(write(writer, Str{file_buffer.buffers[i], red::FileBuffer::buffer_size}));
     }
     if (file_buffer.buffers_len > 0) {
-        CZ_TRY(write(writer, Str{file_buffer.buffers[file_buffer.buffers_len], file_buffer.last_len}));
+        CZ_TRY(write(writer,
+                     Str{file_buffer.buffers[file_buffer.buffers_len - 1], file_buffer.last_len}));
     }
     return Result::ok();
 }
