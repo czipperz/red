@@ -8,6 +8,10 @@ void Options::destroy(cz::C* c) {
 }
 
 int Options::parse(cz::C* c, int argc, char** argv) {
+    include_paths.reserve(c->allocator, 2);
+    include_paths.push("/usr/local/include");
+    include_paths.push("/usr/include");
+
     for (size_t i = 0; i < argc; ++i) {
         char* arg = argv[i];
         if (arg[0] == '-' && arg[1] == 'I') {
