@@ -134,22 +134,21 @@ static Result process_pragma(C* c,
                              cz::mem::Allocated<cz::String>* label_value) {
     FileIndex* point = &p->include_stack.last();
     bool at_bol = false;
-    Token token;
-    if (!next_token(p->file_buffers[point->file], &point->index, &token, &at_bol, label_value)) {
+    if (!next_token(p->file_buffers[point->file], &point->index, token_out, &at_bol, label_value)) {
         // ignore #pragma
         return p->next(c, index_out, token_out, label_value);
     }
 
     if (at_bol) {
         // #pragma is ignored
-        process_token(c, p, index_out, token_out, label_value, at_bol);
+        return process_token(c, p, index_out, token_out, label_value, at_bol);
     }
 
-    if (token.type == Token::Label && label_value->object == "once") {
+    if (token_out->type == Token::Label && label_value->object == "once") {
         p->file_pragma_once[point->file] = true;
 
         at_bol = false;
-        if (!next_token(p->file_buffers[point->file], &point->index, &token, &at_bol,
+        if (!next_token(p->file_buffers[point->file], &point->index, token_out, &at_bol,
                         label_value)) {
             // #pragma once \EOF
             return p->next(c, index_out, token_out, label_value);
