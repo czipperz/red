@@ -82,18 +82,23 @@ static Result process_include(C* c,
                         label_value));
     CZ_LOG(c, Information, "Including '",
            cz::Str{label_value->object.buffer() + offset, label_value->object.len() - offset},
-           "' (", label_value->object, ")");
+           '\'');
 
     FileBuffer file_buffer;
     if (ch == '"') {
+        CZ_LOG(c, Information, "Trying '", label_value->object, "'");
         label_value->object.reserve(label_value->allocator, 1);
         label_value->object[label_value->object.len()] = '\0';
 
         // these allocators are probably going to change
         auto result = file_buffer.read(label_value->object.buffer(), c->allocator, c->allocator);
         if (result.is_ok()) {
+            CZ_LOG(c, Information,
+                   "Contents: \n", cz::Str{file_buffer.buffers[0], file_buffer.last_len});
             label_value->object.reserve(label_value->allocator, 1);
             label_value->object[label_value->object.len()] = '\0';
+        } else {
+            CZ_DEBUG_ASSERT(file_buffer.len() == 0);
         }
     }
 
