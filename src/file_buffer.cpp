@@ -110,3 +110,19 @@ void FileBuffer::drop(cz::mem::Allocator buffer_allocator, cz::mem::Allocator bu
 }
 
 }
+
+namespace cz {
+namespace io {
+
+Result write(Writer writer, red::FileBuffer file_buffer) {
+    for (size_t i = 0; i + 1 < file_buffer.buffers_len; ++i) {
+        CZ_TRY(write(writer, Str{file_buffer.buffers[i], red::FileBuffer::buffer_size}));
+    }
+    if (file_buffer.buffers_len > 0) {
+        CZ_TRY(write(writer, Str{file_buffer.buffers[file_buffer.buffers_len], file_buffer.last_len}));
+    }
+    return Result::ok();
+}
+
+}
+}

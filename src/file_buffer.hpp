@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <cz/io/write.hpp>
 #include <cz/mem/allocator.hpp>
 #include "result.hpp"
 
@@ -39,4 +40,12 @@ struct FileBuffer {
     }
 };
 
+}
+
+namespace cz {
+namespace io {
+
+Result write(Writer, red::FileBuffer);
+
+}
 }

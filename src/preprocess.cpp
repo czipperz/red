@@ -128,8 +128,7 @@ static Result process_include(C* c,
             // these allocators are probably going to change
             auto result = file_buffer.read(temp.object.buffer(), c->allocator, c->allocator);
             if (result.is_ok()) {
-                CZ_LOG(c, Information, "Contents: \n",
-                       cz::Str{file_buffer.buffers[0], file_buffer.last_len});
+                CZ_LOG(c, Information, "Contents: \n", file_buffer);
                 file_name.object.drop(file_name.allocator);
                 file_name = temp;
             } else {
