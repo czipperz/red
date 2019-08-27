@@ -195,6 +195,8 @@ top:
             CZ_PANIC("user error: unknown preprocessor attribute");  // @UserError
         }
     }
+
+    *index_out = *point;
     return Result::ok();
 }
 
@@ -209,13 +211,13 @@ Result Preprocessor::next(C* c,
     FileIndex* point = &include_stack.last();
     while (point->index == file_buffers[point->file].len()) {
     pop_include:
-        CZ_DEBUG_ASSERT(include_stack.len() >= 1);
-        if (include_stack.len() == 1) {
-            include_stack.pop();
+        include_stack.pop();
+
+        if (include_stack.len() == 0) {
+            *index_out = *point;
             return Result::done();
         }
 
-        include_stack.pop();
         point = &include_stack.last();
     }
 
