@@ -91,7 +91,11 @@ Result FileBuffer::read(const char* cstr_file_name,
         if (buffers_len > 0) {
             buffer_allocator.dealloc({buffers[buffers_len - 1], last_len});
         }
-        buffers_allocator.dealloc({buffers, buffers_len * sizeof(char*)});
+        buffers_allocator.dealloc({buffers, buffers_capacity * sizeof(char*)});
+
+        buffers = 0;
+        buffers_len = 0;
+        last_len = 0;
 
         return {Result::ErrorFile};
     }
