@@ -255,3 +255,63 @@ TEST_CASE("next_token() string") {
     CHECK(token.end == 5);
     CHECK(label_value.object == "abc");
 }
+
+TEST_CASE("Block comment") {
+    char* buffer = (char*)"/*abc*/x";
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
+
+    size_t index = 0;
+    red::Token token;
+    bool is_bol = false;
+    cz::mem::Allocated<cz::String> label_value;
+    label_value.allocator = cz::mem::heap_allocator();
+    CZ_DEFER(label_value.object.drop(label_value.allocator));
+    REQUIRE(next_token(file_buffer, &index, &token, &is_bol, &label_value));
+    CHECK(token.type == red::Token::Label);
+    CHECK(token.start == 7);
+    CHECK(token.end == 8);
+    CHECK(label_value.object == "x");
+}
+
+TEST_CASE("Empty block comment") {
+    char* buffer = (char*)"/**/x";
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
+
+    size_t index = 0;
+    red::Token token;
+    bool is_bol = false;
+    cz::mem::Allocated<cz::String> label_value;
+    label_value.allocator = cz::mem::heap_allocator();
+    CZ_DEFER(label_value.object.drop(label_value.allocator));
+    REQUIRE(next_token(file_buffer, &index, &token, &is_bol, &label_value));
+    CHECK(token.type == red::Token::Label);
+    CHECK(token.start == 4);
+    CHECK(token.end == 5);
+    CHECK(label_value.object == "x");
+}
+
+TEST_CASE("Block comment nothing after") {
+    char* buffer = (char*)"/**/";
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
+
+    size_t index = 0;
+    red::Token token;
+    bool is_bol = false;
+    cz::mem::Allocated<cz::String> label_value;
+    label_value.allocator = cz::mem::heap_allocator();
+    CZ_DEFER(label_value.object.drop(label_value.allocator));
+    REQUIRE_FALSE(next_token(file_buffer, &index, &token, &is_bol, &label_value));
+}
+
+TEST_CASE("Block comment is not recursive") {
+    char* buffer = (char*)"/*/**/";
+    red::FileBuffer file_buffer = mem_buffer(&buffer);
+
+    size_t index = 0;
+    red::Token token;
+    bool is_bol = false;
+    cz::mem::Allocated<cz::String> label_value;
+    label_value.allocator = cz::mem::heap_allocator();
+    CZ_DEFER(label_value.object.drop(label_value.allocator));
+    REQUIRE_FALSE(next_token(file_buffer, &index, &token, &is_bol, &label_value));
+}

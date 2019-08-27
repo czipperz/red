@@ -104,7 +104,29 @@ top:
             token_out->type = Token::Minus;
             break;
         case '/':
-            token_out->type = Token::Divide;
+            *index = point;
+            c = next_character(file_buffer, &point);
+            if (c == '*') {
+                char c = next_character(file_buffer, &point);
+                while (1) {
+                    if (!c) {
+                        *index = point;
+                        CZ_PANIC("Error: Unterminated block comment");  // @UserError
+                        return false;
+                    }
+
+                    char next = next_character(file_buffer, &point);
+                    if (c == '*' && next == '/') {
+                        break;
+                    }
+                    c = next;
+                }
+                *index = point;
+                goto top;
+            } else {
+                token_out->type = Token::Divide;
+                point = *index;
+            }
             break;
         case '*':
             token_out->type = Token::Star;
