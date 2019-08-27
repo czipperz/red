@@ -18,9 +18,9 @@ static void log(void*, cz::log::LogInfo info) {
     cz::io::write(cz::io::file_writer(out), info.level, ": ", info.message, '\n');
 }
 
-static Result run_main(C* c, char* program_name, int argc, char** argv) {
-    for (size_t i = 0; i < argc; ++i) {
-        CZ_TRY(compile_file(c, argv[i]));
+static Result run_main(C* c) {
+    for (size_t i = 0; i < c->options.input_files.len(); ++i) {
+        CZ_TRY(compile_file(c, c->options.input_files[i]));
     }
     return Result::ok();
 }
@@ -39,9 +39,14 @@ int main(int argc, char** argv) {
     context.temp = &temp;
     context.logger = {log, NULL};
     context.max_log_level = cz::log::LogLevel::Debug;
+    context.program_name = program_name;
+    CZ_DEFER(context.options.destroy(&context));
+    if (context.options.parse(&context, argc, argv) != 0) {
+        return 1;
+    }
 
     try {
-        Result result = run_main(&context, program_name, argc, argv);
+        Result result = run_main(&context);
         if (result.is_err()) {
             CZ_LOG(&context, Error, "Error code ", result.type);
             return 1;
