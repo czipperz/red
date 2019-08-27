@@ -69,53 +69,80 @@ static Result process_include(C* c,
         CZ_PANIC("Unimplemented #include macro");
     }
 
-    label_value->object.clear();
+    // @LEAK: we are going to just leak this memory until we get a multi arena rolling
+    cz::mem::Allocated<cz::String> file_name;
+    file_name.allocator = c->allocator;
+
     if (ch == '"') {
-        cz::Str file_name = p->file_names[point->file];
-        cz::Str directory_name = cz::fs::directory_component(file_name);
-        label_value->object.reserve(label_value->allocator, directory_name.len);
-        label_value->object.append(directory_name);
+        cz::Str directory_name = cz::fs::directory_component(p->file_names[point->file]);
+        file_name.object.reserve(file_name.allocator, directory_name.len);
+        file_name.object.append(directory_name);
     }
-    size_t offset = label_value->object.len();
+    size_t offset = file_name.object.len();
 
     CZ_TRY(read_include(p->file_buffers[point->file], &point->index, ch == '<' ? '>' : '"',
-                        label_value));
+                        &file_name));
     CZ_LOG(c, Information, "Including '",
-           cz::Str{label_value->object.buffer() + offset, label_value->object.len() - offset},
-           '\'');
+           cz::Str{file_name.object.buffer() + offset, file_name.object.len() - offset}, '\'');
 
     FileBuffer file_buffer;
     if (ch == '"') {
-        CZ_LOG(c, Information, "Trying '", label_value->object, "'");
-        label_value->object.reserve(label_value->allocator, 1);
-        label_value->object[label_value->object.len()] = '\0';
+        CZ_LOG(c, Information, "Trying '", file_name.object, "'");
+        file_name.object.reserve(file_name.allocator, 1);
+        *file_name.object.end() = '\0';
 
         // these allocators are probably going to change
-        auto result = file_buffer.read(label_value->object.buffer(), c->allocator, c->allocator);
+        auto result = file_buffer.read(file_name.object.buffer(), c->allocator, c->allocator);
         if (result.is_ok()) {
             CZ_LOG(c, Information, "Contents: \n",
                    cz::Str{file_buffer.buffers[0], file_buffer.last_len});
-            label_value->object.reserve(label_value->allocator, 1);
-            label_value->object[label_value->object.len()] = '\0';
         } else {
             CZ_DEBUG_ASSERT(file_buffer.len() == 0);
         }
     }
 
     if (file_buffer.len() == 0) {
-        memmove(label_value->object.buffer(), label_value->object.buffer() + offset,
-                label_value->object.len() - offset);
-        label_value->object.set_len(label_value->object.len() - offset);
-        CZ_PANIC("Unimplemented #include system lookups");
+        cz::Str included_file_name = {file_name.object.buffer() + offset,
+                                      file_name.object.len() - offset};
+
+        cz::mem::Allocated<cz::String> temp;
+        temp.allocator = file_name.allocator;
+
+        for (size_t i = 0; file_buffer.len() == 0 && i < c->options.include_paths.len(); ++i) {
+            // @Speed: store the include paths as Str s so we don't call strlen
+            // over and over here
+            cz::Str include_path(c->options.include_paths[i]);
+            bool trailing_slash = include_path.ends_with("/");  // @Speed: ends_with(char)
+            temp.object.reserve(temp.allocator,
+                                include_path.len + !trailing_slash + included_file_name.len + 1);
+            temp.object.append(include_path);
+            if (!trailing_slash) {
+                temp.object.push('/');
+            }
+            temp.object.append(included_file_name);
+            *temp.object.end() = '\0';
+
+            CZ_LOG(c, Information, "Trying '", temp.object, "'");
+
+            // these allocators are probably going to change
+            auto result = file_buffer.read(temp.object.buffer(), c->allocator, c->allocator);
+            if (result.is_ok()) {
+                CZ_LOG(c, Information, "Contents: \n",
+                       cz::Str{file_buffer.buffers[0], file_buffer.last_len});
+                file_name.object.drop(file_name.allocator);
+                file_name = temp;
+            } else {
+                temp.object.clear();
+            }
+        }
+
+        if (file_buffer.len() == 0) {
+            CZ_LOG(c, Error, "Couldn't include file '", included_file_name, "'");
+            return {Result::ErrorInvalidInput};
+        }
     }
 
-    // @LEAK: we are going to just leak this memory until we get a multi arena rolling
-    cz::String file_name;
-    file_name.reserve(c->allocator, label_value->object.len() + 1);
-    file_name.append(label_value->object);
-    file_name[file_name.len()] = '\0';
-
-    p->push(c, file_name.buffer(), file_buffer);
+    p->push(c, file_name.object.buffer(), file_buffer);
 
     return p->next(c, index_out, token_out, label_value);
 }
