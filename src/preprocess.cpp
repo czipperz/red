@@ -109,10 +109,10 @@ static Result process_include(C* c,
         cz::mem::Allocated<cz::String> temp;
         temp.allocator = file_name.allocator;
 
-        for (size_t i = 0; file_buffer.len() == 0 && i < c->options.include_paths.len(); ++i) {
+        for (size_t i = c->options.include_paths.len(); file_buffer.len() == 0 && i > 0; --i) {
             // @Speed: store the include paths as Str s so we don't call strlen
             // over and over here
-            cz::Str include_path(c->options.include_paths[i]);
+            cz::Str include_path(c->options.include_paths[i - 1]);
             bool trailing_slash = include_path.ends_with("/");  // @Speed: ends_with(char)
             temp.object.reserve(temp.allocator,
                                 include_path.len + !trailing_slash + included_file_name.len + 1);
