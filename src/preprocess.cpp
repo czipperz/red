@@ -51,6 +51,7 @@ static Result read_include(const FileBuffer& buffer,
         output->object.push(c);
         c = next_character(buffer, &point);
     }
+    *index = point;
     return Result::ok();
 }
 
