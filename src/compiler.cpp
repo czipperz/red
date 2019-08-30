@@ -15,13 +15,13 @@ Result compile_file(C* c, const char* file_name) {
     CZ_DEFER(preprocessor.destroy(c));
     CZ_TRY(preprocessor.push(c, file_name, file_buffer));
 
-    FileIndex file_index;
+    FileLocation file_location;
     Result result;
     cz::mem::Allocated<cz::String> label_value;
     label_value.allocator = c->allocator;
     CZ_DEFER(label_value.object.drop(label_value.allocator));
     Token token;
-    while ((result = preprocessor.next(c, &file_index, &token, &label_value)).is_ok()) {
+    while ((result = preprocessor.next(c, &file_location, &token, &label_value)).is_ok()) {
         if (result.type == Result::Done) {
             result.type = Result::Success;
             break;

@@ -5,11 +5,13 @@
 TEST_CASE("next_character() empty file") {
     red::FileBuffer file_buffer;
 
-    size_t index = 0;
-    char ch = red::next_character(file_buffer, &index);
+    red::Location location = {};
+    char ch = red::next_character(file_buffer, &location);
 
     REQUIRE(ch == '\0');
-    REQUIRE(index == 0);
+    REQUIRE(location.index == 0);
+    REQUIRE(location.line == 0);
+    REQUIRE(location.column == 0);
 }
 
 TEST_CASE("next_character() normal chars") {
@@ -19,22 +21,24 @@ TEST_CASE("next_character() normal chars") {
     file_buffer.buffers_len = 1;
     file_buffer.last_len = strlen(buffer);
 
-    size_t index = 0;
-    char ch = red::next_character(file_buffer, &index);
+    red::Location location = {};
+    char ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == 'a');
-    REQUIRE(index == 1);
+    REQUIRE(location.index == 1);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == 'b');
-    REQUIRE(index == 2);
+    REQUIRE(location.index == 2);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == 'c');
-    REQUIRE(index == 3);
+    REQUIRE(location.index == 3);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '\0');
-    REQUIRE(index == 3);
+    REQUIRE(location.index == 3);
+    REQUIRE(location.line == 0);
+    REQUIRE(location.column == 3);
 }
 
 TEST_CASE("next_character() trigraph") {
@@ -44,11 +48,13 @@ TEST_CASE("next_character() trigraph") {
     file_buffer.buffers_len = 1;
     file_buffer.last_len = strlen(buffer);
 
-    size_t index = 0;
-    char ch = red::next_character(file_buffer, &index);
+    red::Location location = {};
+    char ch = red::next_character(file_buffer, &location);
 
     REQUIRE(ch == '{');
-    REQUIRE(index == 3);
+    REQUIRE(location.index == 3);
+    REQUIRE(location.line == 0);
+    REQUIRE(location.column == 3); // @Fix: this fails right now
 }
 
 TEST_CASE("next_character() question mark chain no trigraphs") {
@@ -58,34 +64,34 @@ TEST_CASE("next_character() question mark chain no trigraphs") {
     file_buffer.buffers_len = 1;
     file_buffer.last_len = strlen(buffer);
 
-    size_t index = 0;
-    char ch = red::next_character(file_buffer, &index);
+    red::Location location = {};
+    char ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '?');
-    REQUIRE(index == 1);
+    REQUIRE(location.index == 1);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '?');
-    REQUIRE(index == 2);
+    REQUIRE(location.index == 2);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '?');
-    REQUIRE(index == 3);
+    REQUIRE(location.index == 3);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '?');
-    REQUIRE(index == 4);
+    REQUIRE(location.index == 4);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '?');
-    REQUIRE(index == 5);
+    REQUIRE(location.index == 5);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '?');
-    REQUIRE(index == 6);
+    REQUIRE(location.index == 6);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '\0');
-    REQUIRE(index == 6);
+    REQUIRE(location.index == 6);
 }
 
 TEST_CASE("next_character() backslash newline") {
@@ -94,11 +100,14 @@ TEST_CASE("next_character() backslash newline") {
     file_buffer.buffers = &buffer;
     file_buffer.buffers_len = 1;
     file_buffer.last_len = strlen(buffer);
-    size_t index = 0;
-    char ch = red::next_character(file_buffer, &index);
+
+    red::Location location = {};
+    char ch = red::next_character(file_buffer, &location);
 
     REQUIRE(ch == 'a');
-    REQUIRE(index == 3);
+    REQUIRE(location.index == 3);
+    REQUIRE(location.line == 1);
+    REQUIRE(location.column == 1);
 }
 
 TEST_CASE("next_character() backslash trigraph newline") {
@@ -108,11 +117,40 @@ TEST_CASE("next_character() backslash trigraph newline") {
     file_buffer.buffers_len = 1;
     file_buffer.last_len = strlen(buffer);
 
-    size_t index = 0;
-    char ch = red::next_character(file_buffer, &index);
+    red::Location location = {};
+    char ch = red::next_character(file_buffer, &location);
 
     REQUIRE(ch == 'a');
-    REQUIRE(index == 5);
+    REQUIRE(location.index == 5);
+    REQUIRE(location.line == 1);
+    REQUIRE(location.column == 1);
+}
+
+TEST_CASE("next_character() newline") {
+    red::FileBuffer file_buffer;
+    char* buffer = (char*)"a\nb";
+    file_buffer.buffers = &buffer;
+    file_buffer.buffers_len = 1;
+    file_buffer.last_len = strlen(buffer);
+
+    red::Location location = {};
+    char ch = red::next_character(file_buffer, &location);
+    REQUIRE(ch == 'a');
+    REQUIRE(location.index == 1);
+    REQUIRE(location.line == 0);
+    REQUIRE(location.column == 1);
+
+    ch = red::next_character(file_buffer, &location);
+    REQUIRE(ch == '\n');
+    REQUIRE(location.index == 2);
+    REQUIRE(location.line == 1);
+    REQUIRE(location.column == 0);
+
+    ch = red::next_character(file_buffer, &location);
+    REQUIRE(ch == 'b');
+    REQUIRE(location.index == 3);
+    REQUIRE(location.line == 1);
+    REQUIRE(location.column == 1);
 }
 
 TEST_CASE("next_character() trigraph interrupted by backslash newline isn't a trigraph") {
@@ -122,22 +160,24 @@ TEST_CASE("next_character() trigraph interrupted by backslash newline isn't a tr
     file_buffer.buffers_len = 1;
     file_buffer.last_len = strlen(buffer);
 
-    size_t index = 0;
-    char ch = red::next_character(file_buffer, &index);
+    red::Location location = {};
+    char ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '?');
-    REQUIRE(index == 1);
+    REQUIRE(location.index == 1);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '?');
-    REQUIRE(index == 2);
+    REQUIRE(location.index == 2);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == '>');
-    REQUIRE(index == 5);
+    REQUIRE(location.index == 5);
 
-    ch = red::next_character(file_buffer, &index);
+    ch = red::next_character(file_buffer, &location);
     REQUIRE(ch == 'a');
-    REQUIRE(index == 6);
+    REQUIRE(location.index == 6);
+    REQUIRE(location.line == 1);
+    REQUIRE(location.column == 2);
 }
 
 TEST_CASE("next_character() backslash newline repeatedly handled") {
@@ -146,9 +186,12 @@ TEST_CASE("next_character() backslash newline repeatedly handled") {
     file_buffer.buffers = &buffer;
     file_buffer.buffers_len = 1;
     file_buffer.last_len = strlen(buffer);
-    size_t index = 0;
-    char ch = red::next_character(file_buffer, &index);
+
+    red::Location location = {};
+    char ch = red::next_character(file_buffer, &location);
 
     REQUIRE(ch == '0');
-    REQUIRE(index == 7);
+    REQUIRE(location.index == 7);
+    REQUIRE(location.line == 3);
+    REQUIRE(location.column == 1);
 }

@@ -2,18 +2,18 @@
 
 namespace red {
 
-char next_character(const FileBuffer& file_buffer, size_t* index) {
+char next_character(const FileBuffer& file_buffer, Location* location) {
     char buffer[3];
 top:
-    buffer[0] = file_buffer.get(*index);
+    buffer[0] = file_buffer.get(location->index);
     if (buffer[0] == '\0') {
         return buffer[0];
     }
 
     if (buffer[0] == '?') {
-        buffer[1] = file_buffer.get(*index + 1);
+        buffer[1] = file_buffer.get(location->index + 1);
         if (buffer[1] == '?') {
-            buffer[2] = file_buffer.get(*index + 2);
+            buffer[2] = file_buffer.get(location->index + 2);
             switch (buffer[2]) {
                 case '=':
                     buffer[0] = '#';
@@ -43,20 +43,30 @@ top:
                     buffer[0] = '~';
                     break;
                 default:
-                    ++*index;
+                    ++location->index;
                     return '?';
             }
-            *index += 2;
+            location->index += 2;
+            location->column += 2;
         }
     }
 
-    buffer[1] = file_buffer.get(*index + 1);
+    buffer[1] = file_buffer.get(location->index + 1);
     if (buffer[0] == '\\' && buffer[1] == '\n') {
-        *index += 2;
+        location->index += 2;
+        ++location->line;
+        location->column = 0;
         goto top;
     }
 
-    ++*index;
+    ++location->index;
+    if (buffer[0] == '\n') {
+        ++location->line;
+        location->column = 0;
+    } else {
+        ++location->column;
+    }
+
     return buffer[0];
 }
 

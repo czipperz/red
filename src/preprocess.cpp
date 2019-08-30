@@ -30,18 +30,18 @@ void Preprocessor::destroy(C* c) {
     include_stack.drop(c->allocator);
 }
 
-static void advance_over_whitespace(const FileBuffer& buffer, size_t* index) {
-    size_t point = *index;
+static void advance_over_whitespace(const FileBuffer& buffer, Location* location) {
+    Location point = *location;
     while (isspace(next_character(buffer, &point))) {
-        *index = point;
+        *location = point;
     }
 }
 
 static Result read_include(const FileBuffer& buffer,
-                           size_t* index,
+                           Location* location,
                            char target,
                            cz::mem::Allocated<cz::String>* output) {
-    size_t point = *index;
+    Location point = *location;
     char c = next_character(buffer, &point);
     while (c != target) {
         if (!c) {
@@ -51,22 +51,22 @@ static Result read_include(const FileBuffer& buffer,
         output->object.push(c);
         c = next_character(buffer, &point);
     }
-    *index = point;
+    *location = point;
     return Result::ok();
 }
 
 static Result process_include(C* c,
                               Preprocessor* p,
-                              FileIndex* index_out,
+                              FileLocation* location_out,
                               Token* token_out,
                               cz::mem::Allocated<cz::String>* label_value) {
-    FileIndex* point = &p->include_stack.last();
-    advance_over_whitespace(p->file_buffers[point->file], &point->index);
+    FileLocation* point = &p->include_stack.last();
+    advance_over_whitespace(p->file_buffers[point->file], &point->location);
 
-    size_t index_backup = point->index;
-    char ch = next_character(p->file_buffers[point->file], &point->index);
+    Location backup = point->location;
+    char ch = next_character(p->file_buffers[point->file], &point->location);
     if (ch != '<' && ch != '"') {
-        point->index = index_backup;
+        point->location = backup;
         CZ_PANIC("Unimplemented #include macro");
     }
 
@@ -81,7 +81,7 @@ static Result process_include(C* c,
     }
     size_t offset = file_name.object.len();
 
-    CZ_TRY(read_include(p->file_buffers[point->file], &point->index, ch == '<' ? '>' : '"',
+    CZ_TRY(read_include(p->file_buffers[point->file], &point->location, ch == '<' ? '>' : '"',
                         &file_name));
     CZ_LOG(c, Information, "Including '",
            cz::Str{file_name.object.buffer() + offset, file_name.object.len() - offset}, '\'');
@@ -144,41 +144,42 @@ static Result process_include(C* c,
 
     p->push(c, file_name.object.buffer(), file_buffer);
 
-    return p->next(c, index_out, token_out, label_value);
+    return p->next(c, location_out, token_out, label_value);
 }
 
 static Result process_token(C* c,
                             Preprocessor* p,
-                            FileIndex* index_out,
+                            FileLocation* location_out,
                             Token* token,
                             cz::mem::Allocated<cz::String>* label_value,
                             bool at_bol);
 
 static Result process_pragma(C* c,
                              Preprocessor* p,
-                             FileIndex* index_out,
+                             FileLocation* location_out,
                              Token* token_out,
                              cz::mem::Allocated<cz::String>* label_value) {
-    FileIndex* point = &p->include_stack.last();
+    FileLocation* point = &p->include_stack.last();
     bool at_bol = false;
-    if (!next_token(p->file_buffers[point->file], &point->index, token_out, &at_bol, label_value)) {
+    if (!next_token(p->file_buffers[point->file], &point->location, token_out, &at_bol,
+                    label_value)) {
         // ignore #pragma
-        return p->next(c, index_out, token_out, label_value);
+        return p->next(c, location_out, token_out, label_value);
     }
 
     if (at_bol) {
         // #pragma is ignored
-        return process_token(c, p, index_out, token_out, label_value, at_bol);
+        return process_token(c, p, location_out, token_out, label_value, at_bol);
     }
 
     if (token_out->type == Token::Label && label_value->object == "once") {
         p->file_pragma_once[point->file] = true;
 
         at_bol = false;
-        if (!next_token(p->file_buffers[point->file], &point->index, token_out, &at_bol,
+        if (!next_token(p->file_buffers[point->file], &point->location, token_out, &at_bol,
                         label_value)) {
             // #pragma once \EOF
-            return p->next(c, index_out, token_out, label_value);
+            return p->next(c, location_out, token_out, label_value);
         }
 
         if (!at_bol) {
@@ -186,7 +187,7 @@ static Result process_pragma(C* c,
         }
 
         // done processing the #pragma once so get the next token
-        return process_token(c, p, index_out, token_out, label_value, at_bol);
+        return process_token(c, p, location_out, token_out, label_value, at_bol);
     }
 
     CZ_PANIC("#pragma unhandled");  // @UserError
@@ -194,15 +195,15 @@ static Result process_pragma(C* c,
 
 static Result process_token(C* c,
                             Preprocessor* p,
-                            FileIndex* index_out,
+                            FileLocation* location_out,
                             Token* token_out,
                             cz::mem::Allocated<cz::String>* label_value,
                             bool at_bol) {
 top:
-    FileIndex* point = &p->include_stack.last();
+    FileLocation* point = &p->include_stack.last();
     if (at_bol && token_out->type == Token::Hash) {
         at_bol = false;
-        if (next_token(p->file_buffers[point->file], &point->index, token_out, &at_bol,
+        if (next_token(p->file_buffers[point->file], &point->location, token_out, &at_bol,
                        label_value)) {
             if (at_bol) {
                 // #\n is ignored
@@ -211,10 +212,10 @@ top:
 
             if (token_out->type == Token::Label) {
                 if (label_value->object == "include") {
-                    return process_include(c, p, index_out, token_out, label_value);
+                    return process_include(c, p, location_out, token_out, label_value);
                 }
                 if (label_value->object == "pragma") {
-                    return process_pragma(c, p, index_out, token_out, label_value);
+                    return process_pragma(c, p, location_out, token_out, label_value);
                 }
             }
 
@@ -222,39 +223,40 @@ top:
         }
     }
 
-    *index_out = *point;
+    *location_out = *point;
     return Result::ok();
 }
 
 Result Preprocessor::next(C* c,
-                          FileIndex* index_out,
+                          FileLocation* location_out,
                           Token* token_out,
                           cz::mem::Allocated<cz::String>* label_value) {
     if (include_stack.len() == 0) {
         return Result::done();
     }
 
-    FileIndex* point = &include_stack.last();
-    while (point->index == file_buffers[point->file].len()) {
+    FileLocation* point = &include_stack.last();
+    while (point->location.index == file_buffers[point->file].len()) {
     pop_include:
         include_stack.pop();
 
         if (include_stack.len() == 0) {
-            *index_out = *point;
+            *location_out = *point;
             return Result::done();
         }
 
         point = &include_stack.last();
     }
 
-    bool at_bol = point->index == 0;
-    if (next_token(file_buffers[point->file], &point->index, token_out, &at_bol, label_value)) {
-        return process_token(c, this, index_out, token_out, label_value, at_bol);
+    bool at_bol = point->location.index == 0;
+    if (next_token(file_buffers[point->file], &point->location, token_out, &at_bol, label_value)) {
+        return process_token(c, this, location_out, token_out, label_value, at_bol);
     } else {
-        CZ_DEBUG_ASSERT(point->index <= file_buffers[point->file].len());
-        if (point->index < file_buffers[point->file].len()) {
-            CZ_LOG(c, Error, "Invalid input: ", file_buffers[point->file].get(point->index), " at ",
-                   point->index);
+        CZ_DEBUG_ASSERT(point->location.index <= file_buffers[point->file].len());
+        if (point->location.index < file_buffers[point->file].len()) {
+            CZ_LOG(c, Error,
+                   "Invalid input: ", file_buffers[point->file].get(point->location.index), " at ",
+                   point->location.index);
             return {Result::ErrorInvalidInput};
         }
         goto pop_include;

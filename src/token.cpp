@@ -7,13 +7,13 @@
 namespace red {
 
 bool next_token(const FileBuffer& file_buffer,
-                size_t* index,
+                Location* location,
                 Token* token_out,
                 bool* at_bol,
                 cz::mem::Allocated<cz::String>* label_value) {
-    size_t point = *index;
+    Location point = *location;
 top:
-    const size_t start = point;
+    const Location start = point;
     char c = next_character(file_buffer, &point);
     switch (c) {
         case '(':
@@ -35,7 +35,7 @@ top:
             token_out->type = Token::CloseSquare;
             break;
         case '<': {
-            *index = point;
+            *location = point;
             char next = next_character(file_buffer, &point);
             if (next == '=') {
                 token_out->type = Token::LessEqual;
@@ -45,22 +45,22 @@ top:
                 token_out->type = Token::OpenCurly;
             } else {
                 token_out->type = Token::LessThan;
-                point = *index;
+                point = *location;
             }
             break;
         }
         case '>': {
-            *index = point;
+            *location = point;
             if (next_character(file_buffer, &point) == '=') {
                 token_out->type = Token::GreaterEqual;
             } else {
                 token_out->type = Token::GreaterThan;
-                point = *index;
+                point = *location;
             }
             break;
         }
         case ':': {
-            *index = point;
+            *location = point;
             char next = next_character(file_buffer, &point);
             if (next == '>') {
                 token_out->type = Token::CloseSquare;
@@ -68,12 +68,12 @@ top:
                 token_out->type = Token::Namespace;
             } else {
                 token_out->type = Token::Colon;
-                point = *index;
+                point = *location;
             }
             break;
         }
         case '%': {
-            *index = point;
+            *location = point;
             if (next_character(file_buffer, &point) == '>') {
                 token_out->type = Token::CloseCurly;
             } else {
@@ -83,12 +83,12 @@ top:
             break;
         }
         case '=':
-            *index = point;
+            *location = point;
             if (next_character(file_buffer, &point) == '=') {
                 token_out->type = Token::Equals;
             } else {
                 token_out->type = Token::Set;
-                point = *index;
+                point = *location;
             }
             break;
         case '.':
@@ -104,13 +104,13 @@ top:
             token_out->type = Token::Minus;
             break;
         case '/':
-            *index = point;
+            *location = point;
             c = next_character(file_buffer, &point);
             if (c == '*') {
                 char c = next_character(file_buffer, &point);
                 while (1) {
                     if (!c) {
-                        *index = point;
+                        *location = point;
                         CZ_PANIC("Error: Unterminated block comment");  // @UserError
                         return false;
                     }
@@ -121,11 +121,11 @@ top:
                     }
                     c = next;
                 }
-                *index = point;
+                *location = point;
                 goto top;
             } else {
                 token_out->type = Token::Divide;
-                point = *index;
+                point = *location;
             }
             break;
         case '*':
@@ -138,25 +138,25 @@ top:
             token_out->type = Token::Not;
             break;
         case '#': {
-            *index = point;
+            *location = point;
             if (next_character(file_buffer, &point) == '#') {
                 token_out->type = Token::HashHash;
             } else {
                 token_out->type = Token::Hash;
-                point = *index;
+                point = *location;
             }
             break;
         }
         case '"': {
             label_value->object.clear();
 
-            *index = point;
+            *location = point;
             c = next_character(file_buffer, &point);
             while (c && c != '"') {
                 label_value->object.reserve(label_value->allocator, 1);
                 label_value->object.push(c);
 
-                *index = point;
+                *location = point;
                 c = next_character(file_buffer, &point);
             }
 
@@ -173,7 +173,7 @@ top:
                 if (c == '\n') {
                     *at_bol = true;
                 }
-                *index = point;
+                *location = point;
                 goto top;
             }
 
@@ -184,10 +184,10 @@ top:
                     label_value->object.reserve(label_value->allocator, 1);
                     label_value->object.push(c);
 
-                    *index = point;
+                    *location = point;
                     c = next_character(file_buffer, &point);
                     if (!isalnum(c) && c != '_') {
-                        point = *index;
+                        point = *location;
                         break;
                     }
                 }
@@ -203,10 +203,10 @@ top:
                     label_value->object.reserve(label_value->allocator, 1);
                     label_value->object.push(c);
 
-                    *index = point;
+                    *location = point;
                     c = next_character(file_buffer, &point);
                     if (!isdigit(c)) {
-                        point = *index;
+                        point = *location;
                         break;
                     }
                 }
@@ -220,7 +220,7 @@ top:
 
     token_out->start = start;
     token_out->end = point;
-    *index = point;
+    *location = point;
     return true;
 }
 

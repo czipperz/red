@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <cz/string.hpp>
 #include "file_buffer.hpp"
+#include "location.hpp"
 
 namespace red {
 
@@ -35,8 +36,11 @@ struct Token {
         String,
         Label,
         Integer,
-    } type;
-    size_t start, end;
+    };
+
+    Type type;
+    Location start;
+    Location end;
 };
 
 /**
@@ -45,7 +49,7 @@ struct Token {
  * macro) Token::Hash starts a macro.
  */
 bool next_token(const FileBuffer& file_buffer,
-                size_t* index,
+                Location* location,
                 Token* token_out,
                 bool* at_bol,
                 cz::mem::Allocated<cz::String>* label_value);
