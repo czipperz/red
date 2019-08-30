@@ -15,19 +15,19 @@ static FILE* choose_file(cz::log::LogLevel level) {
     }
 }
 
-static cz::io::Result log_prefix(void*, const cz::log::LogInfo& info) {
+static cz::Result log_prefix(void*, const cz::log::LogInfo& info) {
     FILE* out = choose_file(info.level);
-    return cz::io::write(cz::io::file_writer(out), info.level, ": ");
+    return cz::write(cz::file_writer(out), info.level, ": ");
 }
 
-static cz::io::Result log_chunk(void*, const cz::log::LogInfo& info, cz::Str chunk) {
+static cz::Result log_chunk(void*, const cz::log::LogInfo& info, cz::Str chunk) {
     FILE* out = choose_file(info.level);
-    return cz::io::write(cz::io::file_writer(out), chunk);
+    return cz::write(cz::file_writer(out), chunk);
 }
 
-static cz::io::Result log_suffix(void*, const cz::log::LogInfo& info) {
+static cz::Result log_suffix(void*, const cz::log::LogInfo& info) {
     FILE* out = choose_file(info.level);
-    return cz::io::write(cz::io::file_writer(out), '\n');
+    return cz::write(cz::file_writer(out), '\n');
 }
 
 static Result run_main(C* c) {
@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
             return 0;
         }
     } catch (cz::PanicReachedException& e) {
-        e.log(&context);
+        CZ_LOG(&context, Fatal, e.what());
         return 2;
     }
 }

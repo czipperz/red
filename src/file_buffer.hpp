@@ -1,8 +1,8 @@
 #pragma once
 
 #include <stddef.h>
-#include <cz/io/write.hpp>
 #include <cz/mem/allocator.hpp>
+#include <cz/write.hpp>
 #include "result.hpp"
 
 namespace red {
@@ -43,9 +43,7 @@ struct FileBuffer {
 }
 
 namespace cz {
-namespace io {
 
 Result write(Writer, red::FileBuffer);
 
-}
 }
