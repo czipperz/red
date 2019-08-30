@@ -7,6 +7,8 @@ namespace cz {
 
 using Hash = uint32_t;
 
+void hash(Hash* hash, Str key);
+
 namespace impl {
 struct GenericStringMap {
     struct Entry {
@@ -41,8 +43,6 @@ struct GenericStringMap {
     Entry find(Str key, Hash key_hash);
 
     void drop(mem::AllocInfo info, mem::Allocator allocator);
-
-    static void hash(Hash* hash, Str key);
 };
 }
 
@@ -109,8 +109,6 @@ public:
 
     constexpr size_t count() const { return _count; }
     constexpr size_t cap() const { return _cap; }
-
-    using Generic::hash;
 };
 
 }

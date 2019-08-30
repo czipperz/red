@@ -5,6 +5,14 @@
 #include <cz/util.hpp>
 
 namespace cz {
+
+void hash(Hash* hash, Str key) {
+    for (size_t i = 0; i < key.len; ++i) {
+        *hash *= 31;
+        *hash += key[i];
+    }
+}
+
 namespace impl {
 
 static void bit_array_set(char* array, size_t index) {
@@ -198,13 +206,6 @@ void GenericStringMap::drop(mem::AllocInfo info, mem::Allocator allocator) {
     allocator.dealloc({_hashes, sizeof(Hash) * _cap});
     allocator.dealloc({_keys, sizeof(Str) * _cap});
     allocator.dealloc({_values, info.size * _cap});
-}
-
-void GenericStringMap::hash(Hash* hash, Str key) {
-    for (size_t i = 0; i < key.len; ++i) {
-        *hash *= 31;
-        *hash += key[i];
-    }
 }
 
 }
