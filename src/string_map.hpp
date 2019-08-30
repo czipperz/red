@@ -26,7 +26,6 @@ struct GenericStringMap {
         }
 
         void insert_unchecked(size_t size, mem::Allocator allocator, const void* value);
-        void remove_unchecked(mem::Allocator allocator);
     };
 
     char* _masks = 0;
@@ -89,16 +88,6 @@ public:
             }
 
             return *value();
-        }
-
-        bool and_remove(mem::Allocator allocator) {
-            if (is_present()) {
-                entry.remove_unchecked(allocator);
-                entry._present = false;
-                return true;
-            } else {
-                return false;
-            }
         }
 
         Value* value() { return static_cast<Value*>(entry.value(sizeof(Value))); }

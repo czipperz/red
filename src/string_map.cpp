@@ -33,25 +33,15 @@ static size_t bit_array_alloc_size(size_t bits) {
 }
 
 static void mask_set_present(char* masks, size_t index) {
-    bit_array_set(masks, 2 * index);
-    bit_array_unset(masks, 2 * index + 1);
-}
-
-static void mask_set_tombstone(char* masks, size_t index) {
-    bit_array_unset(masks, 2 * index);
-    bit_array_set(masks, 2 * index + 1);
+    bit_array_set(masks, index);
 }
 
 static bool mask_is_present(char* masks, size_t index) {
-    return bit_array_get(masks, 2 * index);
-}
-
-static bool mask_is_tombstone(char* masks, size_t index) {
-    return bit_array_get(masks, 2 * index + 1);
+    return bit_array_get(masks, index);
 }
 
 static size_t mask_alloc_size(size_t cap) {
-    return bit_array_alloc_size(cap * 2);
+    return bit_array_alloc_size(cap);
 }
 
 static void insert_unchecked_inner(GenericStringMap::Entry* entry,
@@ -143,11 +133,10 @@ GenericStringMap::Entry GenericStringMap::find(Str key, Hash key_hash) {
     }
 
     size_t start = key_hash % _cap;
-    size_t free_index = _cap;
     size_t index = start;
 
-    while (1) {
-        if (mask_is_present(_masks, index) && _hashes[index] == key_hash) {
+    while (mask_is_present(_masks, index)) {
+        if (_hashes[index] == key_hash) {
             // @Speed: We could remove this check if we don't care about hash collisions.
             if (_keys[index] == key) {
                 Entry entry;
@@ -159,28 +148,6 @@ GenericStringMap::Entry GenericStringMap::find(Str key, Hash key_hash) {
                 entry._has_space = true;
                 return entry;
             }
-        }
-
-        // check if position could be inserted into
-        if (mask_is_tombstone(_masks, index) || !mask_is_present(_masks, index)) {
-            if (free_index == _cap) {
-                free_index = index;
-            }
-        }
-
-        // if neither present or tombstone, then key is not in the map
-        if (!mask_is_tombstone(_masks, index) && !mask_is_present(_masks, index)) {
-            // case above must trigger as present is not set
-            CZ_DEBUG_ASSERT(free_index == index);
-
-            Entry entry;
-            entry._map = this;
-            entry._key = key;
-            entry._hash = key_hash;
-            entry._index = free_index;
-            entry._present = false;
-            entry._has_space = true;
-            return entry;
         }
 
         ++index;
@@ -200,6 +167,16 @@ GenericStringMap::Entry GenericStringMap::find(Str key, Hash key_hash) {
             return entry;
         }
     }
+
+    // since we can't remove, first open position is where we insert
+    Entry entry;
+    entry._map = this;
+    entry._key = key;
+    entry._hash = key_hash;
+    entry._index = index;
+    entry._present = false;
+    entry._has_space = true;
+    return entry;
 }
 
 void GenericStringMap::Entry::insert_unchecked(size_t size,
@@ -208,13 +185,6 @@ void GenericStringMap::Entry::insert_unchecked(size_t size,
     auto key = _key.duplicate(allocator).as_str();
     insert_unchecked_inner(this, size, key, value);
     ++_map->_count;
-}
-
-void GenericStringMap::Entry::remove_unchecked(mem::Allocator allocator) {
-    auto key = _map->_keys[_index];
-    allocator.dealloc({const_cast<char*>(key.buffer), key.len});
-    mask_set_tombstone(_map->_masks, _index);
-    --_map->_count;
 }
 
 void GenericStringMap::drop(mem::AllocInfo info, mem::Allocator allocator) {

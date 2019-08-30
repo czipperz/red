@@ -59,7 +59,6 @@ TEST_CASE("StringMap find empty map") {
     REQUIRE_FALSE(entry.is_present());
     REQUIRE_FALSE(entry.can_insert());
     REQUIRE(entry.and_set(3) == nullptr);
-    REQUIRE_FALSE(entry.and_remove(allocator));
 }
 
 TEST_CASE("StringMap finds spot immediately") {
@@ -73,7 +72,6 @@ TEST_CASE("StringMap finds spot immediately") {
     REQUIRE_FALSE(entry.is_present());
     REQUIRE(entry.can_insert());
     REQUIRE(entry.and_set(3) == nullptr);
-    REQUIRE_FALSE(entry.and_remove(allocator));
 
     REQUIRE(entry.or_insert(allocator, 3) == 3);
 
@@ -153,22 +151,6 @@ TEST_CASE("StringMap after reserve can find #2") {
 
     REQUIRE(map.find("a").value() != nullptr);
     REQUIRE(*map.find("a").value() == 3);
-    REQUIRE(map.find("c").value() != nullptr);
-    REQUIRE(*map.find("c").value() == -42);
-}
-
-TEST_CASE("StringMap insert insert collision remove") {
-    StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
-    CZ_DEFER(map.drop(allocator));
-
-    map.reserve(allocator, 2);
-
-    map.find("a").or_insert(allocator, 3);
-    map.find("c").or_insert(allocator, -42);  // With the current hash algorithm this collides
-    map.find("a").and_remove(allocator);
-
-    REQUIRE_FALSE(map.find("a").is_present());
     REQUIRE(map.find("c").value() != nullptr);
     REQUIRE(*map.find("c").value() == -42);
 }
