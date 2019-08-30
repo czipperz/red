@@ -6,7 +6,9 @@
 namespace red {
 
 struct CompilerError {
-    Location location;
+    size_t file;
+    Location start;
+    Location end;
     cz::String message;
 };
 
