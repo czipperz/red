@@ -2,7 +2,7 @@
 
 #include <cz/vector.hpp>
 #include "context.hpp"
-#include "file_buffer.hpp"
+#include "files.hpp"
 #include "location.hpp"
 #include "string_map.hpp"
 #include "token.hpp"
@@ -10,8 +10,7 @@
 namespace red {
 
 struct Preprocessor {
-    cz::SmallVector<FileBuffer, 0> file_buffers;
-    cz::SmallVector<const char*, 0> file_names;
+    Files files;
     cz::SmallVector<bool, 0> file_pragma_once;
 
     cz::SmallVector<FileLocation, 0> include_stack;
