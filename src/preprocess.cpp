@@ -26,8 +26,17 @@ void Preprocessor::destroy(C* c) {
         file_buffers[i].drop(c->allocator, c->allocator);
     }
     file_buffers.drop(c->allocator);
+
+    // @TODO: Remove when we change file names to use multi arena allocator.
+    for (size_t i = 1; i < file_names.len(); ++i) {
+        cz::Str file_name(file_names[i]);
+        c->allocator.dealloc({const_cast<char*>(file_name.buffer), file_name.len});
+    }
     file_names.drop(c->allocator);
+    file_pragma_once.drop(c->allocator);
+
     include_stack.drop(c->allocator);
+    definitions.drop(c->allocator);
 }
 
 static void advance_over_whitespace(const FileBuffer& buffer, Location* location) {
@@ -70,8 +79,8 @@ static Result process_include(C* c,
         CZ_PANIC("Unimplemented #include macro");
     }
 
-    // @LEAK: we are going to just leak this memory until we get a multi arena rolling
     cz::mem::Allocated<cz::String> file_name;
+    // @TODO: Use a multi arena allocator here instead of fragmenting it.
     file_name.allocator = c->allocator;
 
     if (ch == '"') {
@@ -134,12 +143,15 @@ static Result process_include(C* c,
                 CZ_LOG(c, Information, "Contents: \n", file_buffer);
                 file_name.object.drop(file_name.allocator);
                 file_name = temp;
+                break;
             } else {
                 temp.object.clear();
+                CZ_DEBUG_ASSERT(file_buffer.len() == 0);
             }
         }
 
         if (file_buffer.len() == 0) {
+            temp.object.drop(temp.allocator);
             c->report_error(point->file, start, end, "Couldn't include file '", included_file_name,
                             "'");
             return {Result::ErrorInvalidInput};
