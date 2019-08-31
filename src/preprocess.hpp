@@ -10,7 +10,6 @@
 namespace red {
 
 struct Preprocessor {
-    Files files;
     cz::SmallVector<bool, 0> file_pragma_once;
 
     cz::SmallVector<FileLocation, 0> include_stack;

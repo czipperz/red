@@ -2,6 +2,7 @@
 
 #include <cz/context.hpp>
 #include "compiler_error.hpp"
+#include "files.hpp"
 #include "options.hpp"
 
 namespace red {
@@ -9,6 +10,7 @@ namespace red {
 struct Context : cz::Context {
     const char* program_name;
     Options options;
+    Files files;
     cz::SmallVector<CompilerError, 0> errors;
 
     template <class... Ts>
