@@ -3,17 +3,17 @@
 #include <stdint.h>
 #include <cz/string.hpp>
 
-namespace cz {
+namespace red {
 
 using Hash = uint32_t;
 
-void hash(Hash* hash, Str key);
+void hash(Hash* hash, cz::Str key);
 
 namespace impl {
 struct GenericStringMap {
     struct Entry {
         GenericStringMap* _map;
-        Str _key;
+        cz::Str _key;
         Hash _hash;
         size_t _index;
         bool _present;
@@ -27,22 +27,22 @@ struct GenericStringMap {
             }
         }
 
-        void insert_unchecked(size_t size, mem::Allocator allocator, const void* value);
+        void insert_unchecked(size_t size, cz::mem::Allocator allocator, const void* value);
     };
 
     char* _masks = 0;
     Hash* _hashes = 0;
-    Str* _keys = 0;
+    cz::Str* _keys = 0;
     char* _values = 0;
     size_t _count = 0;
     size_t _cap = 0;
 
-    void reserve(mem::AllocInfo info, mem::Allocator allocator, size_t extra);
+    void reserve(cz::mem::AllocInfo info, cz::mem::Allocator allocator, size_t extra);
 
-    Entry find(Str key);
-    Entry find(Str key, Hash key_hash);
+    Entry find(cz::Str key);
+    Entry find(cz::Str key, Hash key_hash);
 
-    void drop(mem::AllocInfo info, mem::Allocator allocator);
+    void drop(cz::mem::AllocInfo info, cz::mem::Allocator allocator);
 };
 }
 
@@ -56,11 +56,11 @@ public:
         friend class StringMap;
 
     public:
-        Str key() const { return entry._key; }
+        cz::Str key() const { return entry._key; }
         bool is_present() const { return entry._present; }
         bool can_insert() const { return entry._has_space; }
 
-        Value& set(mem::Allocator allocator, const Value& value) {
+        Value& set(cz::mem::Allocator allocator, const Value& value) {
             if (is_present()) {
                 return *and_set(value);
             } else {
@@ -77,7 +77,7 @@ public:
             return v;
         }
 
-        Value& or_insert(mem::Allocator allocator, const Value& v) {
+        Value& or_insert(cz::mem::Allocator allocator, const Value& v) {
             if (!can_insert()) {
                 CZ_PANIC("StringMap::Entry::or_insert(): No space to insert");
             }
@@ -93,18 +93,18 @@ public:
         Value* value() { return static_cast<Value*>(entry.value(sizeof(Value))); }
     };
 
-    void reserve(mem::Allocator allocator, size_t extra) {
-        return Generic::reserve(mem::alloc_info<Value>(), allocator, extra);
+    void reserve(cz::mem::Allocator allocator, size_t extra) {
+        return Generic::reserve(cz::mem::alloc_info<Value>(), allocator, extra);
     }
 
-    Entry find(Str key) {
+    Entry find(cz::Str key) {
         Entry entry;
         entry.entry = Generic::find(key);
         return entry;
     }
 
-    void drop(mem::Allocator allocator) {
-        return Generic::drop(mem::alloc_info<Value>(), allocator);
+    void drop(cz::mem::Allocator allocator) {
+        return Generic::drop(cz::mem::alloc_info<Value>(), allocator);
     }
 
     constexpr size_t count() const { return _count; }

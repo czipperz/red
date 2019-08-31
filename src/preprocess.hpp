@@ -13,7 +13,7 @@ struct Preprocessor {
     cz::SmallVector<bool, 0> file_pragma_once;
 
     cz::SmallVector<FileLocation, 0> include_stack;
-    cz::StringMap<cz::SmallVector<Token, 0>> definitions;
+    red::StringMap<Definition> definitions;
 
     Result push(C* c, const char* file_name, FileBuffer file_contents);
     void destroy(C* c);

@@ -7,6 +7,7 @@
 #include "string_map.hpp"
 
 using namespace cz;
+using namespace red;
 
 TEST_CASE("StringMap construction") {
     StringMap<int> map;

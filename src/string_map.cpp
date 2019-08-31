@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <cz/util.hpp>
 
-namespace cz {
+namespace red {
 
-void hash(Hash* hash, Str key) {
+void hash(Hash* hash, cz::Str key) {
     for (size_t i = 0; i < key.len; ++i) {
         *hash *= 31;
         *hash += key[i];
@@ -54,7 +54,7 @@ static size_t mask_alloc_size(size_t cap) {
 
 static void insert_unchecked_inner(GenericStringMap::Entry* entry,
                                    size_t size,
-                                   Str key,
+                                   cz::Str key,
                                    const void* value) {
     size_t index = entry->_index;
     mask_set_present(entry->_map->_masks, index);
@@ -63,9 +63,11 @@ static void insert_unchecked_inner(GenericStringMap::Entry* entry,
     memcpy(&entry->_map->_values[index * size], value, size);
 }
 
-void GenericStringMap::reserve(mem::AllocInfo info, mem::Allocator allocator, size_t extra) {
+void GenericStringMap::reserve(cz::mem::AllocInfo info,
+                               cz::mem::Allocator allocator,
+                               size_t extra) {
     if (_cap - _count < extra) {
-        size_t new_cap = max(_cap * 2, _count + extra);
+        size_t new_cap = cz::max(_cap * 2, _count + extra);
 
         char* new_masks = static_cast<char*>(allocator.alloc({mask_alloc_size(new_cap), 1}).buffer);
         CZ_ASSERT(new_masks);
@@ -75,8 +77,8 @@ void GenericStringMap::reserve(mem::AllocInfo info, mem::Allocator allocator, si
             static_cast<Hash*>(allocator.alloc({sizeof(Hash) * new_cap, alignof(Hash)}).buffer);
         CZ_ASSERT(new_hashes != nullptr);
 
-        Str* new_keys =
-            static_cast<Str*>(allocator.alloc({sizeof(Str) * new_cap, alignof(Str)}).buffer);
+        cz::Str* new_keys = static_cast<cz::Str*>(
+            allocator.alloc({sizeof(cz::Str) * new_cap, alignof(cz::Str)}).buffer);
         CZ_ASSERT(new_keys != nullptr);
 
         char* new_values =
@@ -104,7 +106,7 @@ void GenericStringMap::reserve(mem::AllocInfo info, mem::Allocator allocator, si
 
             allocator.dealloc({_masks, mask_alloc_size(_cap)});
             allocator.dealloc({_hashes, sizeof(Hash) * _cap});
-            allocator.dealloc({_keys, sizeof(Str) * _cap});
+            allocator.dealloc({_keys, sizeof(cz::Str) * _cap});
             allocator.dealloc({_values, info.size * _cap});
         }
 
@@ -112,7 +114,7 @@ void GenericStringMap::reserve(mem::AllocInfo info, mem::Allocator allocator, si
     }
 }
 
-static GenericStringMap::Entry empty_entry(GenericStringMap* map, Str key, Hash hash) {
+static GenericStringMap::Entry empty_entry(GenericStringMap* map, cz::Str key, Hash hash) {
     GenericStringMap::Entry entry;
     entry._map = map;
     entry._key = key;
@@ -123,7 +125,7 @@ static GenericStringMap::Entry empty_entry(GenericStringMap* map, Str key, Hash 
     return entry;
 }
 
-GenericStringMap::Entry GenericStringMap::find(Str key) {
+GenericStringMap::Entry GenericStringMap::find(cz::Str key) {
     if (_cap == 0) {
         return empty_entry(this, key, 0);
     }
@@ -135,7 +137,7 @@ GenericStringMap::Entry GenericStringMap::find(Str key) {
     return find(key, key_hash);
 }
 
-GenericStringMap::Entry GenericStringMap::find(Str key, Hash key_hash) {
+GenericStringMap::Entry GenericStringMap::find(cz::Str key, Hash key_hash) {
     if (_cap == 0) {
         return empty_entry(this, key, key_hash);
     }
@@ -188,23 +190,23 @@ GenericStringMap::Entry GenericStringMap::find(Str key, Hash key_hash) {
 }
 
 void GenericStringMap::Entry::insert_unchecked(size_t size,
-                                               mem::Allocator allocator,
+                                               cz::mem::Allocator allocator,
                                                const void* value) {
     auto key = _key.duplicate(allocator).as_str();
     insert_unchecked_inner(this, size, key, value);
     ++_map->_count;
 }
 
-void GenericStringMap::drop(mem::AllocInfo info, mem::Allocator allocator) {
+void GenericStringMap::drop(cz::mem::AllocInfo info, cz::mem::Allocator allocator) {
     for (size_t i = 0; i < _cap; ++i) {
-        const Str& key = _keys[i];
+        const cz::Str& key = _keys[i];
         if (mask_is_present(_masks, i)) {
             allocator.dealloc({const_cast<char*>(key.buffer), key.len});
         }
     }
     allocator.dealloc({_masks, mask_alloc_size(_cap)});
     allocator.dealloc({_hashes, sizeof(Hash) * _cap});
-    allocator.dealloc({_keys, sizeof(Str) * _cap});
+    allocator.dealloc({_keys, sizeof(cz::Str) * _cap});
     allocator.dealloc({_values, info.size * _cap});
 }
 
