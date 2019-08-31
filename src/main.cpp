@@ -77,6 +77,7 @@ int main(int argc, char** argv) {
     if (context.options.parse(&context, argc, argv) != 0) {
         return 1;
     }
+    CZ_DEFER(context.errors.drop(context.allocator));
 
     return try_run_main(&context);
 }
