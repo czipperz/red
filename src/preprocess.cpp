@@ -283,9 +283,10 @@ Result Preprocessor::next(C* c,
     } else {
         CZ_DEBUG_ASSERT(point->location.index <= file_buffers[point->file].len());
         if (point->location.index < file_buffers[point->file].len()) {
-            CZ_LOG(c, Error,
-                   "Invalid input: ", file_buffers[point->file].get(point->location.index), " at ",
-                   point->location.index);
+            Location end = point->location;
+            next_character(file_buffers[point->file], &end);
+            c->report_error(point->file, point->location, end, "Invalid input '",
+                            file_buffers[point->file].get(point->location.index), "'");
             return {Result::ErrorInvalidInput};
         }
         goto pop_include;
