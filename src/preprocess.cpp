@@ -183,14 +183,31 @@ static Result process_pragma(C* c,
         }
 
         if (!at_bol) {
-            CZ_PANIC("#pragma once has trailing tokens");  // @UserError
+            c->report_error(point->file, token_out->start, token_out->end,
+                            "#pragma once has trailing tokens");
+
+            // eat until eof
+            at_bol = false;
+            while (!at_bol && next_token(p->file_buffers[point->file], &point->location, token_out,
+                                         &at_bol, label_value)) {
+            }
         }
 
         // done processing the #pragma once so get the next token
         return process_token(c, p, location_out, token_out, label_value, at_bol);
     }
 
-    CZ_PANIC("#pragma unhandled");  // @UserError
+    auto start = token_out->start;
+
+    // eat until eof
+    at_bol = false;
+    while (!at_bol && next_token(p->file_buffers[point->file], &point->location, token_out, &at_bol,
+                                 label_value)) {
+    }
+
+    c->report_error(point->file, start, token_out->end, "Unknown #pragma");
+
+    return process_token(c, p, location_out, token_out, label_value, at_bol);
 }
 
 static Result process_token(C* c,
