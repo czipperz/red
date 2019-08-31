@@ -60,11 +60,16 @@ int main(int argc, char** argv) {
 
     try {
         Result result = run_main(&context);
+
+        for (size_t i = 0; i < context.errors.len(); ++i) {
+            CZ_LOG(&context, Error, context.errors[i].message);
+        }
+
         if (result.is_err()) {
             CZ_LOG(&context, Error, "Error code ", result.type);
             return 1;
         } else {
-            return 0;
+            return context.errors.len() > 0;
         }
     } catch (cz::PanicReachedException& e) {
         CZ_LOG(&context, Fatal, e.what());
