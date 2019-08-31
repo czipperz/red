@@ -23,17 +23,6 @@ Result Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
 }
 
 void Preprocessor::destroy(C* c) {
-    for (size_t i = 0; i < c->files.buffers.len(); ++i) {
-        c->files.buffers[i].drop(c->allocator, c->allocator);
-    }
-    c->files.buffers.drop(c->allocator);
-
-    // @TODO: Remove when we change file names to use multi arena allocator.
-    for (size_t i = 1; i < c->files.names.len(); ++i) {
-        cz::Str file_name(c->files.names[i]);
-        c->allocator.dealloc({const_cast<char*>(file_name.buffer), file_name.len});
-    }
-    c->files.names.drop(c->allocator);
     file_pragma_once.drop(c->allocator);
 
     include_stack.drop(c->allocator);

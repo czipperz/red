@@ -88,6 +88,10 @@ int main(int argc, char** argv) {
         context.errors.drop(context.allocator);
     });
 
+    // @TODO: Change second allocator here (name allocator) when we change file
+    // names to use multi arena allocator.
+    CZ_DEFER(context.files.destroy(context.allocator, context.allocator));
+
     return try_run_main(&context);
 }
 
