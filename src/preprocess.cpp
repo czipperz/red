@@ -13,10 +13,11 @@ Result Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
     file_pragma_once.reserve(c->allocator, 1);
     include_stack.reserve(c->allocator, 1);
 
-    include_stack.push({c->files.buffers.len()});
+    size_t file = c->files.buffers.len();
     c->files.buffers.push(file_buffer);
     c->files.names.push(file_name);
     file_pragma_once.push(false);
+    include_stack.push({file, {}});
 
     return Result::ok();
 }
