@@ -49,19 +49,48 @@ static int try_run_main(C* c) {
             cz::write(cz::cerr(), "Error: ", name, ":", error.start.line + 1, ":",
                       error.start.column + 1, ": ", c->errors[i].message, ":\n");
 
-            cz::write(cz::cerr(), "  ");
-            // @Speed: Can optimize this by writing out entire chunks.  I doubt
-            // this is a problem for performance though.
-            for (size_t i = error.start.index - error.start.column; i < error.end.index; ++i) {
+            cz::write(cz::cerr(), "~   ");
+
+            size_t line = error.start.line;
+            size_t line_start = error.start.index - error.start.column;
+            for (size_t i = line_start;; ++i) {
                 cz::write(cz::cerr(), buffer.get(i));
+
                 if (buffer.get(i) == '\n') {
-                    cz::write(cz::cerr(), "  ");
+                    cz::write(cz::cerr(), "    ");
+
+                    size_t j = 0;
+                    if (line == error.start.line) {
+                        for (; j < error.start.column; ++j) {
+                            cz::write(cz::cerr(), ' ');
+                        }
+                    }
+
+                    if (line == error.end.line) {
+                        for (; j < error.end.column; ++j) {
+                            cz::write(cz::cerr(), '^');
+                        }
+                    } else {
+                        for (; buffer.get(j + line_start) != '\n'; ++j) {
+                            cz::write(cz::cerr(), '^');
+                        }
+                    }
+
+                    cz::write(cz::cerr(), '\n');
+                    if (i < error.end.index) {
+                        cz::write(cz::cerr(), "~   ");
+                    }
+
+                    ++line;
+                    line_start = i + 1;
+                }
+
+                if (i >= error.end.index && buffer.get(i) == '\n') {
+                    break;
                 }
             }
-            for (size_t i = error.end.index; buffer.get(i) && buffer.get(i) != '\n'; ++i) {
-                cz::write(cz::cerr(), buffer.get(i));
-            }
-            cz::write(cz::cerr(), "\n\n");
+
+            cz::write(cz::cerr(), '\n');
         }
 
         if (result.is_err()) {
