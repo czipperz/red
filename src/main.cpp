@@ -43,10 +43,6 @@ static int try_run_main(C* c) {
         Result result = run_main(c);
 
         for (size_t i = 0; i < c->errors.len(); ++i) {
-            if (i != 0) {
-                cz::write(cz::cerr(), '\n');
-            }
-
             const CompilerError& error = c->errors[i];
             const FileBuffer& buffer = c->files.buffers[error.file];
             const char* name = c->files.names[error.file];
@@ -65,7 +61,7 @@ static int try_run_main(C* c) {
             for (size_t i = error.end.index; buffer.get(i) && buffer.get(i) != '\n'; ++i) {
                 cz::write(cz::cerr(), buffer.get(i));
             }
-            cz::write(cz::cerr(), '\n');
+            cz::write(cz::cerr(), "\n\n");
         }
 
         if (result.is_err()) {
