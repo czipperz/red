@@ -81,8 +81,11 @@ static Result process_include(C* c,
     }
     size_t offset = file_name.object.len();
 
+    Location start = point->location;
     CZ_TRY(read_include(p->file_buffers[point->file], &point->location, ch == '<' ? '>' : '"',
                         &file_name));
+    Location end = point->location;
+
     CZ_LOG(c, Information, "Including '",
            cz::Str{file_name.object.buffer() + offset, file_name.object.len() - offset}, '\'');
 
@@ -137,7 +140,8 @@ static Result process_include(C* c,
         }
 
         if (file_buffer.len() == 0) {
-            CZ_LOG(c, Error, "Couldn't include file '", included_file_name, "'");
+            c->report_error(point->file, start, end, "Couldn't include file '", included_file_name,
+                            "'");
             return {Result::ErrorInvalidInput};
         }
     }
