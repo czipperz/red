@@ -37,6 +37,26 @@ static Result run_main(C* c) {
     return Result::ok();
 }
 
+static int try_run_main(C* c) {
+    try {
+        Result result = run_main(c);
+
+        for (size_t i = 0; i < c->errors.len(); ++i) {
+            CZ_LOG(c, Error, c->errors[i].message);
+        }
+
+        if (result.is_err()) {
+            CZ_LOG(c, Error, "Error code ", result.type);
+            return 1;
+        } else {
+            return c->errors.len() > 0;
+        }
+    } catch (cz::PanicReachedException& e) {
+        CZ_LOG(c, Fatal, e.what());
+        return 2;
+    }
+}
+
 int main(int argc, char** argv) {
     char* program_name = argv[0];
     argc--;
@@ -58,23 +78,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    try {
-        Result result = run_main(&context);
-
-        for (size_t i = 0; i < context.errors.len(); ++i) {
-            CZ_LOG(&context, Error, context.errors[i].message);
-        }
-
-        if (result.is_err()) {
-            CZ_LOG(&context, Error, "Error code ", result.type);
-            return 1;
-        } else {
-            return context.errors.len() > 0;
-        }
-    } catch (cz::PanicReachedException& e) {
-        CZ_LOG(&context, Fatal, e.what());
-        return 2;
-    }
+    return try_run_main(&context);
 }
 
 }
