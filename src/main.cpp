@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cz/assert.hpp>
 #include <cz/logger.hpp>
 #include <cz/mem/heap.hpp>
@@ -92,7 +93,25 @@ int main(int argc, char** argv) {
     // names to use multi arena allocator.
     CZ_DEFER(context.files.destroy(context.allocator, context.allocator));
 
-    return try_run_main(&context);
+    auto start_time = std::chrono::high_resolution_clock::now();
+    int code = try_run_main(&context);
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    size_t bytes = 0;
+    for (size_t i = 0; i < context.files.buffers.len(); ++i) {
+        bytes += context.files.buffers[i].len();
+    }
+    CZ_LOG(&context, Information, "Bytes processed: ", bytes);
+
+    auto duration = end_time - start_time;
+    using time_t = std::chrono::microseconds;
+    auto as_micros = std::chrono::duration_cast<time_t>(duration).count();
+    auto seconds = as_micros / time_t::period::den;
+    auto micros = as_micros % time_t::period::den;
+
+    CZ_LOG(&context, Information, "Elapsed: ", seconds, ".", micros, "s");
+
+    return code;
 }
 
 }
