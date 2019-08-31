@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
     auto seconds = as_micros / time_t::period::den;
     auto micros = as_micros % time_t::period::den;
 
-    CZ_LOG(&context, Information, "Elapsed: ", seconds, ".", micros, "s");
+    CZ_LOG(&context, Information, "Elapsed: ", seconds, ".", cz::format::width(6, micros), "s");
 
     return code;
 }
