@@ -69,15 +69,24 @@ int main(int argc, char** argv) {
     Context context;
     context.allocator = cz::mem::heap_allocator();
     context.temp = &temp;
+
     static const cz::log::Logger::VTable log_vtable = {log_prefix, log_chunk, log_suffix};
     context.logger = {&log_vtable, NULL};
     context.max_log_level = cz::log::LogLevel::Debug;
+
     context.program_name = program_name;
+
     CZ_DEFER(context.options.destroy(&context));
     if (context.options.parse(&context, argc, argv) != 0) {
         return 1;
     }
-    CZ_DEFER(context.errors.drop(context.allocator));
+
+    CZ_DEFER({
+        for (size_t i = 0; i < context.errors.len(); ++i) {
+            context.errors[i].message.drop(context.allocator);
+        }
+        context.errors.drop(context.allocator);
+    });
 
     return try_run_main(&context);
 }
