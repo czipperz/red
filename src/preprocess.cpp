@@ -85,19 +85,19 @@ static Result process_include(C* c,
                         &file_name));
     Location end = point->location;
 
-    CZ_LOG(c, Information, "Including '",
+    CZ_LOG(c, Debug, "Including '",
            cz::Str{file_name.object.buffer() + offset, file_name.object.len() - offset}, '\'');
 
     FileBuffer file_buffer;
     if (ch == '"') {
-        CZ_LOG(c, Information, "Trying '", file_name.object, "'");
+        CZ_LOG(c, Trace, "Trying '", file_name.object, "'");
         file_name.object.reserve(file_name.allocator, 1);
         *file_name.object.end() = '\0';
 
         // these allocators are probably going to change
         auto result = file_buffer.read(file_name.object.buffer(), c->allocator, c->allocator);
         if (result.is_ok()) {
-            CZ_LOG(c, Information, "Contents: \n", file_buffer);
+            CZ_LOG(c, Trace, "Contents: \n", file_buffer);
         } else {
             CZ_DEBUG_ASSERT(file_buffer.len() == 0);
         }
@@ -124,12 +124,12 @@ static Result process_include(C* c,
             temp.object.append(included_file_name);
             *temp.object.end() = '\0';
 
-            CZ_LOG(c, Information, "Trying '", temp.object, "'");
+            CZ_LOG(c, Trace, "Trying '", temp.object, "'");
 
             // these allocators are probably going to change
             auto result = file_buffer.read(temp.object.buffer(), c->allocator, c->allocator);
             if (result.is_ok()) {
-                CZ_LOG(c, Information, "Contents: \n", file_buffer);
+                CZ_LOG(c, Trace, "Contents: \n", file_buffer);
                 file_name.object.drop(file_name.allocator);
                 file_name = temp;
                 break;
