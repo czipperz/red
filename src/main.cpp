@@ -43,7 +43,29 @@ static int try_run_main(C* c) {
         Result result = run_main(c);
 
         for (size_t i = 0; i < c->errors.len(); ++i) {
-            CZ_LOG(c, Error, c->errors[i].message);
+            if (i != 0) {
+                cz::write(cz::cerr(), '\n');
+            }
+
+            const CompilerError& error = c->errors[i];
+            const FileBuffer& buffer = c->files.buffers[error.file];
+            const char* name = c->files.names[error.file];
+            cz::write(cz::cerr(), "Error: ", name, ":", error.start.line + 1, ":",
+                      error.start.column + 1, ": ", c->errors[i].message, ":\n");
+
+            cz::write(cz::cerr(), "  ");
+            // @Speed: Can optimize this by writing out entire chunks.  I doubt
+            // this is a problem for performance though.
+            for (size_t i = error.start.index - error.start.column; i < error.end.index; ++i) {
+                cz::write(cz::cerr(), buffer.get(i));
+                if (buffer.get(i) == '\n') {
+                    cz::write(cz::cerr(), "  ");
+                }
+            }
+            for (size_t i = error.end.index; buffer.get(i) && buffer.get(i) != '\n'; ++i) {
+                cz::write(cz::cerr(), buffer.get(i));
+            }
+            cz::write(cz::cerr(), '\n');
         }
 
         if (result.is_err()) {
