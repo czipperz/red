@@ -219,7 +219,15 @@ top:
                 }
             }
 
-            CZ_PANIC("user error: unknown preprocessor attribute");  // @UserError
+            c->report_error(point->file, token_out->start, token_out->end,
+                            "Unknown preprocessor attribute");
+
+            // eat until eof
+            at_bol = false;
+            while (!at_bol && next_token(p->file_buffers[point->file], &point->location, token_out,
+                                         &at_bol, label_value)) {
+            }
+            goto top;
         }
     }
 
