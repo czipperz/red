@@ -9,6 +9,12 @@
 
 namespace red {
 
+struct Definition {
+    cz::SmallVector<cz::Str, 0> parameters;
+    cz::SmallVector<Token, 0> tokens;
+    bool is_function;
+};
+
 struct Preprocessor {
     cz::SmallVector<bool, 0> file_pragma_once;
 
