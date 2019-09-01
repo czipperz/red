@@ -278,6 +278,30 @@ static Result process_ifdef(C* c,
     }
 }
 
+static Result process_else(C* c,
+                           Preprocessor* p,
+                           FileLocation* location_out,
+                           Token* token_out,
+                           cz::mem::Allocated<cz::String>* label_value) {
+    CZ_PANIC("Unimplemented");
+}
+
+static Result process_endif(C* c,
+                            Preprocessor* p,
+                            FileLocation* location_out,
+                            Token* token_out,
+                            cz::mem::Allocated<cz::String>* label_value) {
+    CZ_PANIC("Unimplemented");
+}
+
+static Result process_define(C* c,
+                             Preprocessor* p,
+                             FileLocation* location_out,
+                             Token* token_out,
+                             cz::mem::Allocated<cz::String>* label_value) {
+    CZ_PANIC("Unimplemented");
+}
+
 static Result process_token(C* c,
                             Preprocessor* p,
                             FileLocation* location_out,
@@ -307,6 +331,15 @@ top:
                 }
                 if (label_value->object == "ifndef") {
                     return process_ifdef<false>(c, p, location_out, token_out, label_value);
+                }
+                if (label_value->object == "else") {
+                    return process_else(c, p, location_out, token_out, label_value);
+                }
+                if (label_value->object == "endif") {
+                    return process_endif(c, p, location_out, token_out, label_value);
+                }
+                if (label_value->object == "define") {
+                    return process_define(c, p, location_out, token_out, label_value);
                 }
             }
 
