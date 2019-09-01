@@ -215,30 +215,67 @@ static Result process_pragma(C* c,
     return process_token(c, p, location_out, token_out, label_value, at_bol);
 }
 
+static Result process_if_true(C* c,
+                              Preprocessor* p,
+                              FileLocation* location_out,
+                              Token* token_out,
+                              cz::mem::Allocated<cz::String>* label_value) {
+    FileLocation* point = &p->include_stack.last().location;
+    bool at_bol = false;
+    if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
+                    label_value)) {
+        c->report_error(point->file, point->location, point->location,
+                        "Unterminated preprocessing branch");
+        return {Result::ErrorInvalidInput};
+    }
+
+    return process_token(c, p, location_out, token_out, label_value, at_bol);
+}
+
+static Result process_if_false(C* c,
+                               Preprocessor* p,
+                               FileLocation* location_out,
+                               Token* token_out,
+                               cz::mem::Allocated<cz::String>* label_value) {
+    CZ_PANIC("Unimplemented");
+}
+
+template <bool want_present>
 static Result process_ifdef(C* c,
                             Preprocessor* p,
                             FileLocation* location_out,
                             Token* token_out,
                             cz::mem::Allocated<cz::String>* label_value) {
-    FileLocation* point = &p->include_stack.last().location;
-    Location backup = point->location;
-    bool at_bol = false;
-    if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
-                    label_value)) {
-        // ignore #pragma
-        return p->next(c, location_out, token_out, label_value);
-    }
+    Location ifdef_start = token_out->start;
+    Location ifdef_end = token_out->end;
 
-    if (at_bol) {
-        c->report_error(point->file, backup, point->location, "No macro to test");
+    PreprocessFileLocation* point = &p->include_stack.last();
+    Location backup = point->location.location;
+    bool at_bol = false;
+    if (!next_token(c->files.buffers[point->location.file], &point->location.location, token_out,
+                    &at_bol, label_value) ||
+        at_bol) {
+        c->report_error(point->location.file, backup, point->location.location, "No macro to test");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
     }
 
-    CZ_PANIC("Unimplemented");
+    if (token_out->type != Token::Label) {
+        c->report_error(point->location.file, backup, point->location.location,
+                        "Must test a macro name");
+        // It doesn't make sense to continue after #if because we can't deduce
+        // which branch to include.
+        return {Result::ErrorInvalidInput};
+    }
 
-    return Result::ok();
+    point->if_depth++;
+
+    if (p->definitions.find(label_value->object).is_present() == want_present) {
+        return process_if_true(c, p, location_out, token_out, label_value);
+    } else {
+        return process_if_false(c, p, location_out, token_out, label_value);
+    }
 }
 
 static Result process_token(C* c,
@@ -266,7 +303,10 @@ top:
                     return process_pragma(c, p, location_out, token_out, label_value);
                 }
                 if (label_value->object == "ifdef") {
-                    return process_ifdef(c, p, location_out, token_out, label_value);
+                    return process_ifdef<true>(c, p, location_out, token_out, label_value);
+                }
+                if (label_value->object == "ifndef") {
+                    return process_ifdef<false>(c, p, location_out, token_out, label_value);
                 }
             }
 
