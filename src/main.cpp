@@ -94,13 +94,12 @@ static int try_run_main(C* c) {
         }
 
         if (result.is_err()) {
-            CZ_LOG(c, Error, "Error code ", result.type);
             return 1;
         } else {
             return c->errors.len() > 0;
         }
     } catch (cz::PanicReachedException& e) {
-        CZ_LOG(c, Fatal, e.what());
+        CZ_LOG(c, Fatal, "Compiler crash: ", e.what());
         return 2;
     }
 }
