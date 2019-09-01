@@ -59,7 +59,7 @@ static Result process_include(C* c,
                               FileLocation* location_out,
                               Token* token_out,
                               cz::mem::Allocated<cz::String>* label_value) {
-    FileLocation* point = &p->include_stack.last();
+    FileLocation* point = &p->include_stack.last().location;
     advance_over_whitespace(c->files.buffers[point->file], &point->location);
 
     Location backup = point->location;
@@ -164,7 +164,7 @@ static Result process_pragma(C* c,
                              FileLocation* location_out,
                              Token* token_out,
                              cz::mem::Allocated<cz::String>* label_value) {
-    FileLocation* point = &p->include_stack.last();
+    FileLocation* point = &p->include_stack.last().location;
     bool at_bol = false;
     if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
                     label_value)) {
@@ -220,7 +220,7 @@ static Result process_ifdef(C* c,
                             FileLocation* location_out,
                             Token* token_out,
                             cz::mem::Allocated<cz::String>* label_value) {
-    FileLocation* point = &p->include_stack.last();
+    FileLocation* point = &p->include_stack.last().location;
     Location backup = point->location;
     bool at_bol = false;
     if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
@@ -248,7 +248,7 @@ static Result process_token(C* c,
                             cz::mem::Allocated<cz::String>* label_value,
                             bool at_bol) {
 top:
-    FileLocation* point = &p->include_stack.last();
+    FileLocation* point = &p->include_stack.last().location;
     if (at_bol && token_out->type == Token::Hash) {
         at_bol = false;
         if (next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
@@ -294,7 +294,7 @@ Result Preprocessor::next(C* c,
         return Result::done();
     }
 
-    FileLocation* point = &include_stack.last();
+    FileLocation* point = &include_stack.last().location;
     while (point->location.index == c->files.buffers[point->file].len()) {
     pop_include:
         include_stack.pop();
@@ -304,7 +304,7 @@ Result Preprocessor::next(C* c,
             return Result::done();
         }
 
-        point = &include_stack.last();
+        point = &include_stack.last().location;
     }
 
     bool at_bol = point->location.index == 0;

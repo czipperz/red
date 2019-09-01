@@ -15,10 +15,15 @@ struct Definition {
     bool is_function;
 };
 
+struct PreprocessFileLocation {
+    FileLocation location;
+    size_t if_depth;
+};
+
 struct Preprocessor {
     cz::SmallVector<bool, 0> file_pragma_once;
 
-    cz::SmallVector<FileLocation, 0> include_stack;
+    cz::SmallVector<PreprocessFileLocation, 0> include_stack;
     red::StringMap<Definition> definitions;
 
     Result push(C* c, const char* file_name, FileBuffer file_contents);
