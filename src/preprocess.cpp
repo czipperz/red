@@ -215,6 +215,32 @@ static Result process_pragma(C* c,
     return process_token(c, p, location_out, token_out, label_value, at_bol);
 }
 
+static Result process_ifdef(C* c,
+                            Preprocessor* p,
+                            FileLocation* location_out,
+                            Token* token_out,
+                            cz::mem::Allocated<cz::String>* label_value) {
+    FileLocation* point = &p->include_stack.last();
+    Location backup = point->location;
+    bool at_bol = false;
+    if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
+                    label_value)) {
+        // ignore #pragma
+        return p->next(c, location_out, token_out, label_value);
+    }
+
+    if (at_bol) {
+        c->report_error(point->file, backup, point->location, "No macro to test");
+        // It doesn't make sense to continue after #if because we can't deduce
+        // which branch to include.
+        return {Result::ErrorInvalidInput};
+    }
+
+    CZ_PANIC("Unimplemented");
+
+    return Result::ok();
+}
+
 static Result process_token(C* c,
                             Preprocessor* p,
                             FileLocation* location_out,
@@ -238,6 +264,9 @@ top:
                 }
                 if (label_value->object == "pragma") {
                     return process_pragma(c, p, location_out, token_out, label_value);
+                }
+                if (label_value->object == "ifdef") {
+                    return process_ifdef(c, p, location_out, token_out, label_value);
                 }
             }
 
