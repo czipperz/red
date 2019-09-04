@@ -20,6 +20,7 @@ struct Definition {
 struct PreprocessFileLocation {
     FileLocation location;
     size_t if_depth;
+    size_t if_skip_depth;
 };
 
 struct Preprocessor {
