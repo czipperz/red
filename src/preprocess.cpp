@@ -7,7 +7,7 @@
 
 namespace red {
 
-Result Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
+void Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
     c->files.buffers.reserve(c->allocator, 1);
     c->files.names.reserve(c->allocator, 1);
     file_pragma_once.reserve(c->allocator, 1);
@@ -19,8 +19,6 @@ Result Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
     file_pragma_once.push(false);
     FileLocation location = {file, {}};
     include_stack.push({location});
-
-    return Result::ok();
 }
 
 void Preprocessor::destroy(C* c) {

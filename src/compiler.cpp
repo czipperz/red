@@ -13,7 +13,7 @@ Result compile_file(C* c, const char* file_name) {
 
     Preprocessor preprocessor;
     CZ_DEFER(preprocessor.destroy(c));
-    CZ_TRY(preprocessor.push(c, file_name, file_buffer));
+    preprocessor.push(c, file_name, file_buffer);
 
     FileLocation file_location;
     Result result;

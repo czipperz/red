@@ -29,7 +29,7 @@ struct Preprocessor {
     cz::Vector<IncludeInfo> include_stack;
     red::StringMap<Definition> definitions;
 
-    Result push(C* c, const char* file_name, FileBuffer file_contents);
+    void push(C* c, const char* file_name, FileBuffer file_contents);
     void destroy(C* c);
 
     Result next(C* c,
