@@ -284,7 +284,22 @@ static Result process_else(C* c,
                            FileLocation* location_out,
                            Token* token_out,
                            cz::mem::Allocated<cz::String>* label_value) {
-    CZ_PANIC("Unimplemented");
+    IncludeInfo* point = &p->include_stack.last();
+    if (point->if_skip_depth > 1) {
+        // skip forward until #endif as we are inside #if 0
+    } else if (point->if_skip_depth == 1) {
+        // include after the #else
+        point->if_skip_depth = 0;
+    } else {
+        // skip until #endif
+        point->if_skip_depth = 1;
+    }
+
+    bool at_bol = false;
+    while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location.location,
+                                 token_out, &at_bol, label_value)) {
+    }
+    return process_token(c, p, location_out, token_out, label_value, at_bol);
 }
 
 static Result process_endif(C* c,
