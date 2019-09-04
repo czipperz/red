@@ -17,7 +17,8 @@ Result Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
     c->files.buffers.push(file_buffer);
     c->files.names.push(file_name);
     file_pragma_once.push(false);
-    include_stack.push({file, {}});
+    FileLocation location = {file, {}};
+    include_stack.push({location});
 
     return Result::ok();
 }
