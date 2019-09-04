@@ -54,4 +54,8 @@ bool next_token(const FileBuffer& file_buffer,
                 bool* at_bol,
                 cz::mem::Allocated<cz::String>* label_value);
 
+constexpr bool token_has_value(Token::Type type) {
+    return type == Token::Label || type == Token::String || type == Token::Integer;
+}
+
 }
