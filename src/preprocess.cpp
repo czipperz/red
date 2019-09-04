@@ -335,6 +335,9 @@ static Result process_define(C* c,
         return process_token(c, p, location_out, token_out, label_value, at_bol);
     }
 
+    cz::String definition_name = label_value->object.clone(c->allocator);
+    CZ_DEFER(definition_name.drop(c->allocator));
+
     Definition definition;
     definition.is_function = false;
 
@@ -352,10 +355,8 @@ static Result process_define(C* c,
         definition.token_values.push(val);
     }
 
-    CZ_PANIC("Unimplemented");
-
     p->definitions.reserve(c->allocator, 1);
-    auto entry = p->definitions.find(label_value->object);
+    auto entry = p->definitions.find(definition_name);
     entry.set(c->allocator, definition);
     return Result::ok();
 }
