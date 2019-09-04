@@ -374,7 +374,8 @@ static Result process_define(C* c,
     p->definitions.reserve(c->allocator, 1);
     auto entry = p->definitions.find(definition_name);
     entry.set(c->allocator, definition);
-    return Result::ok();
+
+    return process_token(c, p, location_out, token_out, label_value, at_bol);
 }
 
 static Result process_token(C* c,
