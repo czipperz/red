@@ -11,6 +11,7 @@ namespace red {
 
 struct Definition {
     cz::Vector<Token> tokens;
+    cz::Vector<cz::String> token_values;
     cz::Vector<cz::Str> parameters;
     bool is_function;
     bool has_varargs;
