@@ -10,8 +10,8 @@
 namespace red {
 
 struct Definition {
-    cz::SmallVector<cz::Str, 0> parameters;
-    cz::SmallVector<Token, 0> tokens;
+    cz::Vector<cz::Str> parameters;
+    cz::Vector<Token> tokens;
     bool is_function;
 };
 
@@ -21,9 +21,9 @@ struct PreprocessFileLocation {
 };
 
 struct Preprocessor {
-    cz::SmallVector<bool, 0> file_pragma_once;
+    cz::Vector<bool> file_pragma_once;
 
-    cz::SmallVector<PreprocessFileLocation, 0> include_stack;
+    cz::Vector<PreprocessFileLocation> include_stack;
     red::StringMap<Definition> definitions;
 
     Result push(C* c, const char* file_name, FileBuffer file_contents);

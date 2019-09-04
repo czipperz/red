@@ -7,8 +7,8 @@
 namespace red {
 
 struct Files {
-    cz::SmallVector<FileBuffer, 0> buffers;
-    cz::SmallVector<const char*, 0> names;
+    cz::Vector<FileBuffer> buffers;
+    cz::Vector<const char*> names;
 
     void destroy(cz::mem::Allocator buffers_allocator, cz::mem::Allocator names_allocator);
 };

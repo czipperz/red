@@ -11,7 +11,7 @@ struct Context : cz::Context {
     const char* program_name;
     Options options;
     Files files;
-    cz::SmallVector<CompilerError, 0> errors;
+    cz::Vector<CompilerError> errors;
 
     template <class... Ts>
     void report_error(size_t file, Location start, Location end, Ts... ts) {
