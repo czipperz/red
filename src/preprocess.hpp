@@ -10,9 +10,10 @@
 namespace red {
 
 struct Definition {
-    cz::Vector<cz::Str> parameters;
     cz::Vector<Token> tokens;
+    cz::Vector<cz::Str> parameters;
     bool is_function;
+    bool has_varargs;
 };
 
 struct PreprocessFileLocation {
