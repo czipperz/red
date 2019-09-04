@@ -299,7 +299,65 @@ static Result process_define(C* c,
                              FileLocation* location_out,
                              Token* token_out,
                              cz::mem::Allocated<cz::String>* label_value) {
+    Location start = token_out->start;
+    Location end = token_out->end;
+
+    PreprocessFileLocation* point = &p->include_stack.last();
+    Location backup = point->location.location;
+    bool at_bol = false;
+    if (!next_token(c->files.buffers[point->location.file], &point->location.location, token_out,
+                    &at_bol, label_value)) {
+        c->report_error(point->location.file, start, end, "Must give the macro a name");
+        at_bol = false;
+        while (!at_bol && next_token(c->files.buffers[point->location.file],
+                                     &point->location.location, token_out, &at_bol, label_value)) {
+        }
+        return process_token(c, p, location_out, token_out, label_value, at_bol);
+    }
+
+    if (at_bol) {
+        c->report_error(point->location.file, backup, point->location.location,
+                        "Must give the macro a name");
+        at_bol = false;
+        while (!at_bol && next_token(c->files.buffers[point->location.file],
+                                     &point->location.location, token_out, &at_bol, label_value)) {
+        }
+        return process_token(c, p, location_out, token_out, label_value, at_bol);
+    }
+
+    if (token_out->type != Token::Label) {
+        c->report_error(point->location.file, token_out->start, token_out->end,
+                        "Must give the macro a name");
+        at_bol = false;
+        while (!at_bol && next_token(c->files.buffers[point->location.file],
+                                     &point->location.location, token_out, &at_bol, label_value)) {
+        }
+        return process_token(c, p, location_out, token_out, label_value, at_bol);
+    }
+
+    Definition definition;
+    definition.is_function = false;
+
+    at_bol = false;
+    while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location.location,
+                                 token_out, &at_bol, label_value)) {
+        definition.tokens.reserve(c->allocator, 1);
+        definition.token_values.reserve(c->allocator, 1);
+        cz::String val;
+        if (token_out->type == Token::Label && token_out->type == Token::String &&
+            token_out->type == Token::Integer) {
+            val = label_value->object.clone(c->allocator);
+        }
+        definition.tokens.push(*token_out);
+        definition.token_values.push(val);
+    }
+
     CZ_PANIC("Unimplemented");
+
+    p->definitions.reserve(c->allocator, 1);
+    auto entry = p->definitions.find(label_value->object);
+    entry.set(c->allocator, definition);
+    return Result::ok();
 }
 
 static Result process_token(C* c,
