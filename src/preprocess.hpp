@@ -17,7 +17,7 @@ struct Definition {
     bool has_varargs;
 };
 
-struct PreprocessFileLocation {
+struct IncludeInfo {
     FileLocation location;
     size_t if_depth;
     size_t if_skip_depth;
@@ -26,7 +26,7 @@ struct PreprocessFileLocation {
 struct Preprocessor {
     cz::Vector<bool> file_pragma_once;
 
-    cz::Vector<PreprocessFileLocation> include_stack;
+    cz::Vector<IncludeInfo> include_stack;
     red::StringMap<Definition> definitions;
 
     Result push(C* c, const char* file_name, FileBuffer file_contents);

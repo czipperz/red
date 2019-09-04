@@ -250,7 +250,7 @@ static Result process_ifdef(C* c,
     Location ifdef_start = token_out->start;
     Location ifdef_end = token_out->end;
 
-    PreprocessFileLocation* point = &p->include_stack.last();
+    IncludeInfo* point = &p->include_stack.last();
     Location backup = point->location.location;
     bool at_bol = false;
     if (!next_token(c->files.buffers[point->location.file], &point->location.location, token_out,
@@ -303,7 +303,7 @@ static Result process_define(C* c,
     Location start = token_out->start;
     Location end = token_out->end;
 
-    PreprocessFileLocation* point = &p->include_stack.last();
+    IncludeInfo* point = &p->include_stack.last();
     Location backup = point->location.location;
     bool at_bol = false;
     if (!next_token(c->files.buffers[point->location.file], &point->location.location, token_out,
