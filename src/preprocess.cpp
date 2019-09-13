@@ -17,7 +17,8 @@ void Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
     c->files.buffers.push(file_buffer);
     c->files.names.push(file_name);
     file_pragma_once.push(false);
-    FileLocation location = {file, {}};
+    Location location = {};
+    location.file = file;
     include_stack.push({location});
 }
 
@@ -28,7 +29,7 @@ void Preprocessor::destroy(C* c) {
     definitions.drop(c->allocator);
 }
 
-FileLocation Preprocessor::file_location() const {
+Location Preprocessor::location() const {
     return include_stack.last().location;
 }
 
@@ -61,13 +62,13 @@ static Result process_include(C* c,
                               Preprocessor* p,
                               Token* token_out,
                               cz::mem::Allocated<cz::String>* label_value) {
-    FileLocation* point = &p->include_stack.last().location;
-    advance_over_whitespace(c->files.buffers[point->file], &point->location);
+    Location* point = &p->include_stack.last().location;
+    advance_over_whitespace(c->files.buffers[point->file], point);
 
-    Location backup = point->location;
-    char ch = next_character(c->files.buffers[point->file], &point->location);
+    Location backup = *point;
+    char ch = next_character(c->files.buffers[point->file], point);
     if (ch != '<' && ch != '"') {
-        point->location = backup;
+        *point = backup;
         CZ_PANIC("Unimplemented #include macro");
     }
 
@@ -82,10 +83,9 @@ static Result process_include(C* c,
     }
     size_t offset = file_name.object.len();
 
-    Location start = point->location;
-    CZ_TRY(read_include(c->files.buffers[point->file], &point->location, ch == '<' ? '>' : '"',
-                        &file_name));
-    Location end = point->location;
+    Location start = *point;
+    CZ_TRY(read_include(c->files.buffers[point->file], point, ch == '<' ? '>' : '"', &file_name));
+    Location end = *point;
 
     CZ_LOG(c, Debug, "Including '",
            cz::Str{file_name.object.buffer() + offset, file_name.object.len() - offset}, '\'');
@@ -164,10 +164,9 @@ static Result process_pragma(C* c,
                              Preprocessor* p,
                              Token* token_out,
                              cz::mem::Allocated<cz::String>* label_value) {
-    FileLocation* point = &p->include_stack.last().location;
+    Location* point = &p->include_stack.last().location;
     bool at_bol = false;
-    if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
-                    label_value)) {
+    if (!next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
         // ignore #pragma
         return p->next(c, token_out, label_value);
     }
@@ -181,8 +180,7 @@ static Result process_pragma(C* c,
         p->file_pragma_once[point->file] = true;
 
         at_bol = false;
-        if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
-                        label_value)) {
+        if (!next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
             // #pragma once \EOF
             return p->next(c, token_out, label_value);
         }
@@ -193,8 +191,8 @@ static Result process_pragma(C* c,
 
             // eat until eof
             at_bol = false;
-            while (!at_bol && next_token(c->files.buffers[point->file], &point->location, token_out,
-                                         &at_bol, label_value)) {
+            while (!at_bol && next_token(c->files.buffers[point->file], point, token_out, &at_bol,
+                                         label_value)) {
             }
         }
 
@@ -206,8 +204,8 @@ static Result process_pragma(C* c,
 
     // eat until eof
     at_bol = false;
-    while (!at_bol && next_token(c->files.buffers[point->file], &point->location, token_out,
-                                 &at_bol, label_value)) {
+    while (!at_bol &&
+           next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
     }
 
     c->report_error(point->file, start, token_out->end, "Unknown #pragma");
@@ -219,12 +217,10 @@ static Result process_if_true(C* c,
                               Preprocessor* p,
                               Token* token_out,
                               cz::mem::Allocated<cz::String>* label_value) {
-    FileLocation* point = &p->include_stack.last().location;
+    Location* point = &p->include_stack.last().location;
     bool at_bol = false;
-    if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
-                    label_value)) {
-        c->report_error(point->file, point->location, point->location,
-                        "Unterminated preprocessing branch");
+    if (!next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
+        c->report_error(point->file, *point, *point, "Unterminated preprocessing branch");
         return {Result::ErrorInvalidInput};
     }
 
@@ -247,20 +243,19 @@ static Result process_ifdef(C* c,
     Location ifdef_end = token_out->end;
 
     IncludeInfo* point = &p->include_stack.last();
-    Location backup = point->location.location;
+    Location backup = point->location;
     bool at_bol = false;
-    if (!next_token(c->files.buffers[point->location.file], &point->location.location, token_out,
-                    &at_bol, label_value) ||
+    if (!next_token(c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
+                    label_value) ||
         at_bol) {
-        c->report_error(point->location.file, backup, point->location.location, "No macro to test");
+        c->report_error(point->location.file, backup, point->location, "No macro to test");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
     }
 
     if (token_out->type != Token::Label) {
-        c->report_error(point->location.file, backup, point->location.location,
-                        "Must test a macro name");
+        c->report_error(point->location.file, backup, point->location, "Must test a macro name");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
@@ -291,7 +286,7 @@ static Result process_else(C* c,
     }
 
     bool at_bol = false;
-    while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location.location,
+    while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
                                  token_out, &at_bol, label_value)) {
     }
     return process_token(c, p, token_out, label_value, at_bol);
@@ -312,24 +307,24 @@ static Result process_define(C* c,
     Location end = token_out->end;
 
     IncludeInfo* point = &p->include_stack.last();
-    Location backup = point->location.location;
+    Location backup = point->location;
     bool at_bol = false;
-    if (!next_token(c->files.buffers[point->location.file], &point->location.location, token_out,
-                    &at_bol, label_value)) {
+    if (!next_token(c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
+                    label_value)) {
         c->report_error(point->location.file, start, end, "Must give the macro a name");
         at_bol = false;
-        while (!at_bol && next_token(c->files.buffers[point->location.file],
-                                     &point->location.location, token_out, &at_bol, label_value)) {
+        while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
+                                     token_out, &at_bol, label_value)) {
         }
         return process_token(c, p, token_out, label_value, at_bol);
     }
 
     if (at_bol) {
-        c->report_error(point->location.file, backup, point->location.location,
+        c->report_error(point->location.file, backup, point->location,
                         "Must give the macro a name");
         at_bol = false;
-        while (!at_bol && next_token(c->files.buffers[point->location.file],
-                                     &point->location.location, token_out, &at_bol, label_value)) {
+        while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
+                                     token_out, &at_bol, label_value)) {
         }
         return process_token(c, p, token_out, label_value, at_bol);
     }
@@ -338,8 +333,8 @@ static Result process_define(C* c,
         c->report_error(point->location.file, token_out->start, token_out->end,
                         "Must give the macro a name");
         at_bol = false;
-        while (!at_bol && next_token(c->files.buffers[point->location.file],
-                                     &point->location.location, token_out, &at_bol, label_value)) {
+        while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
+                                     token_out, &at_bol, label_value)) {
         }
         return process_token(c, p, token_out, label_value, at_bol);
     }
@@ -351,7 +346,7 @@ static Result process_define(C* c,
     definition.is_function = false;
 
     at_bol = false;
-    while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location.location,
+    while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
                                  token_out, &at_bol, label_value)) {
         definition.tokens.reserve(c->allocator, 1);
         definition.token_values.reserve(c->allocator, 1);
@@ -377,11 +372,10 @@ static Result process_token(C* c,
                             cz::mem::Allocated<cz::String>* label_value,
                             bool at_bol) {
 top:
-    FileLocation* point = &p->include_stack.last().location;
+    Location* point = &p->include_stack.last().location;
     if (at_bol && token_out->type == Token::Hash) {
         at_bol = false;
-        if (next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
-                       label_value)) {
+        if (next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
             if (at_bol) {
                 // #\n is ignored
                 goto top;
@@ -416,8 +410,8 @@ top:
 
             // eat until eof
             at_bol = false;
-            while (!at_bol && next_token(c->files.buffers[point->file], &point->location, token_out,
-                                         &at_bol, label_value)) {
+            while (!at_bol && next_token(c->files.buffers[point->file], point, token_out, &at_bol,
+                                         label_value)) {
             }
             goto top;
         }
@@ -431,8 +425,8 @@ Result Preprocessor::next(C* c, Token* token_out, cz::mem::Allocated<cz::String>
         return Result::done();
     }
 
-    FileLocation* point = &include_stack.last().location;
-    while (point->location.index == c->files.buffers[point->file].len()) {
+    Location* point = &include_stack.last().location;
+    while (point->index == c->files.buffers[point->file].len()) {
     pop_include:
         include_stack.pop();
 
@@ -443,17 +437,16 @@ Result Preprocessor::next(C* c, Token* token_out, cz::mem::Allocated<cz::String>
         point = &include_stack.last().location;
     }
 
-    bool at_bol = point->location.index == 0;
-    if (next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
-                   label_value)) {
+    bool at_bol = point->index == 0;
+    if (next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
         return process_token(c, this, token_out, label_value, at_bol);
     } else {
-        CZ_DEBUG_ASSERT(point->location.index <= c->files.buffers[point->file].len());
-        if (point->location.index < c->files.buffers[point->file].len()) {
-            Location end = point->location;
+        CZ_DEBUG_ASSERT(point->index <= c->files.buffers[point->file].len());
+        if (point->index < c->files.buffers[point->file].len()) {
+            Location end = *point;
             next_character(c->files.buffers[point->file], &end);
-            c->report_error(point->file, point->location, end, "Invalid input '",
-                            c->files.buffers[point->file].get(point->location.index), "'");
+            c->report_error(point->file, *point, end, "Invalid input '",
+                            c->files.buffers[point->file].get(point->index), "'");
             return {Result::ErrorInvalidInput};
         }
         goto pop_include;

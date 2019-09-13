@@ -18,7 +18,7 @@ struct Definition {
 };
 
 struct IncludeInfo {
-    FileLocation location;
+    Location location;
     size_t if_depth;
     size_t if_skip_depth;
 };
@@ -34,7 +34,7 @@ struct Preprocessor {
 
     Result next(C* c, Token* token_out, cz::mem::Allocated<cz::String>* label_value);
 
-    FileLocation file_location() const;
+    Location location() const;
 };
 
 }
