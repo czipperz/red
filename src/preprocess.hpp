@@ -32,10 +32,9 @@ struct Preprocessor {
     void push(C* c, const char* file_name, FileBuffer file_contents);
     void destroy(C* c);
 
-    Result next(C* c,
-                FileLocation* location_out,
-                Token* token_out,
-                cz::mem::Allocated<cz::String>* label_value);
+    Result next(C* c, Token* token_out, cz::mem::Allocated<cz::String>* label_value);
+
+    FileLocation file_location() const;
 };
 
 }

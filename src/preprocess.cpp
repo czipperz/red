@@ -28,6 +28,10 @@ void Preprocessor::destroy(C* c) {
     definitions.drop(c->allocator);
 }
 
+FileLocation Preprocessor::file_location() const {
+    return include_stack.last().location;
+}
+
 static void advance_over_whitespace(const FileBuffer& buffer, Location* location) {
     Location point = *location;
     while (isspace(next_character(buffer, &point))) {
@@ -55,7 +59,6 @@ static Result read_include(const FileBuffer& buffer,
 
 static Result process_include(C* c,
                               Preprocessor* p,
-                              FileLocation* location_out,
                               Token* token_out,
                               cz::mem::Allocated<cz::String>* label_value) {
     FileLocation* point = &p->include_stack.last().location;
@@ -148,19 +151,17 @@ static Result process_include(C* c,
 
     p->push(c, file_name.object.buffer(), file_buffer);
 
-    return p->next(c, location_out, token_out, label_value);
+    return p->next(c, token_out, label_value);
 }
 
 static Result process_token(C* c,
                             Preprocessor* p,
-                            FileLocation* location_out,
                             Token* token,
                             cz::mem::Allocated<cz::String>* label_value,
                             bool at_bol);
 
 static Result process_pragma(C* c,
                              Preprocessor* p,
-                             FileLocation* location_out,
                              Token* token_out,
                              cz::mem::Allocated<cz::String>* label_value) {
     FileLocation* point = &p->include_stack.last().location;
@@ -168,12 +169,12 @@ static Result process_pragma(C* c,
     if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
                     label_value)) {
         // ignore #pragma
-        return p->next(c, location_out, token_out, label_value);
+        return p->next(c, token_out, label_value);
     }
 
     if (at_bol) {
         // #pragma is ignored
-        return process_token(c, p, location_out, token_out, label_value, at_bol);
+        return process_token(c, p, token_out, label_value, at_bol);
     }
 
     if (token_out->type == Token::Label && label_value->object == "once") {
@@ -183,7 +184,7 @@ static Result process_pragma(C* c,
         if (!next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
                         label_value)) {
             // #pragma once \EOF
-            return p->next(c, location_out, token_out, label_value);
+            return p->next(c, token_out, label_value);
         }
 
         if (!at_bol) {
@@ -198,7 +199,7 @@ static Result process_pragma(C* c,
         }
 
         // done processing the #pragma once so get the next token
-        return process_token(c, p, location_out, token_out, label_value, at_bol);
+        return process_token(c, p, token_out, label_value, at_bol);
     }
 
     auto start = token_out->start;
@@ -211,12 +212,11 @@ static Result process_pragma(C* c,
 
     c->report_error(point->file, start, token_out->end, "Unknown #pragma");
 
-    return process_token(c, p, location_out, token_out, label_value, at_bol);
+    return process_token(c, p, token_out, label_value, at_bol);
 }
 
 static Result process_if_true(C* c,
                               Preprocessor* p,
-                              FileLocation* location_out,
                               Token* token_out,
                               cz::mem::Allocated<cz::String>* label_value) {
     FileLocation* point = &p->include_stack.last().location;
@@ -228,12 +228,11 @@ static Result process_if_true(C* c,
         return {Result::ErrorInvalidInput};
     }
 
-    return process_token(c, p, location_out, token_out, label_value, at_bol);
+    return process_token(c, p, token_out, label_value, at_bol);
 }
 
 static Result process_if_false(C* c,
                                Preprocessor* p,
-                               FileLocation* location_out,
                                Token* token_out,
                                cz::mem::Allocated<cz::String>* label_value) {
     CZ_PANIC("Unimplemented");
@@ -242,7 +241,6 @@ static Result process_if_false(C* c,
 template <bool want_present>
 static Result process_ifdef(C* c,
                             Preprocessor* p,
-                            FileLocation* location_out,
                             Token* token_out,
                             cz::mem::Allocated<cz::String>* label_value) {
     Location ifdef_start = token_out->start;
@@ -271,15 +269,14 @@ static Result process_ifdef(C* c,
     point->if_depth++;
 
     if (p->definitions.find(label_value->object).is_present() == want_present) {
-        return process_if_true(c, p, location_out, token_out, label_value);
+        return process_if_true(c, p, token_out, label_value);
     } else {
-        return process_if_false(c, p, location_out, token_out, label_value);
+        return process_if_false(c, p, token_out, label_value);
     }
 }
 
 static Result process_else(C* c,
                            Preprocessor* p,
-                           FileLocation* location_out,
                            Token* token_out,
                            cz::mem::Allocated<cz::String>* label_value) {
     IncludeInfo* point = &p->include_stack.last();
@@ -297,12 +294,11 @@ static Result process_else(C* c,
     while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location.location,
                                  token_out, &at_bol, label_value)) {
     }
-    return process_token(c, p, location_out, token_out, label_value, at_bol);
+    return process_token(c, p, token_out, label_value, at_bol);
 }
 
 static Result process_endif(C* c,
                             Preprocessor* p,
-                            FileLocation* location_out,
                             Token* token_out,
                             cz::mem::Allocated<cz::String>* label_value) {
     CZ_PANIC("Unimplemented");
@@ -310,7 +306,6 @@ static Result process_endif(C* c,
 
 static Result process_define(C* c,
                              Preprocessor* p,
-                             FileLocation* location_out,
                              Token* token_out,
                              cz::mem::Allocated<cz::String>* label_value) {
     Location start = token_out->start;
@@ -326,7 +321,7 @@ static Result process_define(C* c,
         while (!at_bol && next_token(c->files.buffers[point->location.file],
                                      &point->location.location, token_out, &at_bol, label_value)) {
         }
-        return process_token(c, p, location_out, token_out, label_value, at_bol);
+        return process_token(c, p, token_out, label_value, at_bol);
     }
 
     if (at_bol) {
@@ -336,7 +331,7 @@ static Result process_define(C* c,
         while (!at_bol && next_token(c->files.buffers[point->location.file],
                                      &point->location.location, token_out, &at_bol, label_value)) {
         }
-        return process_token(c, p, location_out, token_out, label_value, at_bol);
+        return process_token(c, p, token_out, label_value, at_bol);
     }
 
     if (token_out->type != Token::Label) {
@@ -346,7 +341,7 @@ static Result process_define(C* c,
         while (!at_bol && next_token(c->files.buffers[point->location.file],
                                      &point->location.location, token_out, &at_bol, label_value)) {
         }
-        return process_token(c, p, location_out, token_out, label_value, at_bol);
+        return process_token(c, p, token_out, label_value, at_bol);
     }
 
     cz::String definition_name = label_value->object.clone(c->allocator);
@@ -373,12 +368,11 @@ static Result process_define(C* c,
     auto entry = p->definitions.find(definition_name);
     entry.set(c->allocator, definition);
 
-    return process_token(c, p, location_out, token_out, label_value, at_bol);
+    return process_token(c, p, token_out, label_value, at_bol);
 }
 
 static Result process_token(C* c,
                             Preprocessor* p,
-                            FileLocation* location_out,
                             Token* token_out,
                             cz::mem::Allocated<cz::String>* label_value,
                             bool at_bol) {
@@ -395,25 +389,25 @@ top:
 
             if (token_out->type == Token::Label) {
                 if (label_value->object == "include") {
-                    return process_include(c, p, location_out, token_out, label_value);
+                    return process_include(c, p, token_out, label_value);
                 }
                 if (label_value->object == "pragma") {
-                    return process_pragma(c, p, location_out, token_out, label_value);
+                    return process_pragma(c, p, token_out, label_value);
                 }
                 if (label_value->object == "ifdef") {
-                    return process_ifdef<true>(c, p, location_out, token_out, label_value);
+                    return process_ifdef<true>(c, p, token_out, label_value);
                 }
                 if (label_value->object == "ifndef") {
-                    return process_ifdef<false>(c, p, location_out, token_out, label_value);
+                    return process_ifdef<false>(c, p, token_out, label_value);
                 }
                 if (label_value->object == "else") {
-                    return process_else(c, p, location_out, token_out, label_value);
+                    return process_else(c, p, token_out, label_value);
                 }
                 if (label_value->object == "endif") {
-                    return process_endif(c, p, location_out, token_out, label_value);
+                    return process_endif(c, p, token_out, label_value);
                 }
                 if (label_value->object == "define") {
-                    return process_define(c, p, location_out, token_out, label_value);
+                    return process_define(c, p, token_out, label_value);
                 }
             }
 
@@ -429,14 +423,10 @@ top:
         }
     }
 
-    *location_out = *point;
     return Result::ok();
 }
 
-Result Preprocessor::next(C* c,
-                          FileLocation* location_out,
-                          Token* token_out,
-                          cz::mem::Allocated<cz::String>* label_value) {
+Result Preprocessor::next(C* c, Token* token_out, cz::mem::Allocated<cz::String>* label_value) {
     if (include_stack.len() == 0) {
         return Result::done();
     }
@@ -447,7 +437,6 @@ Result Preprocessor::next(C* c,
         include_stack.pop();
 
         if (include_stack.len() == 0) {
-            *location_out = *point;
             return Result::done();
         }
 
@@ -457,7 +446,7 @@ Result Preprocessor::next(C* c,
     bool at_bol = point->location.index == 0;
     if (next_token(c->files.buffers[point->file], &point->location, token_out, &at_bol,
                    label_value)) {
-        return process_token(c, this, location_out, token_out, label_value, at_bol);
+        return process_token(c, this, token_out, label_value, at_bol);
     } else {
         CZ_DEBUG_ASSERT(point->location.index <= c->files.buffers[point->file].len());
         if (point->location.index < c->files.buffers[point->file].len()) {
