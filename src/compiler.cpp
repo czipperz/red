@@ -16,7 +16,7 @@ Result compile_file(C* c, const char* file_name) {
     preprocessor.push(c, file_name, file_buffer);
 
     Result result;
-    cz::mem::Allocated<cz::String> label_value;
+    cz::Allocated<cz::String> label_value;
     label_value.allocator = c->allocator;
     CZ_DEFER(label_value.object.drop(label_value.allocator));
     Token token;

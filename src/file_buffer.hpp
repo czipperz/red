@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stddef.h>
-#include <cz/mem/allocator.hpp>
+#include <cz/allocator.hpp>
 #include <cz/write.hpp>
 #include "result.hpp"
 
@@ -19,10 +19,10 @@ struct FileBuffer {
     size_t last_len = 0;
 
     Result read(const char* cstr_file_name,
-                cz::mem::Allocator buffer_allocator,
-                cz::mem::Allocator buffers_allocator);
+                cz::Allocator buffer_allocator,
+                cz::Allocator buffers_allocator);
 
-    void drop(cz::mem::Allocator buffer_allocator, cz::mem::Allocator buffers_allocator);
+    void drop(cz::Allocator buffer_allocator, cz::Allocator buffers_allocator);
 
     char get(size_t index) const {
         const size_t outer = (index & outer_mask) >> buffer_size_bits;

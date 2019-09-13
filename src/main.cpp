@@ -1,32 +1,32 @@
 #include <chrono>
 #include <cz/assert.hpp>
-#include <cz/logger.hpp>
-#include <cz/mem/heap.hpp>
+#include <cz/heap.hpp>
+#include <cz/log.hpp>
 #include <cz/slice.hpp>
 #include "compiler.hpp"
 #include "context.hpp"
 
 namespace red {
 
-static FILE* choose_file(cz::log::LogLevel level) {
-    if (level < cz::log::LogLevel::Warning) {
+static FILE* choose_file(cz::LogLevel level) {
+    if (level < cz::LogLevel::Warning) {
         return stderr;
     } else {
         return stdout;
     }
 }
 
-static cz::Result log_prefix(void*, const cz::log::LogInfo& info) {
+static cz::Result log_prefix(void*, const cz::LogInfo& info) {
     FILE* out = choose_file(info.level);
     return cz::write(cz::file_writer(out), info.level, ": ");
 }
 
-static cz::Result log_chunk(void*, const cz::log::LogInfo& info, cz::Str chunk) {
+static cz::Result log_chunk(void*, const cz::LogInfo& info, cz::Str chunk) {
     FILE* out = choose_file(info.level);
     return cz::write(cz::file_writer(out), chunk);
 }
 
-static cz::Result log_suffix(void*, const cz::log::LogInfo& info) {
+static cz::Result log_suffix(void*, const cz::LogInfo& info) {
     FILE* out = choose_file(info.level);
     return cz::write(cz::file_writer(out), '\n');
 }
@@ -109,17 +109,17 @@ int main(int argc, char** argv) {
     argc--;
     argv++;
 
-    cz::mem::AlignedBuffer<4096> temp_buffer;
-    cz::mem::TempArena temp;
+    cz::AlignedBuffer<4096> temp_buffer;
+    cz::TempArena temp;
     temp.arena.mem = temp_buffer;
 
     Context context;
-    context.allocator = cz::mem::heap_allocator();
+    context.allocator = cz::heap_allocator();
     context.temp = &temp;
 
-    static const cz::log::Logger::VTable log_vtable = {log_prefix, log_chunk, log_suffix};
+    static const cz::Logger::VTable log_vtable = {log_prefix, log_chunk, log_suffix};
     context.logger = {&log_vtable, NULL};
-    context.max_log_level = cz::log::LogLevel::Debug;
+    context.max_log_level = cz::LogLevel::Debug;
 
     context.program_name = program_name;
 

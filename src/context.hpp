@@ -22,7 +22,7 @@ struct Context : cz::Context {
         error.start = start;
         error.end = end;
 
-        cz::mem::Allocated<cz::String> message;
+        cz::Allocated<cz::String> message;
         message.allocator = allocator;
         // ignore errors in return value
         cz::write(cz::string_writer(&message), ts...);

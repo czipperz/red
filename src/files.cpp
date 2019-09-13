@@ -2,7 +2,7 @@
 
 namespace red {
 
-void Files::destroy(cz::mem::Allocator buffers_allocator, cz::mem::Allocator names_allocator) {
+void Files::destroy(cz::Allocator buffers_allocator, cz::Allocator names_allocator) {
     for (size_t i = 0; i < buffers.len(); ++i) {
         buffers[i].drop(buffers_allocator, buffers_allocator);
     }

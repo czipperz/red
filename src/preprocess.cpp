@@ -1,8 +1,9 @@
 #include "preprocess.hpp"
 
+#include <ctype.h>
 #include <cz/assert.hpp>
 #include <cz/fs/directory.hpp>
-#include <cz/logger.hpp>
+#include <cz/log.hpp>
 #include "text_replacement.hpp"
 
 namespace red {
@@ -43,7 +44,7 @@ static void advance_over_whitespace(const FileBuffer& buffer, Location* location
 static Result read_include(const FileBuffer& buffer,
                            Location* location,
                            char target,
-                           cz::mem::Allocated<cz::String>* output) {
+                           cz::Allocated<cz::String>* output) {
     Location point = *location;
     char c = next_character(buffer, &point);
     while (c != target) {
@@ -61,7 +62,7 @@ static Result read_include(const FileBuffer& buffer,
 static Result process_include(C* c,
                               Preprocessor* p,
                               Token* token_out,
-                              cz::mem::Allocated<cz::String>* label_value) {
+                              cz::Allocated<cz::String>* label_value) {
     Location* point = &p->include_stack.last().location;
     advance_over_whitespace(c->files.buffers[point->file], point);
 
@@ -72,7 +73,7 @@ static Result process_include(C* c,
         CZ_PANIC("Unimplemented #include macro");
     }
 
-    cz::mem::Allocated<cz::String> file_name;
+    cz::Allocated<cz::String> file_name;
     // @TODO: Use a multi arena allocator here instead of fragmenting it.
     file_name.allocator = c->allocator;
 
@@ -109,7 +110,7 @@ static Result process_include(C* c,
         cz::Str included_file_name = {file_name.object.buffer() + offset,
                                       file_name.object.len() - offset};
 
-        cz::mem::Allocated<cz::String> temp;
+        cz::Allocated<cz::String> temp;
         temp.allocator = file_name.allocator;
 
         for (size_t i = c->options.include_paths.len(); file_buffer.len() == 0 && i > 0; --i) {
@@ -157,13 +158,13 @@ static Result process_include(C* c,
 static Result process_token(C* c,
                             Preprocessor* p,
                             Token* token,
-                            cz::mem::Allocated<cz::String>* label_value,
+                            cz::Allocated<cz::String>* label_value,
                             bool at_bol);
 
 static Result process_pragma(C* c,
                              Preprocessor* p,
                              Token* token_out,
-                             cz::mem::Allocated<cz::String>* label_value) {
+                             cz::Allocated<cz::String>* label_value) {
     Location* point = &p->include_stack.last().location;
     bool at_bol = false;
     if (!next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
@@ -216,7 +217,7 @@ static Result process_pragma(C* c,
 static Result process_if_true(C* c,
                               Preprocessor* p,
                               Token* token_out,
-                              cz::mem::Allocated<cz::String>* label_value) {
+                              cz::Allocated<cz::String>* label_value) {
     Location* point = &p->include_stack.last().location;
     bool at_bol = false;
     if (!next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
@@ -230,7 +231,7 @@ static Result process_if_true(C* c,
 static Result process_if_false(C* c,
                                Preprocessor* p,
                                Token* token_out,
-                               cz::mem::Allocated<cz::String>* label_value) {
+                               cz::Allocated<cz::String>* label_value) {
     CZ_PANIC("Unimplemented");
 }
 
@@ -238,7 +239,7 @@ template <bool want_present>
 static Result process_ifdef(C* c,
                             Preprocessor* p,
                             Token* token_out,
-                            cz::mem::Allocated<cz::String>* label_value) {
+                            cz::Allocated<cz::String>* label_value) {
     Location ifdef_start = token_out->start;
     Location ifdef_end = token_out->end;
 
@@ -273,7 +274,7 @@ static Result process_ifdef(C* c,
 static Result process_else(C* c,
                            Preprocessor* p,
                            Token* token_out,
-                           cz::mem::Allocated<cz::String>* label_value) {
+                           cz::Allocated<cz::String>* label_value) {
     IncludeInfo* point = &p->include_stack.last();
     if (point->if_skip_depth > 1) {
         // skip forward until #endif as we are inside #if 0
@@ -295,14 +296,14 @@ static Result process_else(C* c,
 static Result process_endif(C* c,
                             Preprocessor* p,
                             Token* token_out,
-                            cz::mem::Allocated<cz::String>* label_value) {
+                            cz::Allocated<cz::String>* label_value) {
     CZ_PANIC("Unimplemented");
 }
 
 static Result process_define(C* c,
                              Preprocessor* p,
                              Token* token_out,
-                             cz::mem::Allocated<cz::String>* label_value) {
+                             cz::Allocated<cz::String>* label_value) {
     Location start = token_out->start;
     Location end = token_out->end;
 
@@ -369,7 +370,7 @@ static Result process_define(C* c,
 static Result process_token(C* c,
                             Preprocessor* p,
                             Token* token_out,
-                            cz::mem::Allocated<cz::String>* label_value,
+                            cz::Allocated<cz::String>* label_value,
                             bool at_bol) {
 top:
     Location* point = &p->include_stack.last().location;
@@ -420,7 +421,7 @@ top:
     return Result::ok();
 }
 
-Result Preprocessor::next(C* c, Token* token_out, cz::mem::Allocated<cz::String>* label_value) {
+Result Preprocessor::next(C* c, Token* token_out, cz::Allocated<cz::String>* label_value) {
     if (include_stack.len() == 0) {
         return Result::done();
     }

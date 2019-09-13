@@ -63,9 +63,7 @@ static void insert_unchecked_inner(GenericStringMap::Entry* entry,
     memcpy(&entry->_map->_values[index * size], value, size);
 }
 
-void GenericStringMap::reserve(cz::mem::AllocInfo info,
-                               cz::mem::Allocator allocator,
-                               size_t extra) {
+void GenericStringMap::reserve(cz::AllocInfo info, cz::Allocator allocator, size_t extra) {
     if (_cap - _count < extra) {
         size_t new_cap = cz::max(_cap * 2, _count + extra);
 
@@ -190,14 +188,14 @@ GenericStringMap::Entry GenericStringMap::find(cz::Str key, Hash key_hash) {
 }
 
 void GenericStringMap::Entry::insert_unchecked(size_t size,
-                                               cz::mem::Allocator allocator,
+                                               cz::Allocator allocator,
                                                const void* value) {
     auto key = _key.duplicate(allocator).as_str();
     insert_unchecked_inner(this, size, key, value);
     ++_map->_count;
 }
 
-void GenericStringMap::drop(cz::mem::AllocInfo info, cz::mem::Allocator allocator) {
+void GenericStringMap::drop(cz::AllocInfo info, cz::Allocator allocator) {
     for (size_t i = 0; i < _cap; ++i) {
         const cz::Str& key = _keys[i];
         if (mask_is_present(_masks, i)) {

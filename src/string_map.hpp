@@ -27,7 +27,7 @@ struct GenericStringMap {
             }
         }
 
-        void insert_unchecked(size_t size, cz::mem::Allocator allocator, const void* value);
+        void insert_unchecked(size_t size, cz::Allocator allocator, const void* value);
     };
 
     char* _masks = 0;
@@ -37,12 +37,12 @@ struct GenericStringMap {
     size_t _count = 0;
     size_t _cap = 0;
 
-    void reserve(cz::mem::AllocInfo info, cz::mem::Allocator allocator, size_t extra);
+    void reserve(cz::AllocInfo info, cz::Allocator allocator, size_t extra);
 
     Entry find(cz::Str key);
     Entry find(cz::Str key, Hash key_hash);
 
-    void drop(cz::mem::AllocInfo info, cz::mem::Allocator allocator);
+    void drop(cz::AllocInfo info, cz::Allocator allocator);
 };
 }
 
@@ -60,7 +60,7 @@ public:
         bool is_present() const { return entry._present; }
         bool can_insert() const { return entry._has_space; }
 
-        Value& set(cz::mem::Allocator allocator, const Value& value) {
+        Value& set(cz::Allocator allocator, const Value& value) {
             if (is_present()) {
                 return *and_set(value);
             } else {
@@ -77,7 +77,7 @@ public:
             return v;
         }
 
-        Value& or_insert(cz::mem::Allocator allocator, const Value& v) {
+        Value& or_insert(cz::Allocator allocator, const Value& v) {
             if (!can_insert()) {
                 CZ_PANIC("StringMap::Entry::or_insert(): No space to insert");
             }
@@ -93,8 +93,8 @@ public:
         Value* value() { return static_cast<Value*>(entry.value(sizeof(Value))); }
     };
 
-    void reserve(cz::mem::Allocator allocator, size_t extra) {
-        return Generic::reserve(cz::mem::alloc_info<Value>(), allocator, extra);
+    void reserve(cz::Allocator allocator, size_t extra) {
+        return Generic::reserve(cz::alloc_info<Value>(), allocator, extra);
     }
 
     Entry find(cz::Str key) {
@@ -103,8 +103,8 @@ public:
         return entry;
     }
 
-    void drop(cz::mem::Allocator allocator) {
-        return Generic::drop(cz::mem::alloc_info<Value>(), allocator);
+    void drop(cz::Allocator allocator) {
+        return Generic::drop(cz::alloc_info<Value>(), allocator);
     }
 
     constexpr size_t count() const { return _count; }

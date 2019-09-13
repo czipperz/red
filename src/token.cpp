@@ -10,7 +10,7 @@ bool next_token(const FileBuffer& file_buffer,
                 Location* location,
                 Token* token_out,
                 bool* at_bol,
-                cz::mem::Allocated<cz::String>* label_value) {
+                cz::Allocated<cz::String>* label_value) {
     Location point = *location;
 top:
     const Location start = point;

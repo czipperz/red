@@ -2,7 +2,7 @@
 
 #include <limits.h>
 #include <cz/defer.hpp>
-#include <cz/mem/heap.hpp>
+#include <cz/heap.hpp>
 #include <czt/mock_allocate.hpp>
 #include "string_map.hpp"
 
@@ -18,7 +18,7 @@ TEST_CASE("StringMap construction") {
 
 TEST_CASE("StringMap reserve") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
     map.reserve(allocator, 4);
 
@@ -53,7 +53,7 @@ TEST_CASE("StringMap drop") {
 
 TEST_CASE("StringMap find empty map") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
 
     auto entry = map.find("a");
@@ -64,7 +64,7 @@ TEST_CASE("StringMap find empty map") {
 
 TEST_CASE("StringMap finds spot immediately") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
 
     map.reserve(allocator, 1);
@@ -81,7 +81,7 @@ TEST_CASE("StringMap finds spot immediately") {
 
 TEST_CASE("StringMap after insert can be found") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
 
     map.reserve(allocator, 1);
@@ -96,7 +96,7 @@ TEST_CASE("StringMap after insert can be found") {
 
 TEST_CASE("StringMap after reserve can find") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
 
     map.reserve(allocator, 1);
@@ -118,7 +118,7 @@ TEST_CASE("StringMap after reserve can find") {
 
 TEST_CASE("StringMap has collision advances to next slot") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
 
     map.reserve(allocator, 2);
@@ -138,7 +138,7 @@ TEST_CASE("StringMap has collision advances to next slot") {
 
 TEST_CASE("StringMap after reserve can find #2") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
 
     map.reserve(allocator, 2);
@@ -158,7 +158,7 @@ TEST_CASE("StringMap after reserve can find #2") {
 
 TEST_CASE("StringMap or_insert doesn't change the value") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
 
     map.reserve(allocator, 2);
@@ -173,7 +173,7 @@ TEST_CASE("StringMap or_insert doesn't change the value") {
 
 TEST_CASE("StringMap and_set not present does nothing") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
 
     map.reserve(allocator, 2);
@@ -185,7 +185,7 @@ TEST_CASE("StringMap and_set not present does nothing") {
 
 TEST_CASE("StringMap and_set overrides value") {
     StringMap<int> map;
-    auto allocator = cz::mem::heap_allocator();
+    auto allocator = cz::heap_allocator();
     CZ_DEFER(map.drop(allocator));
 
     map.reserve(allocator, 2);

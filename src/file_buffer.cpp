@@ -6,8 +6,8 @@
 namespace red {
 
 Result FileBuffer::read(const char* cstr_file_name,
-                        cz::mem::Allocator buffer_allocator,
-                        cz::mem::Allocator buffers_allocator) {
+                        cz::Allocator buffer_allocator,
+                        cz::Allocator buffers_allocator) {
     FILE* file = fopen(cstr_file_name, "r");
     if (!file) {
         return Result::last_system_error();
@@ -99,7 +99,7 @@ Result FileBuffer::read(const char* cstr_file_name,
     }
 }
 
-void FileBuffer::drop(cz::mem::Allocator buffer_allocator, cz::mem::Allocator buffers_allocator) {
+void FileBuffer::drop(cz::Allocator buffer_allocator, cz::Allocator buffers_allocator) {
     for (size_t i = 0; i + 1 < buffers_len; ++i) {
         buffer_allocator.dealloc({buffers[i], buffer_size});
     }
