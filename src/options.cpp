@@ -8,9 +8,11 @@ void Options::destroy(cz::C* c) {
 }
 
 int Options::parse(cz::C* c, int argc, char** argv) {
-    include_paths.reserve(c->allocator, 2);
+    include_paths.reserve(c->allocator, 4);
     include_paths.push("/usr/local/include");
+    include_paths.push("/usr/lib/gcc/x86_64-pc-linux-gnu/9.1.0/include-fixed");
     include_paths.push("/usr/include");
+    include_paths.push("/usr/lib/gcc/x86_64-pc-linux-gnu/9.1.0/include");
 
     for (size_t i = 0; i < argc; ++i) {
         char* arg = argv[i];
