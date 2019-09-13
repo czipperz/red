@@ -43,20 +43,23 @@ static void advance_over_whitespace(const FileBuffer& buffer, Location* location
 
 static Result read_include(const FileBuffer& buffer,
                            Location* location,
+                           Location* end_out,
                            char target,
                            cz::Allocated<cz::String>* output) {
-    Location point = *location;
-    char c = next_character(buffer, &point);
-    while (c != target) {
+    while (1) {
+        *end_out = *location;
+        char c = next_character(buffer, location);
+        if (c == target) {
+            return Result::ok();
+        }
+
         if (!c) {
             return {Result::ErrorEndOfFile};
         }
+
         output->object.reserve(output->allocator, 1);
         output->object.push(c);
-        c = next_character(buffer, &point);
     }
-    *location = point;
-    return Result::ok();
 }
 
 static Result process_include(C* c,
@@ -85,8 +88,9 @@ static Result process_include(C* c,
     size_t offset = file_name.object.len();
 
     Location start = *point;
-    CZ_TRY(read_include(c->files.buffers[point->file], point, ch == '<' ? '>' : '"', &file_name));
-    Location end = *point;
+    Location end;
+    CZ_TRY(read_include(c->files.buffers[point->file], point, &end, ch == '<' ? '>' : '"',
+                        &file_name));
 
     CZ_LOG(c, Debug, "Including '",
            cz::Str{file_name.object.buffer() + offset, file_name.object.len() - offset}, '\'');
