@@ -16,9 +16,9 @@ Result compile_file(C* c, const char* file_name) {
     preprocessor.push(c, file_name, file_buffer);
 
     Result result;
-    cz::Allocated<cz::String> label_value;
+    cz::AllocatedString label_value;
     label_value.allocator = c->allocator;
-    CZ_DEFER(label_value.object.drop(label_value.allocator));
+    CZ_DEFER(label_value.drop());
     Token token;
     while ((result = preprocessor.next(c, &token, &label_value)).is_ok()) {
         if (result.type == Result::Done) {

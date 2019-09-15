@@ -54,7 +54,7 @@ bool next_token(C* c,
                 Location* location,
                 Token* token_out,
                 bool* at_bol,
-                cz::Allocated<cz::String>* label_value);
+                cz::AllocatedString* label_value);
 
 constexpr bool token_has_value(Token::Type type) {
     return type == Token::Label || type == Token::String || type == Token::Integer;

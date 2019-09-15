@@ -11,7 +11,7 @@ bool next_token(C* ctxt,
                 Location* location,
                 Token* token_out,
                 bool* at_bol,
-                cz::Allocated<cz::String>* label_value) {
+                cz::AllocatedString* label_value) {
     Location point = *location;
 top:
     const Location start = point;
@@ -149,15 +149,15 @@ top:
             break;
         }
         case '"': {
-            label_value->object.clear();
+            label_value->clear();
 
             Location start = point;
 
             *location = point;
             c = next_character(file_buffer, &point);
             while (c && c != '"') {
-                label_value->object.reserve(label_value->allocator, 1);
-                label_value->object.push(c);
+                label_value->reserve(1);
+                label_value->push(c);
 
                 *location = point;
                 c = next_character(file_buffer, &point);
@@ -181,11 +181,11 @@ top:
             }
 
             if (isalpha(c) || c == '_') {
-                label_value->object.clear();
+                label_value->clear();
 
                 while (1) {
-                    label_value->object.reserve(label_value->allocator, 1);
-                    label_value->object.push(c);
+                    label_value->reserve(1);
+                    label_value->push(c);
 
                     *location = point;
                     c = next_character(file_buffer, &point);
@@ -200,11 +200,11 @@ top:
             }
 
             if (isdigit(c)) {
-                label_value->object.clear();
+                label_value->clear();
 
                 while (1) {
-                    label_value->object.reserve(label_value->allocator, 1);
-                    label_value->object.push(c);
+                    label_value->reserve(1);
+                    label_value->push(c);
 
                     *location = point;
                     c = next_character(file_buffer, &point);

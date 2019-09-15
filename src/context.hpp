@@ -22,11 +22,11 @@ struct Context : cz::Context {
         error.start = start;
         error.end = end;
 
-        cz::Allocated<cz::String> message;
+        cz::AllocatedString message;
         message.allocator = allocator;
         // ignore errors in return value
         cz::write(cz::string_writer(&message), ts...);
-        error.message = message.object;
+        error.message = /* slice */ message;
 
         errors.push(error);
     }
