@@ -6,7 +6,8 @@
 
 namespace red {
 
-bool next_token(const FileBuffer& file_buffer,
+bool next_token(C* ctxt,
+                const FileBuffer& file_buffer,
                 Location* location,
                 Token* token_out,
                 bool* at_bol,
@@ -110,8 +111,8 @@ top:
                 char c = next_character(file_buffer, &point);
                 while (1) {
                     if (!c) {
+                        ctxt->report_error(*location, point, "Unterminated block comment");
                         *location = point;
-                        CZ_PANIC("Error: Unterminated block comment");  // @UserError
                         return false;
                     }
 
@@ -150,6 +151,8 @@ top:
         case '"': {
             label_value->object.clear();
 
+            Location start = point;
+
             *location = point;
             c = next_character(file_buffer, &point);
             while (c && c != '"') {
@@ -161,7 +164,7 @@ top:
             }
 
             if (!c) {
-                CZ_PANIC("Error: Unterminated string");  // @UserError
+                ctxt->report_error(start, point, "Unterminated string");
                 return false;
             }
 

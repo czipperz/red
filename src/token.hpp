@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <cz/string.hpp>
+#include "context.hpp"
 #include "file_buffer.hpp"
 #include "location.hpp"
 
@@ -48,7 +49,8 @@ struct Token {
  * calling if at the bof otherwise false.  This dictates whether (when not in a
  * macro) Token::Hash starts a macro.
  */
-bool next_token(const FileBuffer& file_buffer,
+bool next_token(C* c,
+                const FileBuffer& file_buffer,
                 Location* location,
                 Token* token_out,
                 bool* at_bol,

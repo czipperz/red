@@ -22,7 +22,7 @@ TEST_CASE("next_token() basic symbol") {
     bool is_bol = false;
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::test::panic_allocator();
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
 
     CHECK(token.type == red::Token::LessThan);
     CHECK(token.start.index == 0);
@@ -40,7 +40,7 @@ TEST_CASE("next_token() basic label") {
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::heap_allocator();
     CZ_DEFER(label_value.object.drop(label_value.allocator));
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
 
     CHECK(token.type == red::Token::Label);
     CHECK(token.start.index == 0);
@@ -59,7 +59,7 @@ TEST_CASE("next_token() underscores in label") {
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::heap_allocator();
     CZ_DEFER(label_value.object.drop(label_value.allocator));
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
 
     CHECK(token.type == red::Token::Label);
     CHECK(token.start.index == 0);
@@ -78,21 +78,21 @@ TEST_CASE("next_token() parenthesized label") {
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::heap_allocator();
     CZ_DEFER(label_value.object.drop(label_value.allocator));
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::OpenParen);
     CHECK(token.start.index == 0);
     CHECK(token.end.index == 1);
     CHECK(is_bol == false);
     CHECK(label_value.object == "");
 
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
     CHECK(token.start.index == 1);
     CHECK(token.end.index == 4);
     CHECK(is_bol == false);
     CHECK(label_value.object == "abc");
 
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::CloseParen);
     CHECK(token.start.index == 4);
     CHECK(token.end.index == 5);
@@ -109,25 +109,25 @@ TEST_CASE("next_token() digraph") {
     bool is_bol = false;
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::test::panic_allocator();
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::OpenSquare);
     CHECK(token.start.index == 0);
     CHECK(token.end.index == 2);
     CHECK(is_bol == false);
 
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::CloseSquare);
     CHECK(token.start.index == 2);
     CHECK(token.end.index == 4);
     CHECK(is_bol == false);
 
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::OpenCurly);
     CHECK(token.start.index == 4);
     CHECK(token.end.index == 6);
     CHECK(is_bol == false);
 
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::CloseCurly);
     CHECK(token.start.index == 6);
     CHECK(token.end.index == 8);
@@ -144,14 +144,14 @@ TEST_CASE("next_token() break token with whitespace") {
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::heap_allocator();
     CZ_DEFER(label_value.object.drop(label_value.allocator));
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
     CHECK(token.start.index == 0);
     CHECK(token.end.index == 1);
     CHECK(is_bol == false);
     CHECK(label_value.object == "a");
 
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
     CHECK(token.start.index == 2);
     CHECK(token.end.index == 3);
@@ -169,7 +169,7 @@ TEST_CASE("next_token() hash") {
     bool is_bol = false;
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::test::panic_allocator();
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Hash);
     CHECK(token.start.index == 0);
     CHECK(token.end.index == 1);
@@ -185,7 +185,7 @@ TEST_CASE("next_token() hash hash") {
     bool is_bol = false;
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::test::panic_allocator();
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::HashHash);
     CHECK(token.start.index == 0);
     CHECK(token.end.index == 2);
@@ -201,12 +201,12 @@ TEST_CASE("next_token() doesn't set is_bol when no newline") {
     bool is_bol = false;
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::test::panic_allocator();
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(is_bol == false);
 
     location = {};
     is_bol = true;
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(is_bol == true);
 }
 
@@ -219,7 +219,7 @@ TEST_CASE("next_token() hit newline sets is_bol") {
     bool is_bol = false;
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::test::panic_allocator();
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Hash);
     CHECK(token.start.index == 1);
     CHECK(token.end.index == 2);
@@ -235,7 +235,7 @@ TEST_CASE("next_token() on error index is set after whitespace") {
     bool is_bol = false;
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::test::panic_allocator();
-    REQUIRE_FALSE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE_FALSE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     REQUIRE(location.index == 1);
 }
 
@@ -249,7 +249,7 @@ TEST_CASE("next_token() string") {
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::heap_allocator();
     CZ_DEFER(label_value.object.drop(label_value.allocator));
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::String);
     CHECK(token.start.index == 0);
     CHECK(token.end.index == 5);
@@ -266,7 +266,7 @@ TEST_CASE("Block comment") {
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::heap_allocator();
     CZ_DEFER(label_value.object.drop(label_value.allocator));
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
     CHECK(token.start.index == 7);
     CHECK(token.end.index == 8);
@@ -283,7 +283,7 @@ TEST_CASE("Empty block comment") {
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::heap_allocator();
     CZ_DEFER(label_value.object.drop(label_value.allocator));
-    REQUIRE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
     CHECK(token.start.index == 4);
     CHECK(token.end.index == 5);
@@ -300,7 +300,7 @@ TEST_CASE("Block comment nothing after") {
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::heap_allocator();
     CZ_DEFER(label_value.object.drop(label_value.allocator));
-    REQUIRE_FALSE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE_FALSE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
 }
 
 TEST_CASE("Block comment is not recursive") {
@@ -313,5 +313,5 @@ TEST_CASE("Block comment is not recursive") {
     cz::Allocated<cz::String> label_value;
     label_value.allocator = cz::heap_allocator();
     CZ_DEFER(label_value.object.drop(label_value.allocator));
-    REQUIRE_FALSE(next_token(file_buffer, &location, &token, &is_bol, &label_value));
+    REQUIRE_FALSE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
 }

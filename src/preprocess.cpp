@@ -170,7 +170,7 @@ static Result process_pragma(C* c,
                              cz::Allocated<cz::String>* label_value) {
     Location* point = &p->include_stack.last().location;
     bool at_bol = false;
-    if (!next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
+    if (!next_token(c, c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
         // ignore #pragma
         return p->next(c, token_out, label_value);
     }
@@ -184,7 +184,7 @@ static Result process_pragma(C* c,
         p->file_pragma_once[point->file] = true;
 
         at_bol = false;
-        if (!next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
+        if (!next_token(c, c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
             // #pragma once \EOF
             return p->next(c, token_out, label_value);
         }
@@ -194,8 +194,8 @@ static Result process_pragma(C* c,
 
             // eat until eof
             at_bol = false;
-            while (!at_bol && next_token(c->files.buffers[point->file], point, token_out, &at_bol,
-                                         label_value)) {
+            while (!at_bol && next_token(c, c->files.buffers[point->file], point, token_out,
+                                         &at_bol, label_value)) {
             }
         }
 
@@ -208,7 +208,7 @@ static Result process_pragma(C* c,
     // eat until eof
     at_bol = false;
     while (!at_bol &&
-           next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
+           next_token(c, c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
     }
 
     c->report_error(start, token_out->end, "Unknown #pragma");
@@ -222,7 +222,7 @@ static Result process_if_true(C* c,
                               cz::Allocated<cz::String>* label_value) {
     Location* point = &p->include_stack.last().location;
     bool at_bol = false;
-    if (!next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
+    if (!next_token(c, c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
         c->report_error(*point, *point, "Unterminated preprocessing branch");
         return {Result::ErrorInvalidInput};
     }
@@ -248,7 +248,7 @@ static Result process_ifdef(C* c,
     IncludeInfo* point = &p->include_stack.last();
     Location backup = point->location;
     bool at_bol = false;
-    if (!next_token(c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
+    if (!next_token(c, c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
                     label_value) ||
         at_bol) {
         c->report_error(backup, point->location, "No macro to test");
@@ -289,7 +289,7 @@ static Result process_else(C* c,
     }
 
     bool at_bol = false;
-    while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
+    while (!at_bol && next_token(c, c->files.buffers[point->location.file], &point->location,
                                  token_out, &at_bol, label_value)) {
     }
     return process_token(c, p, token_out, label_value, at_bol);
@@ -312,11 +312,11 @@ static Result process_define(C* c,
     IncludeInfo* point = &p->include_stack.last();
     Location backup = point->location;
     bool at_bol = false;
-    if (!next_token(c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
+    if (!next_token(c, c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
                     label_value)) {
         c->report_error(start, end, "Must give the macro a name");
         at_bol = false;
-        while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
+        while (!at_bol && next_token(c, c->files.buffers[point->location.file], &point->location,
                                      token_out, &at_bol, label_value)) {
         }
         return process_token(c, p, token_out, label_value, at_bol);
@@ -325,7 +325,7 @@ static Result process_define(C* c,
     if (at_bol) {
         c->report_error(backup, point->location, "Must give the macro a name");
         at_bol = false;
-        while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
+        while (!at_bol && next_token(c, c->files.buffers[point->location.file], &point->location,
                                      token_out, &at_bol, label_value)) {
         }
         return process_token(c, p, token_out, label_value, at_bol);
@@ -334,7 +334,7 @@ static Result process_define(C* c,
     if (token_out->type != Token::Label) {
         c->report_error(token_out->start, token_out->end, "Must give the macro a name");
         at_bol = false;
-        while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
+        while (!at_bol && next_token(c, c->files.buffers[point->location.file], &point->location,
                                      token_out, &at_bol, label_value)) {
         }
         return process_token(c, p, token_out, label_value, at_bol);
@@ -347,7 +347,7 @@ static Result process_define(C* c,
     definition.is_function = false;
 
     at_bol = false;
-    while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
+    while (!at_bol && next_token(c, c->files.buffers[point->location.file], &point->location,
                                  token_out, &at_bol, label_value)) {
         definition.tokens.reserve(c->allocator, 1);
         definition.token_values.reserve(c->allocator, 1);
@@ -376,7 +376,7 @@ top:
     Location* point = &p->include_stack.last().location;
     if (at_bol && token_out->type == Token::Hash) {
         at_bol = false;
-        if (next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
+        if (next_token(c, c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
             if (at_bol) {
                 // #\n is ignored
                 goto top;
@@ -410,8 +410,8 @@ top:
 
             // eat until eof
             at_bol = false;
-            while (!at_bol && next_token(c->files.buffers[point->file], point, token_out, &at_bol,
-                                         label_value)) {
+            while (!at_bol && next_token(c, c->files.buffers[point->file], point, token_out,
+                                         &at_bol, label_value)) {
             }
             goto top;
         }
@@ -438,7 +438,7 @@ Result Preprocessor::next(C* c, Token* token_out, cz::Allocated<cz::String>* lab
     }
 
     bool at_bol = point->index == 0;
-    if (next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
+    if (next_token(c, c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
         return process_token(c, this, token_out, label_value, at_bol);
     } else {
         CZ_DEBUG_ASSERT(point->index <= c->files.buffers[point->file].len());
