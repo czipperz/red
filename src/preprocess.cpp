@@ -148,8 +148,7 @@ static Result process_include(C* c,
 
         if (file_buffer.len() == 0) {
             temp.object.drop(temp.allocator);
-            c->report_error(point->file, start, end, "Couldn't include file '", included_file_name,
-                            "'");
+            c->report_error(start, end, "Couldn't include file '", included_file_name, "'");
             return {Result::ErrorInvalidInput};
         }
     }
@@ -191,8 +190,7 @@ static Result process_pragma(C* c,
         }
 
         if (!at_bol) {
-            c->report_error(point->file, token_out->start, token_out->end,
-                            "#pragma once has trailing tokens");
+            c->report_error(token_out->start, token_out->end, "#pragma once has trailing tokens");
 
             // eat until eof
             at_bol = false;
@@ -213,7 +211,7 @@ static Result process_pragma(C* c,
            next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
     }
 
-    c->report_error(point->file, start, token_out->end, "Unknown #pragma");
+    c->report_error(start, token_out->end, "Unknown #pragma");
 
     return process_token(c, p, token_out, label_value, at_bol);
 }
@@ -225,7 +223,7 @@ static Result process_if_true(C* c,
     Location* point = &p->include_stack.last().location;
     bool at_bol = false;
     if (!next_token(c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
-        c->report_error(point->file, *point, *point, "Unterminated preprocessing branch");
+        c->report_error(*point, *point, "Unterminated preprocessing branch");
         return {Result::ErrorInvalidInput};
     }
 
@@ -253,14 +251,14 @@ static Result process_ifdef(C* c,
     if (!next_token(c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
                     label_value) ||
         at_bol) {
-        c->report_error(point->location.file, backup, point->location, "No macro to test");
+        c->report_error(backup, point->location, "No macro to test");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
     }
 
     if (token_out->type != Token::Label) {
-        c->report_error(point->location.file, backup, point->location, "Must test a macro name");
+        c->report_error(backup, point->location, "Must test a macro name");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
@@ -316,7 +314,7 @@ static Result process_define(C* c,
     bool at_bol = false;
     if (!next_token(c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
                     label_value)) {
-        c->report_error(point->location.file, start, end, "Must give the macro a name");
+        c->report_error(start, end, "Must give the macro a name");
         at_bol = false;
         while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
                                      token_out, &at_bol, label_value)) {
@@ -325,8 +323,7 @@ static Result process_define(C* c,
     }
 
     if (at_bol) {
-        c->report_error(point->location.file, backup, point->location,
-                        "Must give the macro a name");
+        c->report_error(backup, point->location, "Must give the macro a name");
         at_bol = false;
         while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
                                      token_out, &at_bol, label_value)) {
@@ -335,8 +332,7 @@ static Result process_define(C* c,
     }
 
     if (token_out->type != Token::Label) {
-        c->report_error(point->location.file, token_out->start, token_out->end,
-                        "Must give the macro a name");
+        c->report_error(token_out->start, token_out->end, "Must give the macro a name");
         at_bol = false;
         while (!at_bol && next_token(c->files.buffers[point->location.file], &point->location,
                                      token_out, &at_bol, label_value)) {
@@ -410,8 +406,7 @@ top:
                 }
             }
 
-            c->report_error(point->file, token_out->start, token_out->end,
-                            "Unknown preprocessor attribute");
+            c->report_error(token_out->start, token_out->end, "Unknown preprocessor attribute");
 
             // eat until eof
             at_bol = false;
@@ -450,7 +445,7 @@ Result Preprocessor::next(C* c, Token* token_out, cz::Allocated<cz::String>* lab
         if (point->index < c->files.buffers[point->file].len()) {
             Location end = *point;
             next_character(c->files.buffers[point->file], &end);
-            c->report_error(point->file, *point, end, "Invalid input '",
+            c->report_error(*point, end, "Invalid input '",
                             c->files.buffers[point->file].get(point->index), "'");
             return {Result::ErrorInvalidInput};
         }
