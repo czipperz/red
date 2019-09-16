@@ -208,5 +208,13 @@ void GenericStringMap::drop(cz::AllocInfo info, cz::Allocator allocator) {
     allocator.dealloc({_values, info.size * _cap});
 }
 
+void* GenericStringMap::get_index(cz::AllocInfo info, size_t index) {
+    if (mask_is_present(_masks, index)) {
+        return _values + info.size * index;
+    } else {
+        return nullptr;
+    }
+}
+
 }
 }

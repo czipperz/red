@@ -43,6 +43,8 @@ struct GenericStringMap {
     Entry find(cz::Str key, Hash key_hash);
 
     void drop(cz::AllocInfo info, cz::Allocator allocator);
+
+    void* get_index(cz::AllocInfo info, size_t index);
 };
 }
 
@@ -103,12 +105,14 @@ public:
         return entry;
     }
 
-    void drop(cz::Allocator allocator) {
-        return Generic::drop(cz::alloc_info<Value>(), allocator);
-    }
+    void drop(cz::Allocator allocator) { return Generic::drop(cz::alloc_info<Value>(), allocator); }
 
     constexpr size_t count() const { return _count; }
     constexpr size_t cap() const { return _cap; }
+
+    Value* get_index(size_t index) {
+        return static_cast<Value*>(Generic::get_index(cz::alloc_info<Value>(), index));
+    }
 };
 
 }
