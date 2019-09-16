@@ -20,7 +20,6 @@ struct Definition {
 struct IncludeInfo {
     Location location;
     size_t if_depth;
-    size_t if_skip_depth;
 };
 
 struct Preprocessor {

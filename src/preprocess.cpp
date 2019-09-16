@@ -245,7 +245,39 @@ static Result process_if_false(C* c,
                                Preprocessor* p,
                                Token* token_out,
                                cz::AllocatedString* label_value) {
-    CZ_PANIC("Unimplemented");
+    size_t skip_depth = 0;
+    while (1) {
+        bool at_bol = skip_until_eol(c, p, token_out, label_value);
+        if (!at_bol) {
+            CZ_PANIC("Unimplemented unterminated #if");
+        }
+
+        if (token_out->type == Token::Hash) {
+            Location* point = &p->include_stack.last().location;
+            if (!next_token(c, c->files.buffers[point->file], point, token_out, &at_bol,
+                            label_value)) {
+                CZ_PANIC("Unimplemented unterminated #if");
+            }
+
+            if (token_out->type == Token::Label) {
+                if (*label_value == "ifdef" && *label_value == "ifndef" && *label_value == "if") {
+                    ++skip_depth;
+                } else if (*label_value == "else") {
+                    if (skip_depth == 0) {
+                        break;
+                    }
+                } else if (*label_value == "endif") {
+                    if (skip_depth > 0) {
+                        --skip_depth;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    return Result::ok();
 }
 
 template <bool want_present>
@@ -288,25 +320,34 @@ static Result process_else(C* c,
                            Preprocessor* p,
                            Token* token_out,
                            cz::AllocatedString* label_value) {
+    // We just produced x and are skipping over y
+    // #if 1
+    // x
+    // |#else
+    // y
+    // #endif
+
     IncludeInfo* point = &p->include_stack.last();
-    if (point->if_skip_depth > 1) {
-        // skip forward until #endif as we are inside #if 0
-    } else if (point->if_skip_depth == 1) {
-        // include after the #else
-        point->if_skip_depth = 0;
-    } else {
-        // skip until #endif
-        point->if_skip_depth = 1;
+    if (point->if_depth == 0) {
+        c->report_error(token_out->start, token_out->end, "#else without #if");
+        return {Result::ErrorInvalidInput};
     }
 
-    return SKIP_UNTIL_EOL();
+    return process_if_false(c, p, token_out, label_value);
 }
 
 static Result process_endif(C* c,
                             Preprocessor* p,
                             Token* token_out,
                             cz::AllocatedString* label_value) {
-    CZ_PANIC("Unimplemented");
+    IncludeInfo* point = &p->include_stack.last();
+    if (point->if_depth == 0) {
+        c->report_error(token_out->start, token_out->end, "#else without #if");
+        return {Result::ErrorInvalidInput};
+    }
+
+    --point->if_depth;
+    return SKIP_UNTIL_EOL();
 }
 
 static Result process_define(C* c,
