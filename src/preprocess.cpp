@@ -409,6 +409,14 @@ static Result process_define(C* c,
     return process_next(c, p, token_out, label_value, at_bol, at_bol);
 }
 
+static Result process_error(C* c,
+                            Preprocessor* p,
+                            Token* token_out,
+                            cz::AllocatedString* label_value) {
+    c->report_error(token_out->start, token_out->end, "Explicit error");
+    return SKIP_UNTIL_EOL();
+}
+
 static Result process_token(C* c,
                             Preprocessor* p,
                             Token* token_out,
@@ -448,6 +456,9 @@ top:
                 }
                 if (*label_value == "define") {
                     return process_define(c, p, token_out, label_value);
+                }
+                if (*label_value == "error") {
+                    return process_error(c, p, token_out, label_value);
                 }
             }
 
