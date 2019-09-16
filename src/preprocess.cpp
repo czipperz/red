@@ -25,8 +25,19 @@ void Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
 
 void Preprocessor::destroy(C* c) {
     file_pragma_once.drop(c->allocator);
-
     include_stack.drop(c->allocator);
+
+    for (size_t i = 0; i < definitions.cap(); ++i) {
+        Definition* definition = definitions.get_index(i);
+        if (definition) {
+            definition->tokens.drop(c->allocator);
+
+            for (size_t j = 0; j < definition->token_values.len(); ++j) {
+                definition->token_values[j].drop(c->allocator);
+            }
+            definition->token_values.drop(c->allocator);
+        }
+    }
     definitions.drop(c->allocator);
 }
 
