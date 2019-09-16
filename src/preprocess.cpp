@@ -316,6 +316,13 @@ static Result process_ifdef(C* c,
     }
 }
 
+static Result process_if(C* c,
+                         Preprocessor* p,
+                         Token* token_out,
+                         cz::AllocatedString* label_value) {
+    CZ_PANIC("Unimplemented #if");
+}
+
 static Result process_else(C* c,
                            Preprocessor* p,
                            Token* token_out,
@@ -429,6 +436,9 @@ top:
                 }
                 if (*label_value == "ifndef") {
                     return process_ifdef<false>(c, p, token_out, label_value);
+                }
+                if (*label_value == "if") {
+                    return process_if(c, p, token_out, label_value);
                 }
                 if (*label_value == "else") {
                     return process_else(c, p, token_out, label_value);
