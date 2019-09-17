@@ -1,8 +1,8 @@
 #include "string_map.hpp"
 
-#include <limits.h>
 #include <stdint.h>
 #include <cz/util.hpp>
+#include "bit_array.hpp"
 
 namespace red {
 
@@ -15,41 +15,16 @@ void hash(Hash* hash, cz::Str key) {
 
 namespace impl {
 
-static void bit_array_set(char* array, size_t index) {
-    size_t byte = index / CHAR_BIT;
-    size_t bit = index % CHAR_BIT;
-    char* p = &array[byte];
-    *p = *p | (1 << bit);
-}
-
-static void bit_array_unset(char* array, size_t index) {
-    size_t byte = index / CHAR_BIT;
-    size_t bit = index % CHAR_BIT;
-    char* p = &array[byte];
-    *p = *p & ~(1 << bit);
-}
-
-static bool bit_array_get(const char* array, size_t index) {
-    size_t byte = index / CHAR_BIT;
-    size_t bit = index % CHAR_BIT;
-    const char* p = &array[byte];
-    return *p & (1 << bit);
-}
-
-static size_t bit_array_alloc_size(size_t bits) {
-    return (bits + CHAR_BIT - 1) / CHAR_BIT;
-}
-
 static void mask_set_present(char* masks, size_t index) {
-    bit_array_set(masks, index);
+    bit_array::set(masks, index);
 }
 
 static bool mask_is_present(char* masks, size_t index) {
-    return bit_array_get(masks, index);
+    return bit_array::get(masks, index);
 }
 
 static size_t mask_alloc_size(size_t cap) {
-    return bit_array_alloc_size(cap);
+    return bit_array::alloc_size(cap);
 }
 
 static void insert_unchecked_inner(GenericStringMap::Entry* entry,
