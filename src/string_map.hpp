@@ -1,13 +1,9 @@
 #pragma once
 
-#include <stdint.h>
-#include <cz/string.hpp>
+#include <stddef.h>
+#include "hash.hpp"
 
 namespace red {
-
-using Hash = uint32_t;
-
-void hash(Hash* hash, cz::Str key);
 
 namespace impl {
 struct GenericStringMap {
