@@ -18,11 +18,9 @@ struct FileBuffer {
     size_t buffers_len = 0;
     size_t last_len = 0;
 
-    Result read(const char* cstr_file_name,
-                cz::Allocator buffer_allocator,
-                cz::Allocator buffers_allocator);
+    Result read(const char* cstr_file_name, cz::Allocator allocator);
 
-    void drop(cz::Allocator buffer_allocator, cz::Allocator buffers_allocator);
+    void drop(cz::Allocator allocator);
 
     char get(size_t index) const {
         const size_t outer = (index & outer_mask) >> buffer_size_bits;

@@ -137,7 +137,7 @@ int main(int argc, char** argv) {
 
     // @TODO: Change second allocator here (name allocator) when we change file
     // names to use multi arena allocator.
-    CZ_DEFER(context.files.destroy(context.allocator, context.allocator));
+    CZ_DEFER(context.files.destroy(context.allocator));
 
     auto start_time = std::chrono::high_resolution_clock::now();
     int code = try_run_main(&context);

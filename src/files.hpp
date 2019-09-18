@@ -10,7 +10,7 @@ struct Files {
     cz::Vector<FileBuffer> buffers;
     cz::Vector<const char*> names;
 
-    void destroy(cz::Allocator buffers_allocator, cz::Allocator names_allocator);
+    void destroy(cz::Allocator allocator);
 };
 
 }
