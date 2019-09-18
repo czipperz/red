@@ -14,6 +14,8 @@ void Files::destroy(cz::Allocator allocator) {
         allocator.dealloc({const_cast<char*>(file_name.buffer), file_name.len});
     }
     names.drop(allocator);
+
+    indexes.drop(allocator);
 }
 
 }
