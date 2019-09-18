@@ -55,8 +55,10 @@ public:
 
     public:
         cz::Str key() const { return entry._key; }
+        Hash hash() const { return entry._hash; }
         bool is_present() const { return entry._present; }
         bool can_insert() const { return entry._has_space; }
+        size_t index() const { return entry._index; }
 
         Value& set(cz::Allocator allocator, const Value& value) {
             if (is_present()) {
