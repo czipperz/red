@@ -45,8 +45,8 @@ static int try_run_main(C* c) {
         for (size_t i = 0; i < c->errors.len(); ++i) {
             const CompilerError& error = c->errors[i];
             const FileBuffer& buffer = c->files.buffers[error.start.file];
-            const char* name = c->files.names[error.start.file];
-            cz::write(cz::cerr(), "Error: ", name, ":", error.start.line + 1, ":",
+            const char* file_name = c->files.names[error.start.file];
+            cz::write(cz::cerr(), "Error: ", file_name, ":", error.start.line + 1, ":",
                       error.start.column + 1, ": ", c->errors[i].message, ":\n");
 
             cz::write(cz::cerr(), "~   ");
