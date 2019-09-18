@@ -296,9 +296,6 @@ static Result process_ifdef(C* c,
                             Preprocessor* p,
                             Token* token_out,
                             cz::AllocatedString* label_value) {
-    Location ifdef_start = token_out->start;
-    Location ifdef_end = token_out->end;
-
     IncludeInfo* point = &p->include_stack.last();
     Location backup = point->location;
     bool at_bol = false;
@@ -312,7 +309,7 @@ static Result process_ifdef(C* c,
     }
 
     if (token_out->type != Token::Label) {
-        c->report_error(backup, point->location, "Must test a macro name");
+        c->report_error(token_out->start, token_out->end, "Must test a macro name");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
