@@ -5,6 +5,7 @@
 #include "context.hpp"
 #include "file_buffer.hpp"
 #include "location.hpp"
+#include "span.hpp"
 
 namespace red {
 
@@ -40,8 +41,7 @@ struct Token {
     };
 
     Type type;
-    Location start;
-    Location end;
+    Span span;
 };
 
 /**

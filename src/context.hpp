@@ -14,13 +14,12 @@ struct Context : cz::Context {
     cz::Vector<CompilerError> errors;
 
     template <class... Ts>
-    void report_error(Location start, Location end, Ts... ts) {
+    void report_error(Span span, Ts... ts) {
         errors.reserve(allocator, 1);
 
         CompilerError error;
-        CZ_DEBUG_ASSERT(start.file == end.file);
-        error.start = start;
-        error.end = end;
+        CZ_DEBUG_ASSERT(span.start.file == span.end.file);
+        error.span = span;
 
         cz::AllocatedString message;
         message.allocator = allocator;

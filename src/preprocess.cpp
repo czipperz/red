@@ -98,10 +98,10 @@ static Result process_include(C* c,
     }
     size_t offset = file_name.len();
 
-    Location start = *point;
-    Location end;
-    CZ_TRY(read_include(c->files.buffers[point->file], point, &end, ch == '<' ? '>' : '"',
-                        &file_name));
+    Span included_span;
+    included_span.start = *point;
+    CZ_TRY(read_include(c->files.buffers[point->file], point, &included_span.end,
+                        ch == '<' ? '>' : '"', &file_name));
 
     CZ_LOG(c, Debug, "Including '", cz::Str{file_name.buffer() + offset, file_name.len() - offset},
            '\'');
@@ -157,7 +157,7 @@ static Result process_include(C* c,
 
         if (file_buffer.len() == 0) {
             temp.drop();
-            c->report_error(start, end, "Couldn't include file '", included_file_name, "'");
+            c->report_error(included_span, "Couldn't include file '", included_file_name, "'");
             return {Result::ErrorInvalidInput};
         }
     }
@@ -224,7 +224,7 @@ static Result process_pragma(C* c,
         }
 
         if (!at_bol) {
-            c->report_error(token_out->start, token_out->end, "#pragma once has trailing tokens");
+            c->report_error(token_out->span, "#pragma once has trailing tokens");
             return SKIP_UNTIL_EOL();
         }
 
@@ -232,9 +232,10 @@ static Result process_pragma(C* c,
         return process_token(c, p, token_out, label_value, at_bol);
     }
 
-    Location start = token_out->start;
+    Location start = token_out->span.start;
     at_bol = skip_until_eol(c, p, token_out, label_value);
-    c->report_error(start, token_out->end, "Unknown #pragma");
+    // TODO: make this just report for the token
+    c->report_error({start, token_out->span.end}, "Unknown #pragma");
     return process_next(c, p, token_out, label_value, at_bol, at_bol);
 }
 
@@ -245,7 +246,7 @@ static Result process_if_true(C* c,
     Location* point = &p->include_stack.last().location;
     bool at_bol = false;
     if (!next_token(c, c->files.buffers[point->file], point, token_out, &at_bol, label_value)) {
-        c->report_error(*point, *point, "Unterminated preprocessing branch");
+        c->report_error({*point, *point}, "Unterminated preprocessing branch");
         return {Result::ErrorInvalidInput};
     }
 
@@ -302,14 +303,15 @@ static Result process_ifdef(C* c,
     if (!next_token(c, c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
                     label_value) ||
         at_bol) {
-        c->report_error(backup, point->location, "No macro to test");
+        // TODO fix this position
+        c->report_error({backup, point->location}, "No macro to test");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
     }
 
     if (token_out->type != Token::Label) {
-        c->report_error(token_out->start, token_out->end, "Must test a macro name");
+        c->report_error(token_out->span, "Must test a macro name");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
@@ -344,7 +346,7 @@ static Result process_else(C* c,
 
     IncludeInfo* point = &p->include_stack.last();
     if (point->if_depth == 0) {
-        c->report_error(token_out->start, token_out->end, "#else without #if");
+        c->report_error(token_out->span, "#else without #if");
         return {Result::ErrorInvalidInput};
     }
 
@@ -357,7 +359,7 @@ static Result process_endif(C* c,
                             cz::AllocatedString* label_value) {
     IncludeInfo* point = &p->include_stack.last();
     if (point->if_depth == 0) {
-        c->report_error(token_out->start, token_out->end, "#else without #if");
+        c->report_error(token_out->span, "#else without #if");
         return {Result::ErrorInvalidInput};
     }
 
@@ -369,25 +371,25 @@ static Result process_define(C* c,
                              Preprocessor* p,
                              Token* token_out,
                              cz::AllocatedString* label_value) {
-    Location start = token_out->start;
-    Location end = token_out->end;
+    Span define_span = token_out->span;
 
     IncludeInfo* point = &p->include_stack.last();
     Location backup = point->location;
     bool at_bol = false;
     if (!next_token(c, c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
                     label_value)) {
-        c->report_error(start, end, "Must give the macro a name");
+        c->report_error(define_span, "Must give the macro a name");
         return SKIP_UNTIL_EOL();
     }
 
     if (at_bol) {
-        c->report_error(backup, point->location, "Must give the macro a name");
+        // TODO merge with case above
+        c->report_error({backup, point->location}, "Must give the macro a name");
         return SKIP_UNTIL_EOL();
     }
 
     if (token_out->type != Token::Label) {
-        c->report_error(token_out->start, token_out->end, "Must give the macro a name");
+        c->report_error(token_out->span, "Must give the macro a name");
         return SKIP_UNTIL_EOL();
     }
 
@@ -421,7 +423,7 @@ static Result process_error(C* c,
                             Preprocessor* p,
                             Token* token_out,
                             cz::AllocatedString* label_value) {
-    c->report_error(token_out->start, token_out->end, "Explicit error");
+    c->report_error(token_out->span, "Explicit error");
     return SKIP_UNTIL_EOL();
 }
 
@@ -470,7 +472,7 @@ top:
                 }
             }
 
-            c->report_error(token_out->start, token_out->end, "Unknown preprocessor attribute");
+            c->report_error(token_out->span, "Unknown preprocessor attribute");
             return SKIP_UNTIL_EOL();
         }
     }
@@ -491,7 +493,7 @@ static Result process_next(C* c,
         if (point->index < c->files.buffers[point->file].len()) {
             Location end = *point;
             next_character(c->files.buffers[point->file], &end);
-            c->report_error(*point, end, "Invalid input '",
+            c->report_error({*point, end}, "Invalid input '",
                             c->files.buffers[point->file].get(point->index), "'");
             return {Result::ErrorInvalidInput};
         } else {

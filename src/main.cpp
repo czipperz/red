@@ -44,15 +44,15 @@ static int try_run_main(C* c) {
 
         for (size_t i = 0; i < c->errors.len(); ++i) {
             const CompilerError& error = c->errors[i];
-            const FileBuffer& buffer = c->files.buffers[error.start.file];
-            const char* file_name = c->files.names[error.start.file];
-            cz::write(cz::cerr(), "Error: ", file_name, ":", error.start.line + 1, ":",
-                      error.start.column + 1, ": ", c->errors[i].message, ":\n");
+            const FileBuffer& buffer = c->files.buffers[error.span.start.file];
+            const char* file_name = c->files.names[error.span.start.file];
+            cz::write(cz::cerr(), "Error: ", file_name, ":", error.span.start.line + 1, ":",
+                      error.span.start.column + 1, ": ", c->errors[i].message, ":\n");
 
             cz::write(cz::cerr(), "~   ");
 
-            size_t line = error.start.line;
-            size_t line_start = error.start.index - error.start.column;
+            size_t line = error.span.start.line;
+            size_t line_start = error.span.start.index - error.span.start.column;
             for (size_t i = line_start;; ++i) {
                 cz::write(cz::cerr(), buffer.get(i));
 
@@ -60,14 +60,14 @@ static int try_run_main(C* c) {
                     cz::write(cz::cerr(), "    ");
 
                     size_t j = 0;
-                    if (line == error.start.line) {
-                        for (; j < error.start.column; ++j) {
+                    if (line == error.span.start.line) {
+                        for (; j < error.span.start.column; ++j) {
                             cz::write(cz::cerr(), ' ');
                         }
                     }
 
-                    if (line == error.end.line) {
-                        for (; j < error.end.column; ++j) {
+                    if (line == error.span.end.line) {
+                        for (; j < error.span.end.column; ++j) {
                             cz::write(cz::cerr(), '^');
                         }
                     } else {
@@ -77,14 +77,14 @@ static int try_run_main(C* c) {
                     }
 
                     cz::write(cz::cerr(), '\n');
-                    if (i < error.end.index) {
+                    if (i < error.span.end.index) {
                         cz::write(cz::cerr(), "~   ");
                     }
 
                     ++line;
                     line_start = i + 1;
 
-                    if (i >= error.end.index) {
+                    if (i >= error.span.end.index) {
                         break;
                     }
                 }

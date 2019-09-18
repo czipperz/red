@@ -1,13 +1,12 @@
 #pragma once
 
 #include <cz/string.hpp>
-#include "location.hpp"
+#include "span.hpp"
 
 namespace red {
 
 struct CompilerError {
-    Location start;
-    Location end;
+    Span span;
     cz::String message;
 };
 

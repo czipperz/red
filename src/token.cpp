@@ -111,7 +111,7 @@ top:
                 char c = next_character(file_buffer, &point);
                 while (1) {
                     if (!c) {
-                        ctxt->report_error(*location, point, "Unterminated block comment");
+                        ctxt->report_error({*location, point}, "Unterminated block comment");
                         *location = point;
                         return false;
                     }
@@ -164,7 +164,7 @@ top:
             }
 
             if (!c) {
-                ctxt->report_error(start, point, "Unterminated string");
+                ctxt->report_error({start, point}, "Unterminated string");
                 return false;
             }
 
@@ -221,8 +221,8 @@ top:
             return false;
     }
 
-    token_out->start = start;
-    token_out->end = point;
+    token_out->span.start = start;
+    token_out->span.end = point;
     *location = point;
     return true;
 }

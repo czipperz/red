@@ -25,8 +25,8 @@ TEST_CASE("next_token() basic symbol") {
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
 
     CHECK(token.type == red::Token::LessThan);
-    CHECK(token.start.index == 0);
-    CHECK(token.end.index == 1);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 1);
     CHECK(is_bol == false);
 }
 
@@ -43,8 +43,8 @@ TEST_CASE("next_token() basic label") {
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
 
     CHECK(token.type == red::Token::Label);
-    CHECK(token.start.index == 0);
-    CHECK(token.end.index == 3);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 3);
     CHECK(is_bol == false);
     CHECK(label_value == "abc");
 }
@@ -62,8 +62,8 @@ TEST_CASE("next_token() underscores in label") {
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
 
     CHECK(token.type == red::Token::Label);
-    CHECK(token.start.index == 0);
-    CHECK(token.end.index == 5);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 5);
     CHECK(is_bol == false);
     CHECK(label_value == "_ab_c");
 }
@@ -80,22 +80,22 @@ TEST_CASE("next_token() parenthesized label") {
     CZ_DEFER(label_value.drop());
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::OpenParen);
-    CHECK(token.start.index == 0);
-    CHECK(token.end.index == 1);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 1);
     CHECK(is_bol == false);
     CHECK(label_value == "");
 
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
-    CHECK(token.start.index == 1);
-    CHECK(token.end.index == 4);
+    CHECK(token.span.start.index == 1);
+    CHECK(token.span.end.index == 4);
     CHECK(is_bol == false);
     CHECK(label_value == "abc");
 
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::CloseParen);
-    CHECK(token.start.index == 4);
-    CHECK(token.end.index == 5);
+    CHECK(token.span.start.index == 4);
+    CHECK(token.span.end.index == 5);
     CHECK(is_bol == false);
     /* shouldn't write */ CHECK(label_value == "abc");
 }
@@ -111,26 +111,26 @@ TEST_CASE("next_token() digraph") {
     label_value.allocator = cz::test::panic_allocator();
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::OpenSquare);
-    CHECK(token.start.index == 0);
-    CHECK(token.end.index == 2);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 2);
     CHECK(is_bol == false);
 
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::CloseSquare);
-    CHECK(token.start.index == 2);
-    CHECK(token.end.index == 4);
+    CHECK(token.span.start.index == 2);
+    CHECK(token.span.end.index == 4);
     CHECK(is_bol == false);
 
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::OpenCurly);
-    CHECK(token.start.index == 4);
-    CHECK(token.end.index == 6);
+    CHECK(token.span.start.index == 4);
+    CHECK(token.span.end.index == 6);
     CHECK(is_bol == false);
 
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::CloseCurly);
-    CHECK(token.start.index == 6);
-    CHECK(token.end.index == 8);
+    CHECK(token.span.start.index == 6);
+    CHECK(token.span.end.index == 8);
     CHECK(is_bol == false);
 }
 
@@ -146,18 +146,18 @@ TEST_CASE("next_token() break token with whitespace") {
     CZ_DEFER(label_value.drop());
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
-    CHECK(token.start.index == 0);
-    CHECK(token.end.index == 1);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 1);
     CHECK(is_bol == false);
     CHECK(label_value == "a");
 
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
-    CHECK(token.start.index == 2);
-    CHECK(token.end.index == 3);
+    CHECK(token.span.start.index == 2);
+    CHECK(token.span.end.index == 3);
     CHECK(is_bol == false);
     CHECK(label_value == "b");
-    CHECK(location.index == token.end.index);
+    CHECK(location.index == token.span.end.index);
 }
 
 TEST_CASE("next_token() hash") {
@@ -171,8 +171,8 @@ TEST_CASE("next_token() hash") {
     label_value.allocator = cz::test::panic_allocator();
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Hash);
-    CHECK(token.start.index == 0);
-    CHECK(token.end.index == 1);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 1);
     CHECK(is_bol == false);
 }
 
@@ -187,8 +187,8 @@ TEST_CASE("next_token() hash hash") {
     label_value.allocator = cz::test::panic_allocator();
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::HashHash);
-    CHECK(token.start.index == 0);
-    CHECK(token.end.index == 2);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 2);
     CHECK(is_bol == false);
 }
 
@@ -221,8 +221,8 @@ TEST_CASE("next_token() hit newline sets is_bol") {
     label_value.allocator = cz::test::panic_allocator();
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Hash);
-    CHECK(token.start.index == 1);
-    CHECK(token.end.index == 2);
+    CHECK(token.span.start.index == 1);
+    CHECK(token.span.end.index == 2);
     CHECK(is_bol == true);
 }
 
@@ -251,8 +251,8 @@ TEST_CASE("next_token() string") {
     CZ_DEFER(label_value.drop());
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::String);
-    CHECK(token.start.index == 0);
-    CHECK(token.end.index == 5);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 5);
     CHECK(label_value == "abc");
 }
 
@@ -268,8 +268,8 @@ TEST_CASE("Block comment") {
     CZ_DEFER(label_value.drop());
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
-    CHECK(token.start.index == 7);
-    CHECK(token.end.index == 8);
+    CHECK(token.span.start.index == 7);
+    CHECK(token.span.end.index == 8);
     CHECK(label_value == "x");
 }
 
@@ -285,8 +285,8 @@ TEST_CASE("Empty block comment") {
     CZ_DEFER(label_value.drop());
     REQUIRE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
     CHECK(token.type == red::Token::Label);
-    CHECK(token.start.index == 4);
-    CHECK(token.end.index == 5);
+    CHECK(token.span.start.index == 4);
+    CHECK(token.span.end.index == 5);
     CHECK(label_value == "x");
 }
 
