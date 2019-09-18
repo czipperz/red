@@ -4,24 +4,24 @@
 namespace red {
 namespace bit_array {
 
-inline void set(char* array, size_t index) {
+inline void set(unsigned char* array, size_t index) {
     size_t byte = index / CHAR_BIT;
     size_t bit = index % CHAR_BIT;
-    char* p = &array[byte];
+    unsigned char* p = &array[byte];
     *p = *p | (1 << bit);
 }
 
-inline void unset(char* array, size_t index) {
+inline void unset(unsigned char* array, size_t index) {
     size_t byte = index / CHAR_BIT;
     size_t bit = index % CHAR_BIT;
-    char* p = &array[byte];
+    unsigned char* p = &array[byte];
     *p = *p & ~(1 << bit);
 }
 
-inline bool get(const char* array, size_t index) {
+inline bool get(const unsigned char* array, size_t index) {
     size_t byte = index / CHAR_BIT;
     size_t bit = index % CHAR_BIT;
-    const char* p = &array[byte];
+    const unsigned char* p = &array[byte];
     return *p & (1 << bit);
 }
 
