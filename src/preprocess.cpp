@@ -232,11 +232,8 @@ static Result process_pragma(C* c,
         return process_token(c, p, token_out, label_value, at_bol);
     }
 
-    Location start = token_out->span.start;
-    at_bol = skip_until_eol(c, p, token_out, label_value);
-    // TODO: make this just report for the token
-    c->report_error({start, token_out->span.end}, "Unknown #pragma");
-    return process_next(c, p, token_out, label_value, at_bol, at_bol);
+    c->report_error(token_out->span, "Unknown #pragma");
+    return SKIP_UNTIL_EOL();
 }
 
 static Result process_if_true(C* c,
@@ -297,14 +294,14 @@ static Result process_ifdef(C* c,
                             Preprocessor* p,
                             Token* token_out,
                             cz::AllocatedString* label_value) {
+    Span ifdef_span = token_out->span;
+
     IncludeInfo* point = &p->include_stack.last();
-    Location backup = point->location;
     bool at_bol = false;
     if (!next_token(c, c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
                     label_value) ||
         at_bol) {
-        // TODO fix this position
-        c->report_error({backup, point->location}, "No macro to test");
+        c->report_error(ifdef_span, "No macro to test");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
@@ -374,17 +371,11 @@ static Result process_define(C* c,
     Span define_span = token_out->span;
 
     IncludeInfo* point = &p->include_stack.last();
-    Location backup = point->location;
     bool at_bol = false;
     if (!next_token(c, c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
-                    label_value)) {
+                    label_value) ||
+        at_bol) {
         c->report_error(define_span, "Must give the macro a name");
-        return SKIP_UNTIL_EOL();
-    }
-
-    if (at_bol) {
-        // TODO merge with case above
-        c->report_error({backup, point->location}, "Must give the macro a name");
         return SKIP_UNTIL_EOL();
     }
 
