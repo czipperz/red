@@ -83,10 +83,10 @@ static int try_run_main(C* c) {
 
                     ++line;
                     line_start = i + 1;
-                }
 
-                if (i >= error.end.index && buffer.get(i) == '\n') {
-                    break;
+                    if (i >= error.end.index) {
+                        break;
+                    }
                 }
             }
 
