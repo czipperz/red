@@ -113,7 +113,7 @@ static Result process_include(C* c,
         *file_name.end() = '\0';
 
         // these allocators are probably going to change
-        auto result = file_buffer.read(file_name.buffer(), c->allocator, c->allocator);
+        auto result = file_buffer.read(file_name.buffer(), c->allocator);
         if (result.is_ok()) {
             CZ_LOG(c, Trace, "Contents: \n", file_buffer);
         } else {
@@ -143,7 +143,7 @@ static Result process_include(C* c,
             CZ_LOG(c, Trace, "Trying '", temp, "'");
 
             // these allocators are probably going to change
-            auto result = file_buffer.read(temp.buffer(), c->allocator, c->allocator);
+            auto result = file_buffer.read(temp.buffer(), c->allocator);
             if (result.is_ok()) {
                 CZ_LOG(c, Trace, "Contents: \n", file_buffer);
                 file_name.drop();
