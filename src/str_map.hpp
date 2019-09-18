@@ -35,7 +35,7 @@ struct GenericStrMap {
         }
     };
 
-    char* _masks = 0;
+    unsigned char* _masks = 0;
     Hash* _hashes = 0;
     cz::Str* _keys = 0;
     char* _values = 0;

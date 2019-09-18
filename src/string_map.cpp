@@ -1,6 +1,7 @@
 #include "string_map.hpp"
 
 #include <stdint.h>
+#include <cz/string.hpp>
 #include <cz/util.hpp>
 #include "bit_array.hpp"
 
@@ -8,11 +9,11 @@ namespace red {
 
 namespace impl {
 
-static void mask_set_present(char* masks, size_t index) {
+static void mask_set_present(unsigned char* masks, size_t index) {
     bit_array::set(masks, index);
 }
 
-static bool mask_is_present(char* masks, size_t index) {
+static bool mask_is_present(unsigned char* masks, size_t index) {
     return bit_array::get(masks, index);
 }
 
@@ -35,7 +36,8 @@ void GenericStringMap::reserve(cz::AllocInfo info, cz::Allocator allocator, size
     if (_cap - _count < extra) {
         size_t new_cap = cz::max(_cap * 2, _count + extra);
 
-        char* new_masks = static_cast<char*>(allocator.alloc({mask_alloc_size(new_cap), 1}).buffer);
+        unsigned char* new_masks =
+            static_cast<unsigned char*>(allocator.alloc({mask_alloc_size(new_cap), 1}).buffer);
         CZ_ASSERT(new_masks);
         memset(new_masks, 0, mask_alloc_size(new_cap));
 

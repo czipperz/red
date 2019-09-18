@@ -26,7 +26,7 @@ struct GenericStringMap {
         void insert_unchecked(size_t size, cz::Allocator allocator, const void* value);
     };
 
-    char* _masks = 0;
+    unsigned char* _masks = 0;
     Hash* _hashes = 0;
     cz::Str* _keys = 0;
     char* _values = 0;
