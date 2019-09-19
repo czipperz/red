@@ -11,7 +11,7 @@ Result compile_file(C* c, const char* file_name) {
     // this must be the same as in preprocess when we include a file
     CZ_TRY(file_buffer.read(file_name, c->allocator));
 
-    Preprocessor preprocessor;
+    cpp::Preprocessor preprocessor;
     CZ_DEFER(preprocessor.destroy(c));
     preprocessor.push(c, file_name, file_buffer);
 

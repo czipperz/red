@@ -5,6 +5,8 @@
 #include <czt/mock_allocate.hpp>
 #include "token.hpp"
 
+using red::cpp::next_token;
+
 red::FileBuffer mem_buffer(char** buffers) {
     red::FileBuffer file_buffer;
     file_buffer.buffers = buffers;

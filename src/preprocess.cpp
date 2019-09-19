@@ -7,6 +7,7 @@
 #include "text_replacement.hpp"
 
 namespace red {
+namespace cpp {
 
 void Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
     c->files.buffers.reserve(c->allocator, 1);
@@ -516,4 +517,5 @@ Result Preprocessor::next(C* c, Token* token_out, cz::AllocatedString* label_val
     return process_next(c, this, token_out, label_value, at_bol, has_next);
 }
 
+}
 }

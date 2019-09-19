@@ -1,6 +1,7 @@
 #include "text_replacement.hpp"
 
 namespace red {
+namespace cpp {
 
 char next_character(const FileBuffer& file_buffer, Location* location) {
     char buffer[3];
@@ -70,4 +71,5 @@ top:
     return buffer[0];
 }
 
+}
 }

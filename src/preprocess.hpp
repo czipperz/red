@@ -8,6 +8,7 @@
 #include "token.hpp"
 
 namespace red {
+namespace cpp {
 
 struct Definition {
     cz::Vector<Token> tokens;
@@ -36,4 +37,5 @@ struct Preprocessor {
     Location location() const;
 };
 
+}
 }

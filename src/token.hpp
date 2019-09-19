@@ -44,6 +44,8 @@ struct Token {
     Span span;
 };
 
+namespace cpp {
+
 /**
  * at_bol is an out variable but is only set to true.  Set it to true before
  * calling if at the bof otherwise false.  This dictates whether (when not in a
@@ -60,4 +62,5 @@ constexpr bool token_has_value(Token::Type type) {
     return type == Token::Label || type == Token::String || type == Token::Integer;
 }
 
+}
 }

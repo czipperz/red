@@ -5,6 +5,7 @@
 #include "text_replacement.hpp"
 
 namespace red {
+namespace cpp {
 
 bool next_token(C* ctxt,
                 const FileBuffer& file_buffer,
@@ -227,4 +228,5 @@ top:
     return true;
 }
 
+}
 }
