@@ -219,7 +219,7 @@ top:
             break;
         }
         case '"': {
-            label_value->clear();
+            label_value->set_len(0);
 
             Location start = point;
 
@@ -251,7 +251,7 @@ top:
             }
 
             if (isalpha(c) || c == '_') {
-                label_value->clear();
+                label_value->set_len(0);
 
                 while (1) {
                     label_value->reserve(1);
@@ -270,7 +270,7 @@ top:
             }
 
             if (isdigit(c)) {
-                label_value->clear();
+                label_value->set_len(0);
 
                 while (1) {
                     label_value->reserve(1);
@@ -439,7 +439,7 @@ static Result process_include(C* c,
                 file_name = temp;
                 break;
             } else {
-                temp.clear();
+                temp.set_len(0);
                 CZ_DEBUG_ASSERT(file_buffer.len() == 0);
             }
         }
