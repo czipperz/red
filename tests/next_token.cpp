@@ -3,7 +3,7 @@
 #include <cz/defer.hpp>
 #include <cz/heap.hpp>
 #include <czt/mock_allocate.hpp>
-#include "token.hpp"
+#include "preprocess.hpp"
 
 using red::cpp::next_token;
 
@@ -258,7 +258,7 @@ TEST_CASE("next_token() string") {
     CHECK(label_value == "abc");
 }
 
-TEST_CASE("Block comment") {
+TEST_CASE("next_token() Block comment") {
     char* buffer = (char*)"/*abc*/x";
     red::FileBuffer file_buffer = mem_buffer(&buffer);
 
@@ -275,7 +275,7 @@ TEST_CASE("Block comment") {
     CHECK(label_value == "x");
 }
 
-TEST_CASE("Empty block comment") {
+TEST_CASE("next_token() Empty block comment") {
     char* buffer = (char*)"/**/x";
     red::FileBuffer file_buffer = mem_buffer(&buffer);
 
@@ -292,7 +292,7 @@ TEST_CASE("Empty block comment") {
     CHECK(label_value == "x");
 }
 
-TEST_CASE("Block comment nothing after") {
+TEST_CASE("next_token() Block comment nothing after") {
     char* buffer = (char*)"/**/";
     red::FileBuffer file_buffer = mem_buffer(&buffer);
 
@@ -305,7 +305,7 @@ TEST_CASE("Block comment nothing after") {
     REQUIRE_FALSE(next_token(nullptr, file_buffer, &location, &token, &is_bol, &label_value));
 }
 
-TEST_CASE("Block comment is not recursive") {
+TEST_CASE("next_token() Block comment is not recursive") {
     char* buffer = (char*)"/*/**/";
     red::FileBuffer file_buffer = mem_buffer(&buffer);
 

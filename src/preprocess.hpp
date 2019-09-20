@@ -37,5 +37,19 @@ struct Preprocessor {
     Location location() const;
 };
 
+char next_character(const FileBuffer& file_buffer, Location* location);
+
+/**
+ * at_bol is an out variable but is only set to true.  Set it to true before
+ * calling if at the bof otherwise false.  This dictates whether (when not in a
+ * macro) Token::Hash starts a macro.
+ */
+bool next_token(C* c,
+                const FileBuffer& file_buffer,
+                Location* location,
+                Token* token_out,
+                bool* at_bol,
+                cz::AllocatedString* label_value);
+
 }
 }
