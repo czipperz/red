@@ -29,7 +29,6 @@ struct Preprocessor {
     cz::Vector<IncludeInfo> include_stack;
     red::StringMap<Definition> definitions;
 
-    void push(C* c, const char* file_name, FileBuffer file_contents);
     void destroy(C* c);
 
     Result next(C* c, Token* token_out, cz::AllocatedString* label_value);

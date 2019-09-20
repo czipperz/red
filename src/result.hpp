@@ -1,6 +1,7 @@
 #pragma once
 
 #include <errno.h>
+#include <cz/result.hpp>
 
 namespace red {
 
@@ -24,6 +25,16 @@ struct Result {
         result.type = ErrorSystem;
         result.error.system = errno;
         return result;
+    }
+    static Result from(cz::Result in) {
+        if (in.is_ok()) {
+            return ok();
+        } else {
+            Result result;
+            result.type = ErrorSystem;
+            result.error.system = in.code;
+            return result;
+        }
     }
     constexpr bool is_ok() const { return !is_err(); }
     constexpr bool is_err() const { return type < 0; }

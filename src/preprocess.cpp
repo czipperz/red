@@ -4,6 +4,7 @@
 #include <cz/assert.hpp>
 #include <cz/fs/directory.hpp>
 #include <cz/log.hpp>
+#include "load.hpp"
 
 namespace red {
 namespace cpp {
@@ -297,21 +298,6 @@ top:
     return true;
 }
 
-void Preprocessor::push(C* c, const char* file_name, FileBuffer file_buffer) {
-    c->files.buffers.reserve(c->allocator, 1);
-    c->files.names.reserve(c->allocator, 1);
-    file_pragma_once.reserve(c->allocator, 1);
-    include_stack.reserve(c->allocator, 1);
-
-    size_t file = c->files.buffers.len();
-    c->files.buffers.push(file_buffer);
-    c->files.names.push(file_name);
-    file_pragma_once.push(false);
-    Location location = {};
-    location.file = file;
-    include_stack.push({location});
-}
-
 void Preprocessor::destroy(C* c) {
     file_pragma_once.drop(c->allocator);
     include_stack.drop(c->allocator);
@@ -376,82 +362,55 @@ static Result process_include(C* c,
         CZ_PANIC("Unimplemented #include macro");
     }
 
+    Span included_span;
+    included_span.start = *point;
+    label_value->set_len(0);
+    CZ_TRY(read_include(c->files.buffers[point->file], point, &included_span.end,
+                        ch == '<' ? '>' : '"', label_value));
+
     cz::AllocatedString file_name;
     // @TODO: Use a multi arena allocator here instead of fragmenting it.
     file_name.allocator = c->allocator;
 
-    if (ch == '"') {
-        cz::Str directory_name = cz::fs::directory_component(c->files.names[point->file]);
-        file_name.reserve(directory_name.len);
-        file_name.append(directory_name);
-    }
-    size_t offset = file_name.len();
-
-    Span included_span;
-    included_span.start = *point;
-    CZ_TRY(read_include(c->files.buffers[point->file], point, &included_span.end,
-                        ch == '<' ? '>' : '"', &file_name));
-
-    CZ_LOG(c, Debug, "Including '", cz::Str{file_name.buffer() + offset, file_name.len() - offset},
-           '\'');
-
-    FileBuffer file_buffer;
-    if (ch == '"') {
-        CZ_LOG(c, Trace, "Trying '", file_name, "'");
-        file_name.reserve(1);
-        file_name.null_terminate();
-
-        // these allocators are probably going to change
-        auto result = file_buffer.read(file_name.buffer(), c->allocator);
-        if (result.is_ok()) {
-            CZ_LOG(c, Trace, "Contents: \n", file_buffer);
+    for (size_t i = c->options.include_paths.len() + 1; i > 0; --i) {
+        cz::Str include_path;
+        if (i == c->options.include_paths.len() + 1) {
+            // try local directory
+            if (ch == '"') {
+                include_path = cz::fs::directory_component(c->files.names[point->file]);
+            } else {
+                continue;
+            }
         } else {
-            CZ_DEBUG_ASSERT(file_buffer.len() == 0);
-        }
-    }
-
-    if (file_buffer.len() == 0) {
-        cz::Str included_file_name = {file_name.buffer() + offset, file_name.len() - offset};
-
-        cz::AllocatedString temp;
-        temp.allocator = file_name.allocator;
-
-        for (size_t i = c->options.include_paths.len(); file_buffer.len() == 0 && i > 0; --i) {
             // @Speed: store the include paths as Str s so we don't call strlen
             // over and over here
-            cz::Str include_path(c->options.include_paths[i - 1]);
-            bool trailing_slash = include_path.ends_with("/");  // @Speed: ends_with(char)
-            temp.reserve(include_path.len + !trailing_slash + included_file_name.len + 1);
-            temp.append(include_path);
-            if (!trailing_slash) {
-                temp.push('/');
-            }
-            temp.append(included_file_name);
-            temp.null_terminate();
-
-            CZ_LOG(c, Trace, "Trying '", temp, "'");
-
-            // these allocators are probably going to change
-            auto result = file_buffer.read(temp.buffer(), c->allocator);
-            if (result.is_ok()) {
-                CZ_LOG(c, Trace, "Contents: \n", file_buffer);
-                file_name.drop();
-                file_name = temp;
-                break;
-            } else {
-                temp.set_len(0);
-                CZ_DEBUG_ASSERT(file_buffer.len() == 0);
-            }
+            include_path = c->options.include_paths[i - 1];
         }
 
-        if (file_buffer.len() == 0) {
-            temp.drop();
-            c->report_error(included_span, "Couldn't include file '", included_file_name, "'");
-            return {Result::ErrorInvalidInput};
+        bool trailing_slash = include_path.ends_with("/");  // @Speed: ends_with(char)
+        file_name.set_len(0);
+        file_name.reserve(include_path.len + !trailing_slash + label_value->len() + 1);
+        file_name.append(include_path);
+        if (!trailing_slash) {
+            file_name.push('/');
+        }
+        file_name.append(*label_value);
+        cz::fs::flatten_path(&file_name);
+        file_name.null_terminate();
+
+        CZ_LOG(c, Trace, "Trying '", file_name, "'");
+
+        if (load_file(c, p, file_name).is_ok()) {
+            goto next;
         }
     }
 
-    p->push(c, file_name.buffer(), file_buffer);
+    file_name.drop();
+    c->report_error(included_span, "Couldn't include file '", *label_value, "'");
+    return {Result::ErrorInvalidInput};
+
+next:
+    CZ_LOG(c, Debug, "Including '", c->files.names[p->location().file], '\'');
 
     return p->next(c, token_out, label_value);
 }
