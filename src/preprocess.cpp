@@ -399,7 +399,7 @@ static Result process_include(C* c,
     if (ch == '"') {
         CZ_LOG(c, Trace, "Trying '", file_name, "'");
         file_name.reserve(1);
-        *file_name.end() = '\0';
+        file_name.null_terminate();
 
         // these allocators are probably going to change
         auto result = file_buffer.read(file_name.buffer(), c->allocator);
@@ -427,7 +427,7 @@ static Result process_include(C* c,
                 temp.push('/');
             }
             temp.append(included_file_name);
-            *temp.end() = '\0';
+            temp.null_terminate();
 
             CZ_LOG(c, Trace, "Trying '", temp, "'");
 
