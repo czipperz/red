@@ -1,7 +1,7 @@
 #include "options.hpp"
 
-#include <cz/fs/working_directory.hpp>
 #include <cz/log.hpp>
+#include <cz/path.hpp>
 
 namespace red {
 
@@ -27,7 +27,8 @@ int Options::parse(cz::C* c, int argc, char** argv) {
             include_paths.reserve(c->allocator, 1);
             cz::Str relpath = arg + 2;
             cz::String path;
-            if (cz::fs::make_absolute(relpath, c->allocator, &path).is_err()) {
+            if (cz::path::make_absolute(relpath, c->allocator, &path).is_err()) {
+                path.drop(c->allocator);
                 CZ_LOG(c, Fatal, "Could not access working directory");
                 return 1;
             }

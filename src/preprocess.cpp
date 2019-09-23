@@ -2,8 +2,8 @@
 
 #include <ctype.h>
 #include <cz/assert.hpp>
-#include <cz/fs/directory.hpp>
 #include <cz/log.hpp>
+#include <cz/path.hpp>
 #include "load.hpp"
 
 namespace red {
@@ -377,7 +377,7 @@ static Result process_include(C* c,
         if (i == c->options.include_paths.len() + 1) {
             // try local directory
             if (ch == '"') {
-                include_path = cz::fs::directory_component(c->files.names[point->file]);
+                include_path = cz::path::directory_component(c->files.names[point->file]);
             } else {
                 continue;
             }
@@ -395,7 +395,7 @@ static Result process_include(C* c,
             file_name.push('/');
         }
         file_name.append(*label_value);
-        cz::fs::flatten_path(&file_name);
+        cz::path::flatten(&file_name);
         file_name.null_terminate();
 
         CZ_LOG(c, Trace, "Trying '", file_name, "'");

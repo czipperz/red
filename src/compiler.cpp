@@ -1,7 +1,7 @@
 #include "compiler.hpp"
 
 #include <cz/defer.hpp>
-#include <cz/fs/working_directory.hpp>
+#include <cz/path.hpp>
 #include <cz/try.hpp>
 #include "load.hpp"
 #include "preprocess.hpp"
@@ -13,7 +13,7 @@ Result compile_file(C* c, const char* file_name) {
     CZ_DEFER(preprocessor.destroy(c));
 
     cz::String file_path;
-    cz::Result abs_result = cz::fs::make_absolute(file_name, c->allocator, &file_path);
+    cz::Result abs_result = cz::path::make_absolute(file_name, c->allocator, &file_path);
     if (abs_result.is_err()) {
         file_path.drop(c->allocator);
         return Result::from(abs_result);
