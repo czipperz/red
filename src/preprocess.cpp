@@ -691,7 +691,7 @@ static Result process_endif(C* c,
                             cz::AllocatedString* label_value) {
     IncludeInfo* point = &p->include_stack.last();
     if (point->if_depth == 0) {
-        c->report_error(token_out->span, "#else without #if");
+        c->report_error(token_out->span, "#endif without #if");
         return {Result::ErrorInvalidInput};
     }
 
