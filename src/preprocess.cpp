@@ -203,6 +203,26 @@ top:
         case '*':
             token_out->type = Token::Star;
             break;
+        case '&':
+            *location = point;
+            c = next_character(file_buffer, &point);
+            if (c == '&') {
+                *location = point;
+                token_out->type = Token::And;
+            } else {
+                token_out->type = Token::Ampersand;
+            }
+            break;
+        case '|':
+            *location = point;
+            c = next_character(file_buffer, &point);
+            if (c == '|') {
+                *location = point;
+                token_out->type = Token::Or;
+            } else {
+                token_out->type = Token::Pipe;
+            }
+            break;
         case ';':
             token_out->type = Token::Semicolon;
             break;

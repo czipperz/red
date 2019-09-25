@@ -430,3 +430,17 @@ TEST_CASE("next_token() keyword volatile") {
 TEST_CASE("next_token() keyword while") {
     check_keyword("while", red::Token::While);
 }
+
+TEST_CASE("next_token() pipe") {
+    check_keyword("|", red::Token::Pipe);
+}
+TEST_CASE("next_token() or") {
+    check_keyword("||", red::Token::Or);
+}
+
+TEST_CASE("next_token() ampersand") {
+    check_keyword("&", red::Token::Ampersand);
+}
+TEST_CASE("next_token() and") {
+    check_keyword("&&", red::Token::And);
+}
