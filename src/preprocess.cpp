@@ -266,7 +266,74 @@ top:
                     }
                 }
 
-                token_out->type = Token::Label;
+                if (*label_value == "auto") {
+                    token_out->type = Token::Auto;
+                } else if (*label_value == "break") {
+                    token_out->type = Token::Break;
+                } else if (*label_value == "case") {
+                    token_out->type = Token::Case;
+                } else if (*label_value == "char") {
+                    token_out->type = Token::Char;
+                } else if (*label_value == "const") {
+                    token_out->type = Token::Const;
+                } else if (*label_value == "continue") {
+                    token_out->type = Token::Continue;
+                } else if (*label_value == "default") {
+                    token_out->type = Token::Default;
+                } else if (*label_value == "do") {
+                    token_out->type = Token::Do;
+                } else if (*label_value == "double") {
+                    token_out->type = Token::Double;
+                } else if (*label_value == "else") {
+                    token_out->type = Token::Else;
+                } else if (*label_value == "enum") {
+                    token_out->type = Token::Enum;
+                } else if (*label_value == "extern") {
+                    token_out->type = Token::Extern;
+                } else if (*label_value == "float") {
+                    token_out->type = Token::Float;
+                } else if (*label_value == "for") {
+                    token_out->type = Token::For;
+                } else if (*label_value == "goto") {
+                    token_out->type = Token::Goto;
+                } else if (*label_value == "if") {
+                    token_out->type = Token::If;
+                } else if (*label_value == "int") {
+                    token_out->type = Token::Int;
+                } else if (*label_value == "long") {
+                    token_out->type = Token::Long;
+                } else if (*label_value == "register") {
+                    token_out->type = Token::Register;
+                } else if (*label_value == "return") {
+                    token_out->type = Token::Return;
+                } else if (*label_value == "short") {
+                    token_out->type = Token::Short;
+                } else if (*label_value == "signed") {
+                    token_out->type = Token::Signed;
+                } else if (*label_value == "sizeof") {
+                    token_out->type = Token::Sizeof;
+                } else if (*label_value == "static") {
+                    token_out->type = Token::Static;
+                } else if (*label_value == "struct") {
+                    token_out->type = Token::Struct;
+                } else if (*label_value == "switch") {
+                    token_out->type = Token::Switch;
+                } else if (*label_value == "typedef") {
+                    token_out->type = Token::Typedef;
+                } else if (*label_value == "union") {
+                    token_out->type = Token::Union;
+                } else if (*label_value == "unsigned") {
+                    token_out->type = Token::Unsigned;
+                } else if (*label_value == "void") {
+                    token_out->type = Token::Void;
+                } else if (*label_value == "volatile") {
+                    token_out->type = Token::Volatile;
+                } else if (*label_value == "while") {
+                    token_out->type = Token::While;
+                } else {
+                    token_out->type = Token::Label;
+                }
+
                 break;
             }
 
