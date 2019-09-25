@@ -781,12 +781,6 @@ top:
                 if (*label_value == "ifndef") {
                     return process_ifdef<false>(c, p, token_out, label_value);
                 }
-                if (*label_value == "if") {
-                    return process_if(c, p, token_out, label_value);
-                }
-                if (*label_value == "else") {
-                    return process_else(c, p, token_out, label_value);
-                }
                 if (*label_value == "endif") {
                     return process_endif(c, p, token_out, label_value);
                 }
@@ -796,6 +790,10 @@ top:
                 if (*label_value == "error") {
                     return process_error(c, p, token_out, label_value);
                 }
+            } else if (token_out->type == Token::If) {
+                return process_if(c, p, token_out, label_value);
+            } else if (token_out->type == Token::Else) {
+                return process_else(c, p, token_out, label_value);
             }
 
             c->report_error(token_out->span, "Unknown preprocessor attribute");
