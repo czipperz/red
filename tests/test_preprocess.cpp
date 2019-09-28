@@ -50,31 +50,29 @@ static void setup(C* c, Preprocessor* p, cz::Str contents) {
     load_file_push(c, p, file_path, file_path_hash, file_buffer);
 }
 
-TEST_CASE("Preprocessor::next empty file") {
-    C c;
-    Preprocessor p;
-    setup(&c, &p, "");
-    CZ_DEFER(p.destroy(&c));
-    CZ_DEFER(c.destroy());
+#define SETUP(contents)                  \
+    C c;                                 \
+    Preprocessor p;                      \
+    setup(&c, &p, contents);             \
+                                         \
+    Token token;                         \
+    cz::AllocatedString label_value;     \
+    label_value.allocator = c.allocator; \
+                                         \
+    CZ_DEFER({                           \
+        p.destroy(&c);                   \
+        c.destroy();                     \
+        label_value.drop();              \
+    })
 
-    Token token;
-    cz::AllocatedString label_value;
-    label_value.allocator = c.allocator;
+TEST_CASE("Preprocessor::next empty file") {
+    SETUP("");
 
     REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
 }
 
 TEST_CASE("Preprocessor::next ignores empty #pragma") {
-    C c;
-    Preprocessor p;
-    setup(&c, &p, "#pragma\n<");
-    CZ_DEFER(p.destroy(&c));
-    CZ_DEFER(c.destroy());
-
-    Token token;
-    cz::AllocatedString label_value;
-    label_value.allocator = c.allocator;
-    CZ_DEFER(label_value.drop());
+    SETUP("#pragma\n<");
 
     REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
     REQUIRE(token.type == Token::LessThan);
@@ -91,31 +89,13 @@ TEST_CASE("Preprocessor::next ignores empty #pragma") {
 }
 
 TEST_CASE("Preprocessor::next define is skipped with value") {
-    C c;
-    Preprocessor p;
-    setup(&c, &p, "#define x a\n");
-    CZ_DEFER(p.destroy(&c));
-    CZ_DEFER(c.destroy());
-
-    Token token;
-    cz::AllocatedString label_value;
-    label_value.allocator = c.allocator;
-    CZ_DEFER(label_value.drop());
+    SETUP("#define x a\n");
 
     REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
 }
 
 TEST_CASE("Preprocessor::next define is skipped no value") {
-    C c;
-    Preprocessor p;
-    setup(&c, &p, "#define x\na");
-    CZ_DEFER(p.destroy(&c));
-    CZ_DEFER(c.destroy());
-
-    Token token;
-    cz::AllocatedString label_value;
-    label_value.allocator = c.allocator;
-    CZ_DEFER(label_value.drop());
+    SETUP("#define x\na");
 
     REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
     REQUIRE(token.type == Token::Label);
@@ -125,16 +105,7 @@ TEST_CASE("Preprocessor::next define is skipped no value") {
 }
 
 TEST_CASE("Preprocessor::next ifdef without definition is skipped") {
-    C c;
-    Preprocessor p;
-    setup(&c, &p, "#ifdef x\na\n#endif\nb");
-    CZ_DEFER(p.destroy(&c));
-    CZ_DEFER(c.destroy());
-
-    Token token;
-    cz::AllocatedString label_value;
-    label_value.allocator = c.allocator;
-    CZ_DEFER(label_value.drop());
+    SETUP("#ifdef x\na\n#endif\nb");
 
     REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
     REQUIRE(token.type == Token::Label);
@@ -144,16 +115,7 @@ TEST_CASE("Preprocessor::next ifdef without definition is skipped") {
 }
 
 TEST_CASE("Preprocessor::next ifndef without definition is preserved") {
-    C c;
-    Preprocessor p;
-    setup(&c, &p, "#ifndef x\na\n#endif\nb");
-    CZ_DEFER(p.destroy(&c));
-    CZ_DEFER(c.destroy());
-
-    Token token;
-    cz::AllocatedString label_value;
-    label_value.allocator = c.allocator;
-    CZ_DEFER(label_value.drop());
+    SETUP("#ifndef x\na\n#endif\nb");
 
     REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
     REQUIRE(token.type == Token::Label);
