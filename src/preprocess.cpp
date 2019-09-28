@@ -727,7 +727,7 @@ static Result process_define(C* c,
         definition.tokens.reserve(c->allocator, 1);
         definition.token_values.reserve(c->allocator, 1);
         cz::String val;
-        if (token_out->type == Token::Label && token_out->type == Token::String &&
+        if (token_out->type == Token::Label || token_out->type == Token::String ||
             token_out->type == Token::Integer) {
             val = label_value->clone(c->allocator);
         }
