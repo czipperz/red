@@ -129,3 +129,27 @@ TEST_CASE("Preprocessor::next ifndef without definition is preserved") {
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
+
+TEST_CASE("Preprocessor::next ifdef with definition is preserved") {
+    SETUP("#define x\n#ifdef x\na\n#endif\nb");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "a");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "b");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next ifndef with definition is skipped") {
+    SETUP("#define x\n#ifndef x\na\n#endif\nb");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "b");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
