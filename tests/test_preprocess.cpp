@@ -65,16 +65,18 @@ static void setup(C* c, Preprocessor* p, cz::Str contents) {
         label_value.drop();              \
     })
 
+#define EAT_NEXT() p.next(&c, &token, &label_value)
+
 TEST_CASE("Preprocessor::next empty file") {
     SETUP("");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+    REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
 TEST_CASE("Preprocessor::next ignores empty #pragma") {
     SETUP("#pragma\n<");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(EAT_NEXT().type == Result::Success);
     REQUIRE(token.type == Token::LessThan);
     REQUIRE(token.span.start.file == 0);
     REQUIRE(token.span.start.index == 8);
@@ -85,45 +87,45 @@ TEST_CASE("Preprocessor::next ignores empty #pragma") {
     REQUIRE(token.span.end.line == 1);
     REQUIRE(token.span.end.column == 1);
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+    REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
 TEST_CASE("Preprocessor::next define is skipped with value") {
     SETUP("#define x a\n");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+    REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
 TEST_CASE("Preprocessor::next define is skipped no value") {
     SETUP("#define x\na");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(EAT_NEXT().type == Result::Success);
     REQUIRE(token.type == Token::Label);
     REQUIRE(label_value == "a");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+    REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
 TEST_CASE("Preprocessor::next ifdef without definition is skipped") {
     SETUP("#ifdef x\na\n#endif\nb");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(EAT_NEXT().type == Result::Success);
     REQUIRE(token.type == Token::Label);
     REQUIRE(label_value == "b");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+    REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
 TEST_CASE("Preprocessor::next ifndef without definition is preserved") {
     SETUP("#ifndef x\na\n#endif\nb");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(EAT_NEXT().type == Result::Success);
     REQUIRE(token.type == Token::Label);
     REQUIRE(label_value == "a");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(EAT_NEXT().type == Result::Success);
     REQUIRE(token.type == Token::Label);
     REQUIRE(label_value == "b");
 
-    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+    REQUIRE(EAT_NEXT().type == Result::Done);
 }
