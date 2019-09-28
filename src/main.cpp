@@ -123,21 +123,11 @@ int main(int argc, char** argv) {
 
     context.program_name = program_name;
 
-    CZ_DEFER(context.options.destroy(&context));
+    CZ_DEFER(context.destroy());
+
     if (context.options.parse(&context, argc, argv) != 0) {
         return 1;
     }
-
-    CZ_DEFER({
-        for (size_t i = 0; i < context.errors.len(); ++i) {
-            context.errors[i].message.drop(context.allocator);
-        }
-        context.errors.drop(context.allocator);
-    });
-
-    // @TODO: Change second allocator here (name allocator) when we change file
-    // names to use multi arena allocator.
-    CZ_DEFER(context.files.destroy(context.allocator));
 
     auto start_time = std::chrono::high_resolution_clock::now();
     int code = try_run_main(&context);

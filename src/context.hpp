@@ -29,6 +29,8 @@ struct Context : cz::Context {
 
         errors.push(error);
     }
+
+    void destroy();
 };
 
 using C = Context;
