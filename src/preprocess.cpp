@@ -736,8 +736,8 @@ static Result process_define(C* c,
     }
 
     p->definitions.reserve(c->allocator, 1);
-    auto entry = p->definitions.find(definition_name);
-    entry.set(c->allocator, definition);
+    p->definitions.find(definition_name).set(c->allocator, definition);
+
     return process_next(c, p, token_out, label_value, at_bol, at_bol);
 }
 
