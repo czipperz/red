@@ -619,7 +619,7 @@ static Result process_if_false(C* c,
         }
     }
 
-    return Result::ok();
+    return p->next(c, token_out, label_value);
 }
 
 template <bool want_present>

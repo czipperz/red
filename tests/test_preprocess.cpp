@@ -123,3 +123,45 @@ TEST_CASE("Preprocessor::next define is skipped no value") {
 
     REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
 }
+
+TEST_CASE("Preprocessor::next ifdef without definition is skipped") {
+    C c;
+    Preprocessor p;
+    setup(&c, &p, "#ifdef x\na\n#endif\nb");
+    CZ_DEFER(p.destroy(&c));
+    CZ_DEFER(c.destroy());
+
+    Token token;
+    cz::AllocatedString label_value;
+    label_value.allocator = c.allocator;
+    CZ_DEFER(label_value.drop());
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "b");
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next ifndef without definition is preserved") {
+    C c;
+    Preprocessor p;
+    setup(&c, &p, "#ifndef x\na\n#endif\nb");
+    CZ_DEFER(p.destroy(&c));
+    CZ_DEFER(c.destroy());
+
+    Token token;
+    cz::AllocatedString label_value;
+    label_value.allocator = c.allocator;
+    CZ_DEFER(label_value.drop());
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "a");
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "b");
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+}
