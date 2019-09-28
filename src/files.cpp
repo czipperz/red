@@ -9,9 +9,9 @@ void Files::destroy(cz::Allocator allocator) {
     buffers.drop(allocator);
 
     // @TODO: Remove when we change file names to use multi arena allocator.
-    for (size_t i = 1; i < names.len(); ++i) {
+    for (size_t i = 0; i < names.len(); ++i) {
         cz::Str file_name(names[i]);
-        allocator.dealloc({const_cast<char*>(file_name.buffer), file_name.len});
+        allocator.dealloc({const_cast<char*>(file_name.buffer), file_name.len + 1});
     }
     names.drop(allocator);
 

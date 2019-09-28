@@ -35,6 +35,7 @@ Result load_file(C* c, cpp::Preprocessor* p, cz::String file_path) {
             info.location.file = *file_value;
             p->include_stack.push(info);
         }
+        file_path.drop(c->allocator);
     } else {
         load_file_reserve(c, p);
 
