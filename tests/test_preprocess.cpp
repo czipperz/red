@@ -90,6 +90,21 @@ TEST_CASE("Preprocessor::next ignores empty #pragma") {
     REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
 }
 
+TEST_CASE("Preprocessor::next define is skipped with value") {
+    C c;
+    Preprocessor p;
+    setup(&c, &p, "#define x a\n");
+    CZ_DEFER(p.destroy(&c));
+    CZ_DEFER(c.destroy());
+
+    Token token;
+    cz::AllocatedString label_value;
+    label_value.allocator = c.allocator;
+    CZ_DEFER(label_value.drop());
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+}
+
 TEST_CASE("Preprocessor::next define is skipped no value") {
     C c;
     Preprocessor p;

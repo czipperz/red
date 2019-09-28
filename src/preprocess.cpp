@@ -84,6 +84,7 @@ bool next_token(C* ctxt,
                 bool* at_bol,
                 cz::AllocatedString* label_value) {
     Location point = *location;
+    bool next_at_bol = *at_bol;
 top:
     const Location start = point;
     char c = next_character(file_buffer, &point);
@@ -265,7 +266,7 @@ top:
         default:
             if (isspace(c)) {
                 if (c == '\n') {
-                    *at_bol = true;
+                    next_at_bol = true;
                 }
                 *location = point;
                 goto top;
@@ -382,6 +383,7 @@ top:
     token_out->span.start = start;
     token_out->span.end = point;
     *location = point;
+    *at_bol = next_at_bol;
     return true;
 }
 
