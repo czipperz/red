@@ -488,18 +488,14 @@ static Result process_include(C* c,
         CZ_LOG(c, Trace, "Trying '", file_name, "'");
 
         if (load_file(c, p, file_name).is_ok()) {
-            goto next;
+            CZ_LOG(c, Debug, "Including '", c->files.names[p->location().file], '\'');
+            return p->next(c, token_out, label_value);
         }
     }
 
     file_name.drop();
     c->report_error(included_span, "Couldn't include file '", *label_value, "'");
     return {Result::ErrorInvalidInput};
-
-next:
-    CZ_LOG(c, Debug, "Including '", c->files.names[p->location().file], '\'');
-
-    return p->next(c, token_out, label_value);
 }
 
 static Result process_token(C* c,
