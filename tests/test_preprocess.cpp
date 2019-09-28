@@ -50,15 +50,61 @@ static void setup(C* c, Preprocessor* p, cz::Str contents) {
     load_file_push(c, p, file_path, file_path_hash, file_buffer);
 }
 
-TEST_CASE("Preprocessor::next") {
+TEST_CASE("Preprocessor::next empty file") {
     C c;
     Preprocessor p;
     setup(&c, &p, "");
     CZ_DEFER(p.destroy(&c));
     CZ_DEFER(c.destroy());
 
-    // Token token;
-    // cz::AllocatedString label_value;
-    // label_value.allocator = c.allocator;
-    // p.next(&c, &token, &label_value);
+    Token token;
+    cz::AllocatedString label_value;
+    label_value.allocator = c.allocator;
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next ignores empty #pragma") {
+    C c;
+    Preprocessor p;
+    setup(&c, &p, "#pragma\n<");
+    CZ_DEFER(p.destroy(&c));
+    CZ_DEFER(c.destroy());
+
+    Token token;
+    cz::AllocatedString label_value;
+    label_value.allocator = c.allocator;
+    CZ_DEFER(label_value.drop());
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(token.type == Token::LessThan);
+    REQUIRE(token.span.start.file == 0);
+    REQUIRE(token.span.start.index == 8);
+    REQUIRE(token.span.start.line == 1);
+    REQUIRE(token.span.start.column == 0);
+    REQUIRE(token.span.end.file == 0);
+    REQUIRE(token.span.end.index == 9);
+    REQUIRE(token.span.end.line == 1);
+    REQUIRE(token.span.end.column == 1);
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next define is skipped no value") {
+    C c;
+    Preprocessor p;
+    setup(&c, &p, "#define x\na");
+    CZ_DEFER(p.destroy(&c));
+    CZ_DEFER(c.destroy());
+
+    Token token;
+    cz::AllocatedString label_value;
+    label_value.allocator = c.allocator;
+    CZ_DEFER(label_value.drop());
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "a");
+
+    REQUIRE(p.next(&c, &token, &label_value).type == Result::Done);
 }
