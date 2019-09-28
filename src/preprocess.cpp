@@ -483,7 +483,7 @@ static Result process_include(C* c,
         }
         file_name.append(*label_value);
         cz::path::flatten(&file_name);
-        file_name.null_terminate();
+        file_name.realloc_null_terminate();
 
         CZ_LOG(c, Trace, "Trying '", file_name, "'");
 
