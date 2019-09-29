@@ -750,6 +750,31 @@ static Result process_define(C* c,
     return process_next(c, p, token_out, label_value, at_bol, at_bol);
 }
 
+static Result process_undef(C* c,
+                            Preprocessor* p,
+                            Token* token_out,
+                            cz::AllocatedString* label_value) {
+    Span undef_span = token_out->span;
+
+    IncludeInfo* point = &p->include_stack.last();
+    bool at_bol = false;
+    if (!next_token(c, c->files.buffers[point->location.file], &point->location, token_out, &at_bol,
+                    label_value) ||
+        at_bol) {
+        c->report_error(undef_span, "Must specify the macro to undefine");
+        return SKIP_UNTIL_EOL();
+    }
+
+    if (token_out->type != Token::Label) {
+        c->report_error(token_out->span, "Must specify the macro to undefine");
+        return SKIP_UNTIL_EOL();
+    }
+
+    p->definitions.remove(*label_value, c->allocator);
+
+    return SKIP_UNTIL_EOL();
+}
+
 static Result process_error(C* c,
                             Preprocessor* p,
                             Token* token_out,
@@ -791,6 +816,9 @@ top:
                 }
                 if (*label_value == "define") {
                     return process_define(c, p, token_out, label_value);
+                }
+                if (*label_value == "undef") {
+                    return process_undef(c, p, token_out, label_value);
                 }
                 if (*label_value == "error") {
                     return process_error(c, p, token_out, label_value);

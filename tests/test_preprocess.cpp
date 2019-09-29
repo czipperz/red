@@ -174,6 +174,22 @@ TEST_CASE("Preprocessor::next ifndef with definition is skipped") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
+TEST_CASE("Preprocessor::next #undef then #ifndef") {
+    SETUP("#define x\n#undef x\n#ifndef x\nabc\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "abc");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next #undef then #ifdef") {
+    SETUP("#define x\n#undef x\n#ifdef x\nabc\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
 TEST_CASE(
     "Preprocessor::next in not taken #if, newline between # and endif shouldn't recognize it as "
     "#endif") {
