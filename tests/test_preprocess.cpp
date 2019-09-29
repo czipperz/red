@@ -116,12 +116,32 @@ TEST_CASE("Preprocessor::next ifdef without definition is skipped") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
+TEST_CASE("Preprocessor::next ifdef without definition empty body") {
+    SETUP("#ifdef x\n#endif\nb");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "b");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
 TEST_CASE("Preprocessor::next ifndef without definition is preserved") {
     SETUP("#ifndef x\na\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     REQUIRE(token.type == Token::Label);
     REQUIRE(label_value == "a");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "b");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next ifndef without definition empty body") {
+    SETUP("#ifndef x\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     REQUIRE(token.type == Token::Label);
@@ -152,4 +172,64 @@ TEST_CASE("Preprocessor::next ifndef with definition is skipped") {
     REQUIRE(label_value == "b");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE(
+    "Preprocessor::next in not taken #if, newline between # and endif shouldn't recognize it as "
+    "#endif") {
+    SETUP("#ifdef x\n#\nendif\n#endif\n");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+
+    REQUIRE(c.errors.len() == 0);
+}
+
+TEST_CASE(
+    "Preprocessor::next in taken #if, newline between # and endif shouldn't recognize it as "
+    "#endif") {
+    SETUP("#ifndef x\n#\nendif\n#endif\n");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+
+    REQUIRE(c.errors.len() == 0);
+}
+
+TEST_CASE("Preprocessor::next random #endif is error") {
+    SETUP("#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
+
+    REQUIRE(c.errors.len() > 0);
+}
+
+TEST_CASE("Preprocessor::next unterminated untaken #if is error") {
+    SETUP("#ifdef x");
+
+    REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
+
+    REQUIRE(c.errors.len() > 0);
+}
+
+TEST_CASE("Preprocessor::next unterminated taken #if is error") {
+    SETUP("#ifndef x");
+
+    REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
+
+    REQUIRE(c.errors.len() > 0);
+}
+
+TEST_CASE("Preprocessor::next #if isn't terminated by # newline endif") {
+    SETUP("#ifndef x\n#\nendif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+
+    REQUIRE(c.errors.len() > 0);
 }

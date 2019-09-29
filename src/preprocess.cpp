@@ -591,14 +591,24 @@ static Result process_if_false(C* c,
     while (1) {
         bool at_bol = skip_until_eol(c, p, token_out, label_value);
         if (!at_bol) {
-            CZ_PANIC("Unimplemented unterminated #if");
+            Location point = p->location();
+            c->report_error({point, point}, "Unterminated #if");
+            return {Result::ErrorInvalidInput};
         }
 
+    check_hash:
         if (token_out->type == Token::Hash) {
-            Location* point = &p->include_stack.last().location;
-            if (!next_token(c, c->files.buffers[point->file], point, token_out, &at_bol,
-                            label_value)) {
-                CZ_PANIC("Unimplemented unterminated #if");
+            at_bol = false;
+            IncludeInfo* info = &p->include_stack.last();
+            if (!next_token(c, c->files.buffers[info->location.file], &info->location, token_out,
+                            &at_bol, label_value)) {
+                Location point = p->location();
+                c->report_error({point, point}, "Unterminated #if");
+                return {Result::ErrorInvalidInput};
+            }
+
+            if (at_bol) {
+                goto check_hash;
             }
 
             if (token_out->type == Token::Label) {
@@ -612,6 +622,8 @@ static Result process_if_false(C* c,
                     if (skip_depth > 0) {
                         --skip_depth;
                     } else {
+                        CZ_DEBUG_ASSERT(info->if_depth > 0);
+                        --info->if_depth;
                         break;
                     }
                 }
@@ -832,7 +844,11 @@ Result Preprocessor::next(C* c, Token* token_out, cz::AllocatedString* label_val
 
     Location* point = &include_stack.last().location;
     while (point->index == c->files.buffers[point->file].len()) {
-        include_stack.pop();
+        auto entry = include_stack.pop();
+
+        if (entry.if_depth > 0) {
+            c->report_error({}, "Unterminated #if");
+        }
 
         if (include_stack.len() == 0) {
             return Result::done();
