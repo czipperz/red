@@ -2,6 +2,7 @@
 
 #include <cz/vector.hpp>
 #include "context.hpp"
+#include "definition.hpp"
 #include "files.hpp"
 #include "location.hpp"
 #include "string_map.hpp"
@@ -9,14 +10,6 @@
 
 namespace red {
 namespace cpp {
-
-struct Definition {
-    cz::Vector<Token> tokens;
-    cz::Vector<cz::String> token_values;
-    cz::Vector<cz::Str> parameters;
-    bool is_function;
-    bool has_varargs;
-};
 
 struct IncludeInfo {
     Location location;
@@ -27,7 +20,7 @@ struct Preprocessor {
     cz::Vector<bool> file_pragma_once;
 
     cz::Vector<IncludeInfo> include_stack;
-    red::StringMap<Definition> definitions;
+    red::cpp::DefinitionMap definitions;
 
     void destroy(C* c);
 
