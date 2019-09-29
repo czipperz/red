@@ -244,3 +244,36 @@ TEST_CASE("Preprocessor::next continue over #error and record error") {
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
+
+TEST_CASE("Preprocessor::next continue over #random and record error") {
+    SETUP("#ooooo\nabc");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "abc");
+    REQUIRE(c.errors.len() > 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next #random inside #if false is ignored") {
+    SETUP("#ifdef x\n#ooooo\n#endif\nabc");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "abc");
+    REQUIRE(c.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next #random inside #if true is error and continue") {
+    SETUP("#ifndef x\n#ooooo\n#endif\nabc");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "abc");
+    REQUIRE(c.errors.len() > 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
