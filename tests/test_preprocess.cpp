@@ -233,3 +233,14 @@ TEST_CASE("Preprocessor::next #if isn't terminated by # newline endif") {
 
     REQUIRE(c.errors.len() > 0);
 }
+
+TEST_CASE("Preprocessor::next continue over #error and record error") {
+    SETUP("#error\nabc");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "abc");
+    REQUIRE(c.errors.len() > 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
