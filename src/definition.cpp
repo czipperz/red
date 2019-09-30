@@ -128,9 +128,9 @@ Definition* DefinitionMap::find(cz::Str key) {
 }
 
 void DefinitionMap::set(cz::String key,
-                               Hash key_hash,
-                               cz::Allocator allocator,
-                               const Definition& definition) {
+                        Hash key_hash,
+                        cz::Allocator allocator,
+                        const Definition& definition) {
     if (_cap == 0) {
         CZ_PANIC("DefinitionMap::set(): No space to insert");
     }
