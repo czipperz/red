@@ -656,7 +656,7 @@ static Result process_ifdef(C* c,
 
     point->if_depth++;
 
-    if (p->definitions.find(*label_value).is_present() == want_present) {
+    if (!!p->definitions.find(*label_value) == want_present) {
         return process_if_true(c, p, token_out, label_value);
     } else {
         return process_if_false(c, p, token_out, label_value);
@@ -725,7 +725,6 @@ static Result process_define(C* c,
     }
 
     cz::String definition_name = label_value->clone(c->allocator);
-    CZ_DEFER(definition_name.drop(c->allocator));
 
     Definition definition;
     definition.is_function = false;
@@ -745,7 +744,8 @@ static Result process_define(C* c,
     }
 
     p->definitions.reserve(c->allocator, 1);
-    p->definitions.find(definition_name).set(c->allocator, definition);
+    // consumes definition_name
+    p->definitions.set(definition_name, c->allocator, definition);
 
     return process_next(c, p, token_out, label_value, at_bol, at_bol);
 }
