@@ -22,6 +22,8 @@ struct DefinitionMap {
     void set(cz::String key, cz::Allocator allocator, const Definition& value);
     void set(cz::String key, Hash key_hash, cz::Allocator allocator, const Definition& value);
 
+    void remove(cz::Str key, cz::Allocator allocator);
+
     void drop(cz::Allocator allocator);
 
     constexpr size_t count() const { return _count; }

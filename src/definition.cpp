@@ -173,6 +173,16 @@ void DefinitionMap::set(cz::String key, cz::Allocator allocator, const Definitio
     return set(key, hash(key), allocator, value);
 }
 
+void DefinitionMap::remove(cz::Str key, cz::Allocator allocator) {
+    Definition* def = find(key);
+    if (def) {
+        size_t index = def - _values;
+        mask_set_tombstone(_masks, index);
+        allocator.dealloc({const_cast<char*>(_keys[index].buffer), _keys[index].len});
+        def->drop(allocator);
+    }
+}
+
 void DefinitionMap::drop(cz::Allocator allocator) {
     for (size_t i = 0; i < _cap; ++i) {
         const cz::Str& key = _keys[i];
