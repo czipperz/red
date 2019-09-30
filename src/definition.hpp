@@ -10,6 +10,8 @@ struct Definition {
     cz::Vector<cz::Str> parameters;
     bool is_function;
     bool has_varargs;
+
+    void drop(cz::Allocator);
 };
 
 struct DefinitionMap {

@@ -8,6 +8,15 @@
 namespace red {
 namespace cpp {
 
+void Definition::drop(cz::Allocator allocator) {
+    tokens.drop(allocator);
+
+    for (size_t j = 0; j < token_values.len(); ++j) {
+        token_values[j].drop(allocator);
+    }
+    token_values.drop(allocator);
+}
+
 static void mask_set_present(unsigned char* masks, size_t index) {
     bit_array::set(masks, index);
 }
