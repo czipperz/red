@@ -629,11 +629,11 @@ static Result process_if_false(C* c,
     return p->next(c, token_out, label_value);
 }
 
-template <bool want_present>
 static Result process_ifdef(C* c,
                             Preprocessor* p,
                             Token* token_out,
-                            cz::AllocatedString* label_value) {
+                            cz::AllocatedString* label_value,
+                            bool want_present) {
     Span ifdef_span = token_out->span;
 
     IncludeInfo* point = &p->include_stack.last();
@@ -820,10 +820,10 @@ top:
                     return process_pragma(c, p, token_out, label_value);
                 }
                 if (*label_value == "ifdef") {
-                    return process_ifdef<true>(c, p, token_out, label_value);
+                    return process_ifdef(c, p, token_out, label_value, true);
                 }
                 if (*label_value == "ifndef") {
-                    return process_ifdef<false>(c, p, token_out, label_value);
+                    return process_ifdef(c, p, token_out, label_value, false);
                 }
                 if (*label_value == "endif") {
                     return process_endif(c, p, token_out, label_value);
