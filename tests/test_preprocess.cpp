@@ -39,7 +39,6 @@ static void setup(C* c, Preprocessor* p, cz::Str contents) {
     c->temp = nullptr;
     c->logger = cz::Logger::ignore();
     c->max_log_level = cz::LogLevel::Off;
-    c->program_name = "*test_program*";
 
     load_file_reserve(c, p);
 

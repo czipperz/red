@@ -109,20 +109,8 @@ int main(int argc, char** argv) {
     argc--;
     argv++;
 
-    cz::AlignedBuffer<4096> temp_buffer;
-    cz::TempArena temp;
-    temp.arena.mem = temp_buffer;
-
-    Context context;
-    context.allocator = cz::heap_allocator();
-    context.temp = &temp;
-
-    static const cz::Logger::VTable log_vtable = {log_prefix, log_chunk, log_suffix};
-    context.logger = {&log_vtable, NULL};
-    context.max_log_level = cz::LogLevel::Debug;
-
-    context.program_name = program_name;
-
+    Context context = {};
+    context.init();
     CZ_DEFER(context.destroy());
 
     if (context.options.parse(&context, argc, argv) != 0) {
