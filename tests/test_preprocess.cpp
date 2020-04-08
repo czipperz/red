@@ -293,3 +293,20 @@ TEST_CASE("Preprocessor::next #random inside #if true is error and continue") {
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
+
+TEST_CASE("Preprocessor::next #define no value") {
+    SETUP("#define abc\nabc");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next #define one value") {
+    SETUP("#define abc def\nabc");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    REQUIRE(token.type == Token::Label);
+    REQUIRE(label_value == "def");
+    REQUIRE(c.errors.len() > 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}

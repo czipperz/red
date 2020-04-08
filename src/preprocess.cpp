@@ -783,6 +783,20 @@ static Result process_error(C* c,
     return SKIP_UNTIL_EOL();
 }
 
+static Result process_label(C* c, Preprocessor* p, Token* token, cz::AllocatedString* label_value) {
+    Definition* definition = p->definitions.find(*label_value);
+    if (definition) {
+        p->definition_stack.reserve(c->allocator, 1);
+        DefinitionInfo info;
+        info.definition = definition;
+        info.index = 0;
+        p->definition_stack.push(info);
+        oy
+    } else {
+        return Result::ok();
+    }
+}
+
 static Result process_token(C* c,
                             Preprocessor* p,
                             Token* token_out,
@@ -832,6 +846,8 @@ top:
             c->report_error(token_out->span, "Unknown preprocessor attribute");
             return SKIP_UNTIL_EOL();
         }
+    } else if (token_out->type == Token::Label) {
+        return process_label(c, p, token_out, label_value);
     }
 
     return Result::ok();

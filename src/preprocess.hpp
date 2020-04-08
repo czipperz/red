@@ -16,11 +16,16 @@ struct IncludeInfo {
     size_t if_depth;
 };
 
+struct DefinitionInfo {
+    Definition* definition;
+    size_t index;
+};
+
 struct Preprocessor {
     cz::Vector<bool> file_pragma_once;
-
     cz::Vector<IncludeInfo> include_stack;
     red::cpp::DefinitionMap definitions;
+    cz::Vector<DefinitionInfo> definition_stack;
 
     void destroy(C* c);
 
