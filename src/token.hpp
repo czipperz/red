@@ -1,10 +1,7 @@
 #pragma once
 
-#include <stddef.h>
-#include <cz/string.hpp>
-#include "context.hpp"
-#include "file_buffer.hpp"
-#include "location.hpp"
+#include <stdint.h>
+#include "hashed_str.hpp"
 #include "span.hpp"
 
 namespace red {
@@ -80,8 +77,8 @@ struct Token {
     Type type;
     Span span;
     union Value {
-        cz::Str label;
-        cz::Str string;
+        Hashed_Str label;
+        Hashed_Str string;
         uint64_t integer;
     } v;
 };
