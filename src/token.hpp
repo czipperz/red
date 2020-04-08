@@ -79,10 +79,11 @@ struct Token {
 
     Type type;
     Span span;
+    union Value {
+        cz::Str label;
+        cz::Str string;
+        uint64_t integer;
+    } v;
 };
-
-constexpr bool token_has_value(Token::Type type) {
-    return type == Token::Label || type == Token::String || type == Token::Integer;
-}
 
 }
