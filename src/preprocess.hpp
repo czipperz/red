@@ -24,7 +24,7 @@ struct DefinitionInfo {
 struct Preprocessor {
     cz::Vector<bool> file_pragma_once;
     cz::Vector<IncludeInfo> include_stack;
-    red::cpp::DefinitionMap definitions;
+    DefinitionMap definitions;
     cz::Vector<DefinitionInfo> definition_stack;
 
     void destroy(C* c);
