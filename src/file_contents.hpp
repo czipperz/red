@@ -7,7 +7,7 @@
 
 namespace red {
 
-struct FileBuffer {
+struct File_Contents {
     static constexpr const size_t buffer_size_bits = 13;
     static constexpr const size_t buffer_size = 1 << buffer_size_bits;
 
@@ -37,6 +37,6 @@ struct FileBuffer {
 
 namespace cz {
 
-Result write(Writer, red::FileBuffer);
+Result write(Writer, red::File_Contents);
 
 }

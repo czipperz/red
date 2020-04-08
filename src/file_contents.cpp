@@ -1,4 +1,4 @@
-#include "file_buffer.hpp"
+#include "file_contents.hpp"
 
 #include <stdlib.h>
 #include <cz/assert.hpp>
@@ -6,7 +6,7 @@
 
 namespace red {
 
-Result FileBuffer::read(const char* cstr_file_name) {
+Result File_Contents::read(const char* cstr_file_name) {
     FILE* file = fopen(cstr_file_name, "r");
     if (!file) {
         return Result::last_system_error();
@@ -84,7 +84,7 @@ Result FileBuffer::read(const char* cstr_file_name) {
     }
 }
 
-void FileBuffer::drop(cz::Allocator allocator) {
+void File_Contents::drop(cz::Allocator allocator) {
     for (size_t i = 0; i < buffers_len; ++i) {
         free(buffers[i]);
     }
@@ -95,14 +95,14 @@ void FileBuffer::drop(cz::Allocator allocator) {
 
 namespace cz {
 
-Result write(Writer writer, red::FileBuffer file_buffer) {
+Result write(Writer writer, red::File_Contents file_buffer) {
     for (size_t i = 0; i + 1 < file_buffer.buffers_len; ++i) {
-        CZ_TRY(write(writer, Str{file_buffer.buffers[i], red::FileBuffer::buffer_size}));
+        CZ_TRY(write(writer, Str{file_buffer.buffers[i], red::File_Contents::buffer_size}));
     }
     if (file_buffer.buffers_len > 0) {
         CZ_TRY(write(writer, Str{file_buffer.buffers[file_buffer.buffers_len - 1],
                                  file_buffer.len - (file_buffer.buffers_len - 1) *
-                                                       red::FileBuffer::buffer_size}));
+                                                       red::File_Contents::buffer_size}));
     }
     return Result::ok();
 }
