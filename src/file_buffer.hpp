@@ -14,27 +14,22 @@ struct FileBuffer {
     static constexpr const size_t inner_mask = buffer_size - 1;
     static constexpr const size_t outer_mask = ((size_t)-1) - inner_mask;
 
-    char** buffers = 0;
-    size_t buffers_len = 0;
-    size_t last_len = 0;
+    char** buffers;
+    size_t buffers_len;
+    size_t len;
 
-    Result read(const char* cstr_file_name, cz::Allocator allocator);
+    Result read(const char* cstr_file_name);
 
-    void drop(cz::Allocator allocator);
+    void drop();
 
     char get(size_t index) const {
-        const size_t outer = (index & outer_mask) >> buffer_size_bits;
-        const size_t inner = index & inner_mask;
+        CZ_DEBUG_ASSERT(index < len);
 
-        if (outer + 1 < buffers_len || (outer + 1 == buffers_len && inner < last_len)) {
-            return buffers[outer][inner];
-        } else {
-            return '\0';
-        }
-    }
+        size_t outer = (index & outer_mask) >> buffer_size_bits;
+        CZ_DEBUG_ASSERT(outer < buffers_len);
 
-    constexpr size_t len() const {
-        return buffers_len == 0 ? 0 : ((buffers_len - 1) * buffer_size + last_len);
+        size_t inner = index & inner_mask;
+        return buffers[outer][inner];
     }
 };
 

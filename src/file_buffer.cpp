@@ -1,48 +1,38 @@
 #include "file_buffer.hpp"
 
+#include <stdlib.h>
 #include <cz/assert.hpp>
 #include <cz/defer.hpp>
 
 namespace red {
 
-Result FileBuffer::read(const char* cstr_file_name, cz::Allocator allocator) {
+Result FileBuffer::read(const char* cstr_file_name) {
     FILE* file = fopen(cstr_file_name, "r");
     if (!file) {
         return Result::last_system_error();
     }
     CZ_DEFER(fclose(file));
 
-    const size_t buffer_alignment = 1;
-
     size_t buffers_capacity = 8;
-    buffers = static_cast<char**>(
-        allocator.alloc({buffers_capacity * sizeof(char*), alignof(char*)}).buffer);
+    buffers = static_cast<char**>(malloc(buffers_capacity * sizeof(char*)));
     buffers_len = 0;
 
     while (1) {
         // read a chunk into a new buffer
-        char* buffer = static_cast<char*>(allocator.alloc({buffer_size, buffer_alignment}).buffer);
+        char* buffer = static_cast<char*>(malloc(buffer_size));
         size_t len = fread(buffer, 1, buffer_size, file);
 
         // empty chunk means eof so stop
         if (len == 0) {
-            if (buffers_len == 0) {
-                last_len = 0;
-            } else {
-                last_len = buffer_size;
-            }
-            allocator.dealloc({buffer, buffer_size});
+            this->len = buffers_len * buffer_size;
+            free(buffer);
             break;
         }
 
         // reserve a spot
         if (buffers_len + 1 == buffers_capacity) {
             size_t new_cap = buffers_capacity * 2;
-            char** new_buffers =
-                static_cast<char**>(allocator
-                                        .realloc({buffers, buffers_capacity * sizeof(char*)},
-                                                 {new_cap * sizeof(char*), alignof(char*)})
-                                        .buffer);
+            char** new_buffers = static_cast<char**>(realloc(buffers, new_cap * sizeof(char*)));
             CZ_ASSERT(new_buffers);
 
             buffers = new_buffers;
@@ -55,9 +45,8 @@ Result FileBuffer::read(const char* cstr_file_name, cz::Allocator allocator) {
             ++buffers_len;
         } else {
             // shrink the last string to size
-            last_len = len;
-            char* shrunk_buffer = static_cast<char*>(
-                allocator.realloc({buffer, buffer_size}, {last_len, buffer_alignment}).buffer);
+            this->len = buffers_len * buffer_size + len;
+            char* shrunk_buffer = static_cast<char*>(realloc(buffer, len));
             CZ_ASSERT(shrunk_buffer);
             buffer = shrunk_buffer;
 
@@ -96,13 +85,10 @@ Result FileBuffer::read(const char* cstr_file_name, cz::Allocator allocator) {
 }
 
 void FileBuffer::drop(cz::Allocator allocator) {
-    for (size_t i = 0; i + 1 < buffers_len; ++i) {
-        allocator.dealloc({buffers[i], buffer_size});
+    for (size_t i = 0; i < buffers_len; ++i) {
+        free(buffers[i]);
     }
-    if (buffers_len > 0) {
-        allocator.dealloc({buffers[buffers_len - 1], last_len});
-    }
-    allocator.dealloc({buffers, buffers_len * sizeof(char*)});
+    free(buffers);
 }
 
 }
@@ -114,8 +100,9 @@ Result write(Writer writer, red::FileBuffer file_buffer) {
         CZ_TRY(write(writer, Str{file_buffer.buffers[i], red::FileBuffer::buffer_size}));
     }
     if (file_buffer.buffers_len > 0) {
-        CZ_TRY(write(writer,
-                     Str{file_buffer.buffers[file_buffer.buffers_len - 1], file_buffer.last_len}));
+        CZ_TRY(write(writer, Str{file_buffer.buffers[file_buffer.buffers_len - 1],
+                                 file_buffer.len - (file_buffer.buffers_len - 1) *
+                                                       red::FileBuffer::buffer_size}));
     }
     return Result::ok();
 }
