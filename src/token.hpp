@@ -72,6 +72,10 @@ struct Token {
         Void,
         Volatile,
         While,
+
+        // Special parameter value used in preprocessor definitions
+        Preprocessor_Parameter,
+        Preprocessor_Varargs,
     };
 
     Type type;

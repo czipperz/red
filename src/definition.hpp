@@ -7,7 +7,6 @@ namespace red {
 namespace cpp {
 
 struct Definition {
-    /// Each Token may have a special Tag value that then makes it a parameter.
     cz::Vector<Token> token_or_parameters;
 
     size_t parameter_len;
