@@ -71,8 +71,8 @@ void DefinitionMap::reserve(cz::Allocator allocator, size_t extra) {
         if (_hashes) {
             for (size_t index = 0; index < _cap; ++index) {
                 if (mask_is_present(_masks, index)) {
-                    cz::String key(const_cast<char*>(_keys[index].buffer), _keys[index].len,
-                                   _keys[index].len);
+                    cz::String key = {const_cast<char*>(_keys[index].buffer), _keys[index].len,
+                                      _keys[index].len};
                     new_map.set(key, _hashes[index], allocator, _values[index]);
                 }
             }
