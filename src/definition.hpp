@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cz/vector.hpp>
 #include "token.hpp"
 
