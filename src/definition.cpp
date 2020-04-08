@@ -1,9 +1,9 @@
 #include "definition.hpp"
 
 #include <stdint.h>
+#include <cz/bit_array.hpp>
 #include <cz/string.hpp>
 #include <cz/util.hpp>
-#include "bit_array.hpp"
 
 namespace red {
 namespace cpp {
@@ -18,25 +18,25 @@ void Definition::drop(cz::Allocator allocator) {
 }
 
 static void mask_set_present(unsigned char* masks, size_t index) {
-    bit_array::set(masks, 2 * index);
-    bit_array::unset(masks, 2 * index + 1);
+    cz::bit_array::set(masks, 2 * index);
+    cz::bit_array::unset(masks, 2 * index + 1);
 }
 
 static bool mask_is_present(unsigned char* masks, size_t index) {
-    return bit_array::get(masks, 2 * index);
+    return cz::bit_array::get(masks, 2 * index);
 }
 
 static void mask_set_tombstone(unsigned char* masks, size_t index) {
-    bit_array::unset(masks, 2 * index);
-    bit_array::set(masks, 2 * index + 1);
+    cz::bit_array::unset(masks, 2 * index);
+    cz::bit_array::set(masks, 2 * index + 1);
 }
 
 static bool mask_is_tombstone(unsigned char* masks, size_t index) {
-    return bit_array::get(masks, 2 * index + 1);
+    return cz::bit_array::get(masks, 2 * index + 1);
 }
 
 static size_t mask_alloc_size(size_t cap) {
-    return bit_array::alloc_size(2 * cap);
+    return cz::bit_array::alloc_size(2 * cap);
 }
 
 void DefinitionMap::reserve(cz::Allocator allocator, size_t extra) {
