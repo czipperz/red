@@ -5,7 +5,6 @@
 #include "definition.hpp"
 #include "files.hpp"
 #include "location.hpp"
-#include "string_map.hpp"
 #include "token.hpp"
 
 namespace red {
