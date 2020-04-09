@@ -18,6 +18,16 @@
 namespace red {
 namespace cpp {
 
+static void discard_token(lex::Lexer* lexer, Token* token) {
+    if (token->type == Token::Identifier) {
+        cz::Str str = token->v.identifier.str;
+        lexer->identifier_buffer_array.allocator().dealloc({(char*)str.buffer, str.len});
+    } else if (token->type == Token::String) {
+        cz::Str str = token->v.string;
+        lexer->string_buffer_array.allocator().dealloc({(char*)str.buffer, str.len});
+    }
+}
+
 void Preprocessor::destroy() {
     file_pragma_once.drop(cz::heap_allocator());
 
@@ -240,11 +250,24 @@ static Result process_if_true(Context* context,
 static Result process_if_false(Context* context,
                                Preprocessor* preprocessor,
                                lex::Lexer* lexer,
-                               Token* token) {
+                               Token* token,
+                               bool start_at_bol) {
     ZoneScoped;
     size_t skip_depth = 0;
+
+    bool at_bol;
+    if (start_at_bol) {
+        Location* point = &preprocessor->include_stack.last().location;
+        at_bol = true;
+        at_bol = lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                                 token, &at_bol);
+        goto check_token_exists;
+    }
+
     while (1) {
-        bool at_bol = skip_until_eol(context, preprocessor, lexer, token);
+        at_bol = skip_until_eol(context, preprocessor, lexer, token);
+
+    check_token_exists:
         if (!at_bol) {
             Location point = preprocessor->location();
             context->report_error({point, point}, "Unterminated #if");
@@ -266,22 +289,21 @@ static Result process_if_false(Context* context,
                 goto check_hash;
             }
 
-            if (token->type == Token::Identifier) {
-                if (token->v.identifier.str == "ifdef" && token->v.identifier.str == "ifndef" &&
-                    token->v.identifier.str == "if") {
-                    ++skip_depth;
-                } else if (token->v.identifier.str == "else") {
-                    if (skip_depth == 0) {
-                        break;
-                    }
-                } else if (token->v.identifier.str == "endif") {
-                    if (skip_depth > 0) {
-                        --skip_depth;
-                    } else {
-                        CZ_DEBUG_ASSERT(info->if_depth > 0);
-                        --info->if_depth;
-                        break;
-                    }
+            if ((token->type == Token::Identifier &&
+                 (token->v.identifier.str == "ifdef" || token->v.identifier.str == "ifndef")) ||
+                token->type == Token::If) {
+                ++skip_depth;
+            } else if (token->type == Token::Else) {
+                if (skip_depth == 0) {
+                    break;
+                }
+            } else if (token->type == Token::Identifier && token->v.identifier.str == "endif") {
+                if (skip_depth > 0) {
+                    --skip_depth;
+                } else {
+                    CZ_DEBUG_ASSERT(info->if_depth > 0);
+                    --info->if_depth;
+                    break;
                 }
             }
         }
@@ -322,16 +344,94 @@ static Result process_ifdef(Context* context,
         want_present) {
         return process_if_true(context, preprocessor, lexer, token);
     } else {
-        return process_if_false(context, preprocessor, lexer, token);
+        return process_if_false(context, preprocessor, lexer, token, false);
     }
 }
+
+static Result process_defined_identifier(Context* context,
+                                         Preprocessor* preprocessor,
+                                         lex::Lexer* lexer,
+                                         Token* token,
+                                         Definition* definition,
+                                         bool this_line_only);
+
+static Result next_token_in_definition(Context* context,
+                                       Preprocessor* preprocessor,
+                                       lex::Lexer* lexer,
+                                       Token* token,
+                                       bool this_line_only);
 
 static Result process_if(Context* context,
                          Preprocessor* preprocessor,
                          lex::Lexer* lexer,
                          Token* token) {
     ZoneScoped;
-    CZ_PANIC("Unimplemented #if");
+
+    // Todo: make this more efficient by not storing all the tokens.
+    cz::Vector<Token> tokens = {};
+    CZ_DEFER(tokens.drop(context->temp_buffer_array.allocator()));
+    tokens.reserve(context->temp_buffer_array.allocator(), 8);
+
+    Include_Info* point;
+    while (1) {
+        Result ntid_result = next_token_in_definition(context, preprocessor, lexer, token, true);
+        if (ntid_result.type == Result::Done) {
+            bool at_bol = false;
+            point = &preprocessor->include_stack.last();
+            if (!lex::next_token(context, lexer,
+                                 context->files.files[point->location.file].contents,
+                                 &point->location, token, &at_bol)) {
+                break;
+            }
+            if (at_bol) {
+                lexer->back = *token;
+                break;
+            }
+        }
+
+        if (token->type == Token::Identifier) {
+            if (preprocessor->definition_stack.len() > 0) {
+                // This identifier is either undefined or currently expanded and treated as
+                // undefined because otherwise the ntid would've eaten it.
+                goto undefined_identifier;
+            }
+
+            Definition* definition;
+            definition =
+                preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
+            if (definition) {
+                return process_defined_identifier(context, preprocessor, lexer, token, definition,
+                                                  true);
+            } else {
+            undefined_identifier:
+                // According to the C standard, undefined tokens are converted to 0.
+                discard_token(lexer, token);
+                token->type = Token::Integer;
+                token->v.integer = 0;
+            }
+        }
+
+        tokens.reserve(context->temp_buffer_array.allocator(), 1);
+        tokens.push(*token);
+    }
+
+    point->if_depth++;
+
+    if (tokens.len() > 1) {
+        CZ_PANIC("Unimplemented complex #if");
+    }
+
+    switch (tokens[0].type) {
+        case Token::Integer:
+            if (tokens[0].v.integer != 0) {
+                return process_if_true(context, preprocessor, lexer, token);
+            }
+            return process_if_false(context, preprocessor, lexer, token, true);
+
+        default:
+            context->report_error(tokens[0].span, "#if expects a constant expression");
+            return process_if_false(context, preprocessor, lexer, token, true);
+    }
 }
 
 static Result process_else(Context* context,
@@ -352,7 +452,7 @@ static Result process_else(Context* context,
         return {Result::ErrorInvalidInput};
     }
 
-    return process_if_false(context, preprocessor, lexer, token);
+    return process_if_false(context, preprocessor, lexer, token, false);
 }
 
 static Result process_endif(Context* context,
@@ -460,12 +560,17 @@ static Result process_defined_identifier(Context* context,
                                          Preprocessor* preprocessor,
                                          lex::Lexer* lexer,
                                          Token* token,
-                                         Definition* definition) {
+                                         Definition* definition,
+                                         bool this_line_only) {
     ZoneScoped;
     preprocessor->definition_stack.reserve(cz::heap_allocator(), 1);
+
     Definition_Info info = {};
     info.definition = definition;
-    // Todo: process arguments
+
+    // Todo: Process arguments.  When doing so, if `this_line_only` is defined, only parse arguments
+    // on this line.
+
     preprocessor->definition_stack.push(info);
     return next_token(context, preprocessor, lexer, token);
 }
@@ -478,7 +583,7 @@ static Result process_identifier(Context* context,
     Definition* definition =
         preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
     if (definition) {
-        return process_defined_identifier(context, preprocessor, lexer, token, definition);
+        return process_defined_identifier(context, preprocessor, lexer, token, definition, false);
     } else {
         return Result::ok();
     }
@@ -564,8 +669,11 @@ static Result process_next(Context* context,
     }
 }
 
-Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer, Token* token) {
-    ZoneScoped;
+static Result next_token_in_definition(Context* context,
+                                       Preprocessor* preprocessor,
+                                       lex::Lexer* lexer,
+                                       Token* token,
+                                       bool this_line_only) {
     while (preprocessor->definition_stack.len() > 0) {
         Definition_Info* info = &preprocessor->definition_stack.last();
         if (info->index == info->definition->tokens.len()) {
@@ -609,10 +717,22 @@ Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexe
                     return Result::ok();
                 }
             }
-            return process_defined_identifier(context, preprocessor, lexer, token, definition);
+            return process_defined_identifier(context, preprocessor, lexer, token, definition,
+                                              this_line_only);
         }
 
         return Result::ok();
+    }
+
+    return Result::done();
+}
+
+Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer, Token* token) {
+    ZoneScoped;
+
+    Result result = next_token_in_definition(context, preprocessor, lexer, token, false);
+    if (result.type != Result::Done) {
+        return result;
     }
 
     if (preprocessor->include_stack.len() == 0) {
