@@ -11,7 +11,8 @@ void Files::destroy() {
     }
     files.drop(cz::heap_allocator());
     file_path_hashes.drop(cz::heap_allocator());
-    file_buffer_array.drop();
+    file_array_buffer_array.drop();
+    file_path_buffer_array.drop();
 }
 
 }

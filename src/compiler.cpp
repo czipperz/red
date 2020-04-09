@@ -26,12 +26,12 @@ Result compile_file(Context* context, const char* file_name) {
 
     cz::String file_path = {};
     cz::Result abs_result = cz::path::make_absolute(
-        file_name, context->files.file_buffer_array.allocator(), &file_path);
+        file_name, context->files.file_path_buffer_array.allocator(), &file_path);
     if (abs_result.is_err()) {
-        file_path.drop(context->files.file_buffer_array.allocator());
+        file_path.drop(context->files.file_path_buffer_array.allocator());
         return Result::from(abs_result);
     }
-    file_path.realloc_null_terminate(context->files.file_buffer_array.allocator());
+    file_path.realloc_null_terminate(context->files.file_path_buffer_array.allocator());
 
     CZ_TRY(include_file(&context->files, &preprocessor, file_path));
 

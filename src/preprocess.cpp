@@ -123,7 +123,7 @@ static Result process_include(Context* context,
 
         bool trailing_slash = include_path.ends_with("/");  // @Speed: ends_with(char)
         file_name.set_len(0);
-        file_name.reserve(context->files.file_buffer_array.allocator(),
+        file_name.reserve(context->files.file_path_buffer_array.allocator(),
                           include_path.len + !trailing_slash + relative_path.len() + 1);
         file_name.append(include_path);
         if (!trailing_slash) {
@@ -139,7 +139,7 @@ static Result process_include(Context* context,
     }
 
     context->report_error(included_span, "Couldn't include file '", file_name, "'");
-    file_name.drop(context->files.file_buffer_array.allocator());
+    file_name.drop(context->files.file_path_buffer_array.allocator());
     return {Result::ErrorInvalidInput};
 }
 

@@ -43,7 +43,7 @@ Result include_file(Files* files, cpp::Preprocessor* preprocessor, cz::String fi
         // Todo: Maybe use a Str_Map<size_t> here?
         if (files->file_path_hashes[index] == hash && files->files[index].path == file_path) {
             // We've already included this file.
-            file_path.drop(files->file_buffer_array.allocator());
+            file_path.drop(files->file_path_buffer_array.allocator());
             if (!preprocessor->file_pragma_once[index]) {
                 preprocessor->include_stack.reserve(cz::heap_allocator(), 1);
                 push_file(preprocessor, index);
@@ -56,13 +56,14 @@ Result include_file(Files* files, cpp::Preprocessor* preprocessor, cz::String fi
     include_file_reserve(files, preprocessor);
 
     File_Contents file_contents;
-    Result result = file_contents.read(file_path.buffer(), files->file_buffer_array.allocator());
+    Result result =
+        file_contents.read(file_path.buffer(), files->file_array_buffer_array.allocator());
     if (result.is_err()) {
-        file_contents.drop_array(files->file_buffer_array.allocator());
+        file_contents.drop_array(files->file_array_buffer_array.allocator());
         return result;
     }
 
-    file_path.realloc(files->file_buffer_array.allocator());
+    file_path.realloc(files->file_path_buffer_array.allocator());
     force_include_file(files, preprocessor, {file_path, hash}, file_contents);
 
     return Result::ok();

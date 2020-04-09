@@ -19,7 +19,7 @@ static void setup(Context* context, Preprocessor* preprocessor, cz::Str contents
     include_file_reserve(&context->files, preprocessor);
 
     File_Contents file_contents;
-    file_contents.load_str(contents, context->files.file_buffer_array.allocator());
+    file_contents.load_str(contents, context->files.file_array_buffer_array.allocator());
     Hashed_Str file_path = Hashed_Str::from_str("*test_file*");
     force_include_file(&context->files, preprocessor, file_path, file_contents);
 }
