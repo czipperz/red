@@ -16,11 +16,13 @@ Result File_Contents::read(const char* cstr_file_name, cz::Allocator buffers_arr
     size_t buffers_capacity = 8;
     buffers = static_cast<char**>(
         buffers_array_allocator.alloc({buffers_capacity * sizeof(char*), alignof(char*)}));
+    CZ_ASSERT(buffers);
     buffers_len = 0;
 
     while (1) {
         // read a chunk into a new buffer
         char* buffer = static_cast<char*>(malloc(buffer_size));
+        CZ_ASSERT(buffer);
         size_t len = fread(buffer, 1, buffer_size, file);
 
         // empty chunk means eof so stop
@@ -70,6 +72,7 @@ Result File_Contents::read(const char* cstr_file_name, cz::Allocator buffers_arr
 
         return Result::ok();
     } else {
+        drop_array(buffers_array_allocator);
         return {Result::ErrorFile};
     }
 }

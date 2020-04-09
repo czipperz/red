@@ -1,6 +1,7 @@
 #include "load.hpp"
 
 #include <cz/heap.hpp>
+#include <cz/try.hpp>
 #include "file.hpp"
 #include "file_contents.hpp"
 #include "files.hpp"
@@ -56,12 +57,7 @@ Result include_file(Files* files, cpp::Preprocessor* preprocessor, cz::String fi
     include_file_reserve(files, preprocessor);
 
     File_Contents file_contents;
-    Result result =
-        file_contents.read(file_path.buffer(), files->file_array_buffer_array.allocator());
-    if (result.is_err()) {
-        file_contents.drop_array(files->file_array_buffer_array.allocator());
-        return result;
-    }
+    CZ_TRY(file_contents.read(file_path.buffer(), files->file_array_buffer_array.allocator()));
 
     file_path.realloc(files->file_path_buffer_array.allocator());
     force_include_file(files, preprocessor, {file_path, hash}, file_contents);
