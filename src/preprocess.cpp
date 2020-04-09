@@ -400,8 +400,14 @@ static Result process_if(Context* context,
             definition =
                 preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
             if (definition) {
-                return process_defined_identifier(context, preprocessor, lexer, token, definition,
-                                                  true);
+                Result pdi_result = process_defined_identifier(context, preprocessor, lexer, token,
+                                                               definition, true);
+                if (pdi_result.is_err()) {
+                    return pdi_result;
+                } else if (pdi_result.type == Result::Done) {
+                    // Empty definition.
+                    continue;
+                }
             } else {
             undefined_identifier:
                 // According to the C standard, undefined tokens are converted to 0.

@@ -285,6 +285,17 @@ TEST_CASE("Preprocessor::next #if defined 0 is false") {
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("Preprocessor::next #if defined 1 is true") {
+    SETUP("#define x 1\n#if x\na\n#else\nb\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
     REQUIRE(context.errors.len() == 0);
 
