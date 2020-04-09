@@ -3,17 +3,14 @@
 namespace red {
 
 void Files::destroy(cz::Allocator allocator) {
-    for (size_t i = 0; i < buffers.len(); ++i) {
-        buffers[i].drop(allocator);
+    for (size_t i = 0; i < files.cap; ++i) {
+        if (files.is_present(i)) {
+            files.values[i].drop(allocator);
+        }
     }
-    buffers.drop(allocator);
+    files.drop(allocator);
 
-    // @TODO: Remove when we change file names to use multi arena allocator.
-    for (size_t i = 0; i < names.len(); ++i) {
-        cz::Str file_name(names[i]);
-        allocator.dealloc({const_cast<char*>(file_name.buffer), file_name.len + 1});
-    }
-    names.drop(allocator);
+    file_name_buffer_array.drop();
 
     indexes.drop(allocator);
 }
