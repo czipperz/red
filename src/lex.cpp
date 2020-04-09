@@ -417,6 +417,7 @@ top:
                     *location = point;
                     if (!next_character(file_contents, &point, &c) || !isdigit(c)) {
                         point = *location;
+                        break;
                     }
                     value *= 10;
                     value += c - '0';

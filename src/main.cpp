@@ -131,7 +131,7 @@ int main(int argc, char** argv) {
     uint64_t seconds = as_micros / microseconds::period::den;
     uint64_t micros = as_micros % microseconds::period::den;
 
-    printf("Elapsed: %" PRIu64 ".%.6" PRIu64 "s", seconds, micros);
+    printf("Elapsed: %" PRIu64 ".%.6" PRIu64 "s\n", seconds, micros);
 
     return code;
 }
