@@ -403,12 +403,14 @@ top:
                     for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords); ++i) {
                         if (value == keywords[i].value) {
                             token_out->type = keywords[i].type;
+                            value.drop(lexer->identifier_buffer_array.allocator());
                             goto end_parse_label;
                         }
                     }
                 }
 
                 token_out->type = Token::Identifier;
+                value.realloc(lexer->identifier_buffer_array.allocator());
                 token_out->v.identifier = Hashed_Str::from_str(value);
 
             end_parse_label:
