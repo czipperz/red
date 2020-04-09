@@ -138,7 +138,7 @@ static Result process_include(Context* context,
         }
     }
 
-    context->report_error(included_span, "Couldn't include file '", file_name, "'");
+    context->report_error(included_span, "Couldn't include file '", relative_path, "'");
     file_name.drop(context->files.file_path_buffer_array.allocator());
     return {Result::ErrorInvalidInput};
 }
