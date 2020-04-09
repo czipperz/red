@@ -94,6 +94,12 @@ bool next_token(Context* context,
                 Location* location,
                 Token* token_out,
                 bool* at_bol) {
+    if (lexer->back.type != Token::NullToken) {
+        *token_out = lexer->back;
+        lexer->back.type = Token::NullToken;
+        return true;
+    }
+
     ZoneScopedN("lex::next_token");
     Location point = *location;
 top:

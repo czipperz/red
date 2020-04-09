@@ -8,6 +8,8 @@ namespace red {
 
 struct Token {
     enum Type {
+        NullToken,  // used to indicate no value
+
         OpenParen,
         CloseParen,
         OpenCurly,
