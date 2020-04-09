@@ -17,9 +17,9 @@ int Options::parse(Context* context, int argc, char** argv) {
 
     include_paths.reserve(cz::heap_allocator(), 4);
     include_paths.push("/usr/local/include");
-    include_paths.push("/usr/lib/gcc/x86_64-pc-linux-gnu/9.1.0/include-fixed");
+    include_paths.push("/usr/lib/gcc/x86_64-pc-linux-gnu/9.3.0/include-fixed");
     include_paths.push("/usr/include");
-    include_paths.push("/usr/lib/gcc/x86_64-pc-linux-gnu/9.1.0/include");
+    include_paths.push("/usr/lib/gcc/x86_64-pc-linux-gnu/9.3.0/include");
 
     for (size_t i = 0; i < argc; ++i) {
         char* arg = argv[i];
