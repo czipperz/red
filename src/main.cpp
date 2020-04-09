@@ -1,6 +1,7 @@
-#include <chrono>
-#include <stdint.h>
 #include <inttypes.h>
+#include <stdint.h>
+#include <Tracy.hpp>
+#include <chrono>
 #include <cz/assert.hpp>
 #include <cz/defer.hpp>
 #include <cz/heap.hpp>
@@ -14,6 +15,7 @@
 namespace red {
 
 static Result run_main(Context* context) {
+    ZoneScoped;
     for (size_t i = 0; i < context->options.input_files.len(); ++i) {
         CZ_TRY(compile_file(context, context->options.input_files[i]));
     }
@@ -21,9 +23,11 @@ static Result run_main(Context* context) {
 }
 
 static int try_run_main(Context* context) {
+    ZoneScoped;
     try {
         Result result = run_main(context);
 
+        ZoneScopedN("Show errors");
         for (size_t i = 0; i < context->unspanned_errors.len(); ++i) {
             fprintf(stderr, "Error: ");
             cz::Str error = context->unspanned_errors[i];
@@ -32,6 +36,8 @@ static int try_run_main(Context* context) {
         }
 
         for (size_t i = 0; i < context->errors.len(); ++i) {
+            ZoneScoped;
+
             const Compiler_Error& error = context->errors[i];
             const File& file = context->files.files[error.span.start.file];
 
@@ -96,6 +102,7 @@ static int try_run_main(Context* context) {
 }
 
 int main(int argc, char** argv) {
+    ZoneScoped;
     char* program_name = argv[0];
     argc--;
     argv++;

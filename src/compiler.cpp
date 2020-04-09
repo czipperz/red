@@ -1,5 +1,6 @@
 #include "compiler.hpp"
 
+#include <Tracy.hpp>
 #include <cz/defer.hpp>
 #include <cz/path.hpp>
 #include <cz/try.hpp>
@@ -14,6 +15,8 @@
 namespace red {
 
 Result compile_file(Context* context, const char* file_name) {
+    ZoneScoped;
+
     lex::Lexer lexer = {};
     lexer.init();
     CZ_DEFER(lexer.drop());

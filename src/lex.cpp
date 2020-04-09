@@ -1,6 +1,7 @@
 #include "lex.hpp"
 
 #include <ctype.h>
+#include <Tracy.hpp>
 #include "context.hpp"
 #include "file_contents.hpp"
 #include "location.hpp"
@@ -10,6 +11,7 @@ namespace red {
 namespace lex {
 
 bool next_character(const File_Contents& file_contents, Location* location, char* out) {
+    ZoneScoped;
 top:
     if (location->index == file_contents.len) {
         return false;
@@ -92,6 +94,7 @@ bool next_token(Context* context,
                 Location* location,
                 Token* token_out,
                 bool* at_bol) {
+    ZoneScopedN("lex::next_token");
     Location point = *location;
 top:
     token_out->span.start = point;
@@ -206,6 +209,7 @@ top:
             char next;
             if (next_character(file_contents, &point, &next)) {
                 if (next == '*') {
+                    ZoneScopedN("lex::next_token block comment");
                     char prev = 0;
                     while (1) {
                         char next;
@@ -219,6 +223,22 @@ top:
                             break;
                         }
                         prev = next;
+                    }
+
+                    *location = point;
+                    goto top;
+                } else if (next == '/') {
+                    ZoneScopedN("lex::next_token line comment");
+                    while (1) {
+                        char next;
+                        if (!next_character(file_contents, &point, &next)) {
+                            *location = point;
+                            return false;
+                        }
+
+                        if (next == '\n') {
+                            break;
+                        }
                     }
 
                     *location = point;
@@ -276,6 +296,8 @@ top:
         }
 
         case '"': {
+            ZoneScopedN("lex::next_token string");
+
             cz::String value = {};
             Location start = point;
 
@@ -315,6 +337,8 @@ top:
 
         default:
             if (isalpha(c) || c == '_') {
+                ZoneScopedN("lex::next_token identifier");
+
                 cz::String value = {};
 
                 while (1) {
@@ -368,10 +392,13 @@ top:
                     {"while", Token::While},
                 };
 
-                for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords); ++i) {
-                    if (value == keywords[i].value) {
-                        token_out->type = keywords[i].type;
-                        goto end_parse_label;
+                {
+                    ZoneScopedN("lex::next_token check if identifier is keyword");
+                    for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords); ++i) {
+                        if (value == keywords[i].value) {
+                            token_out->type = keywords[i].type;
+                            goto end_parse_label;
+                        }
                     }
                 }
 
@@ -383,6 +410,8 @@ top:
             }
 
             if (isdigit(c)) {
+                ZoneScopedN("lex::next_token number");
+
                 uint64_t value = 0;
                 while (1) {
                     *location = point;

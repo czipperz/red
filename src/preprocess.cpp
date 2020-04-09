@@ -1,6 +1,7 @@
 #include "preprocess.hpp"
 
 #include <ctype.h>
+#include <Tracy.hpp>
 #include <cz/assert.hpp>
 #include <cz/defer.hpp>
 #include <cz/heap.hpp>
@@ -36,6 +37,7 @@ Location Preprocessor::location() const {
 }
 
 static void advance_over_whitespace(const File_Contents& contents, Location* location) {
+    ZoneScoped;
     Location point = *location;
     while (1) {
         char ch;
@@ -55,6 +57,7 @@ static Result read_include(const File_Contents& contents,
                            char target,
                            cz::Allocator allocator,
                            cz::String* output) {
+    ZoneScoped;
     while (1) {
         *end_out = *location;
 
@@ -75,6 +78,7 @@ static Result process_include(Context* context,
                               Preprocessor* preprocessor,
                               lex::Lexer* lexer,
                               Token* token) {
+    ZoneScoped;
     Location* point = &preprocessor->include_stack.last().location;
     advance_over_whitespace(context->files.files[point->file].contents, point);
 
@@ -156,6 +160,7 @@ static bool skip_until_eol(Context* context,
                            Preprocessor* preprocessor,
                            lex::Lexer* lexer,
                            Token* token) {
+    ZoneScoped;
     Location* point = &preprocessor->include_stack.last().location;
     while (1) {
         bool at_bol = false;
@@ -179,6 +184,7 @@ static Result process_pragma(Context* context,
                              Preprocessor* preprocessor,
                              lex::Lexer* lexer,
                              Token* token) {
+    ZoneScoped;
     Location* point = &preprocessor->include_stack.last().location;
     bool at_bol = false;
     if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
@@ -219,6 +225,7 @@ static Result process_if_true(Context* context,
                               Preprocessor* preprocessor,
                               lex::Lexer* lexer,
                               Token* token) {
+    ZoneScoped;
     Location* point = &preprocessor->include_stack.last().location;
     bool at_bol = false;
     if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
@@ -234,6 +241,7 @@ static Result process_if_false(Context* context,
                                Preprocessor* preprocessor,
                                lex::Lexer* lexer,
                                Token* token) {
+    ZoneScoped;
     size_t skip_depth = 0;
     while (1) {
         bool at_bol = skip_until_eol(context, preprocessor, lexer, token);
@@ -287,6 +295,7 @@ static Result process_ifdef(Context* context,
                             lex::Lexer* lexer,
                             Token* token,
                             bool want_present) {
+    ZoneScoped;
     Span ifdef_span = token->span;
 
     Include_Info* point = &preprocessor->include_stack.last();
@@ -321,6 +330,7 @@ static Result process_if(Context* context,
                          Preprocessor* preprocessor,
                          lex::Lexer* lexer,
                          Token* token) {
+    ZoneScoped;
     CZ_PANIC("Unimplemented #if");
 }
 
@@ -328,6 +338,7 @@ static Result process_else(Context* context,
                            Preprocessor* preprocessor,
                            lex::Lexer* lexer,
                            Token* token) {
+    ZoneScoped;
     // We just produced x and are skipping over y
     // #if 1
     // x
@@ -348,6 +359,7 @@ static Result process_endif(Context* context,
                             Preprocessor* preprocessor,
                             lex::Lexer* lexer,
                             Token* token) {
+    ZoneScoped;
     Include_Info* point = &preprocessor->include_stack.last();
     if (point->if_depth == 0) {
         context->report_error(token->span, "#endif without #if");
@@ -362,6 +374,7 @@ static Result process_define(Context* context,
                              Preprocessor* preprocessor,
                              lex::Lexer* lexer,
                              Token* token) {
+    ZoneScoped;
     Span define_span = token->span;
 
     Location* point = &preprocessor->include_stack.last().location;
@@ -410,6 +423,7 @@ static Result process_undef(Context* context,
                             Preprocessor* preprocessor,
                             lex::Lexer* lexer,
                             Token* token) {
+    ZoneScoped;
     Span undef_span = token->span;
 
     Include_Info* point = &preprocessor->include_stack.last();
@@ -437,6 +451,7 @@ static Result process_error(Context* context,
                             Preprocessor* preprocessor,
                             lex::Lexer* lexer,
                             Token* token) {
+    ZoneScoped;
     context->report_error(token->span, "Explicit error");
     return SKIP_UNTIL_EOL();
 }
@@ -446,6 +461,7 @@ static Result process_defined_identifier(Context* context,
                                          lex::Lexer* lexer,
                                          Token* token,
                                          Definition* definition) {
+    ZoneScoped;
     preprocessor->definition_stack.reserve(cz::heap_allocator(), 1);
     Definition_Info info = {};
     info.definition = definition;
@@ -458,6 +474,7 @@ static Result process_identifier(Context* context,
                                  Preprocessor* preprocessor,
                                  lex::Lexer* lexer,
                                  Token* token) {
+    ZoneScoped;
     Definition* definition =
         preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
     if (definition) {
@@ -472,6 +489,7 @@ static Result process_token(Context* context,
                             lex::Lexer* lexer,
                             Token* token,
                             bool at_bol) {
+    ZoneScoped;
 top:
     Location* point = &preprocessor->include_stack.last().location;
     if (at_bol && token->type == Token::Hash) {
@@ -547,6 +565,7 @@ static Result process_next(Context* context,
 }
 
 Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer, Token* token) {
+    ZoneScoped;
     while (preprocessor->definition_stack.len() > 0) {
         Definition_Info* info = &preprocessor->definition_stack.last();
         if (info->index == info->definition->tokens.len()) {
