@@ -18,26 +18,21 @@ struct Context {
     cz::Vector<CompilerError> errors;
     cz::Buffer_Array error_message_buffer_array;
 
+    void init();
+    void destroy();
+
     template <class... Ts>
     void report_error(Span span, Ts... ts) {
-        errors.reserve(cz::heap_allocator(), 1);
-
-        CompilerError error;
-        CZ_DEBUG_ASSERT(span.start.file == span.end.file);
-        error.span = span;
-
         cz::AllocatedString message;
         message.allocator = error_mesage_buffer_array.allocator();
         // ignore errors in return value
         cz::write(cz::string_writer(&message), ts...);
         message.realloc();
-        error.message = /* slice */ message;
 
-        errors.push(error);
+        report_error_str(span, message);
     }
 
-    void init() { error_message_buffer_array.create(); }
-    void destroy();
+    void report_error_str(Span span, cz::Str message);
 };
 
 using C = Context;
