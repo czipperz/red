@@ -1,13 +1,13 @@
 #pragma once
 
-#include <cz/string.hpp>
+#include <cz/str.hpp>
 #include "span.hpp"
 
 namespace red {
 
-struct CompilerError {
+struct Compiler_Error {
     Span span;
-    cz::String message;
+    cz::Str message;
 };
 
 }

@@ -2,69 +2,45 @@
 
 #include <cz/defer.hpp>
 #include <cz/heap.hpp>
-#include <cz/logger.hpp>
+#include "context.hpp"
+#include "file_contents.hpp"
+#include "hashed_str.hpp"
+#include "lex.hpp"
 #include "load.hpp"
 #include "preprocess.hpp"
+#include "token.hpp"
 
 using namespace red;
 using namespace red::cpp;
 
-static FileBuffer build_file_buffer(cz::Allocator allocator, cz::Str contents) {
-    FileBuffer file_buffer;
-    file_buffer.buffers_len =
-        (contents.len + FileBuffer::buffer_size - 1) / FileBuffer::buffer_size;
-    file_buffer.last_len = contents.len % FileBuffer::buffer_size;
-    file_buffer.buffers =
-        static_cast<char**>(allocator.alloc({sizeof(char*) * file_buffer.buffers_len, 1}).buffer);
+static void setup(Context* context, Preprocessor* preprocessor, cz::Str contents) {
+    context->init();
 
-    for (size_t i = 0; i + 1 < file_buffer.buffers_len; ++i) {
-        char** buffer = &file_buffer.buffers[i];
-        *buffer = static_cast<char*>(allocator.alloc({FileBuffer::buffer_size, 1}).buffer);
-        memcpy(*buffer, contents.buffer + i * FileBuffer::buffer_size, FileBuffer::buffer_size);
-    }
+    include_file_reserve(&context->files, preprocessor);
 
-    if (contents.len > 0) {
-        char** last_buffer = &file_buffer.buffers[file_buffer.buffers_len - 1];
-        *last_buffer = static_cast<char*>(allocator.alloc({file_buffer.last_len, 1}).buffer);
-        memcpy(*last_buffer,
-               contents.buffer + (file_buffer.buffers_len - 1) * FileBuffer::buffer_size,
-               file_buffer.last_len);
-    }
-
-    return file_buffer;
+    File_Contents file_contents;
+    file_contents.load_str(contents, context->files.file_buffer_array.allocator());
+    Hashed_Str file_path = Hashed_Str::from_str("*test_file*");
+    force_include_file(&context->files, preprocessor, file_path, file_contents);
 }
 
-static void setup(C* c, Preprocessor* p, cz::Str contents) {
-    c->allocator = cz::heap_allocator();
-    c->temp = nullptr;
-    c->logger = cz::Logger::ignore();
-    c->max_log_level = cz::LogLevel::Off;
-
-    load_file_reserve(c, p);
-
-    cz::String file_path = cz::Str("*test_file*").duplicate_null_terminate(c->allocator);
-    Hash file_path_hash = StrMap<size_t>::hash(file_path);
-
-    FileBuffer file_buffer = build_file_buffer(c->allocator, contents);
-    load_file_push(c, p, file_path, file_path_hash, file_buffer);
-}
-
-#define SETUP(contents)                  \
-    C c;                                 \
-    Preprocessor p;                      \
-    setup(&c, &p, contents);             \
-                                         \
-    Token token;                         \
-    cz::AllocatedString label_value;     \
-    label_value.allocator = c.allocator; \
-                                         \
-    CZ_DEFER({                           \
-        p.destroy(&c);                   \
-        c.destroy();                     \
-        label_value.drop();              \
+#define SETUP(CONTENTS)                       \
+    Context context = {};                     \
+    Preprocessor preprocessor = {};           \
+    setup(&context, &preprocessor, CONTENTS); \
+                                              \
+    lex::Lexer lexer = {};                    \
+    lexer.init();                             \
+                                              \
+    Token token;                              \
+                                              \
+    CZ_DEFER({                                \
+        lexer.drop();                         \
+        preprocessor.destroy();               \
+        context.destroy();                    \
     })
 
-#define EAT_NEXT() p.next(&c, &token, &label_value)
+#define EAT_NEXT() next_token(&context, &preprocessor, &lexer, &token)
 
 TEST_CASE("Preprocessor::next empty file") {
     SETUP("");
@@ -76,15 +52,15 @@ TEST_CASE("Preprocessor::next ignores empty #pragma") {
     SETUP("#pragma\n<");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::LessThan);
-    REQUIRE(token.span.start.file == 0);
-    REQUIRE(token.span.start.index == 8);
-    REQUIRE(token.span.start.line == 1);
-    REQUIRE(token.span.start.column == 0);
-    REQUIRE(token.span.end.file == 0);
-    REQUIRE(token.span.end.index == 9);
-    REQUIRE(token.span.end.line == 1);
-    REQUIRE(token.span.end.column == 1);
+    CHECK(token.type == Token::LessThan);
+    CHECK(token.span.start.file == 0);
+    CHECK(token.span.start.index == 8);
+    CHECK(token.span.start.line == 1);
+    CHECK(token.span.start.column == 0);
+    CHECK(token.span.end.file == 0);
+    CHECK(token.span.end.index == 9);
+    CHECK(token.span.end.line == 1);
+    CHECK(token.span.end.column == 1);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -99,8 +75,8 @@ TEST_CASE("Preprocessor::next define is skipped no value") {
     SETUP("#define x\na");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "a");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -109,8 +85,8 @@ TEST_CASE("Preprocessor::next ifdef without definition is skipped") {
     SETUP("#ifdef x\na\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "b");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -119,8 +95,8 @@ TEST_CASE("Preprocessor::next ifdef without definition empty body") {
     SETUP("#ifdef x\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "b");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -129,12 +105,12 @@ TEST_CASE("Preprocessor::next ifndef without definition is preserved") {
     SETUP("#ifndef x\na\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "a");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "b");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -143,8 +119,8 @@ TEST_CASE("Preprocessor::next ifndef without definition empty body") {
     SETUP("#ifndef x\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "b");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -153,12 +129,12 @@ TEST_CASE("Preprocessor::next ifdef with definition is preserved") {
     SETUP("#define x\n#ifdef x\na\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "a");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "b");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -167,8 +143,8 @@ TEST_CASE("Preprocessor::next ifndef with definition is skipped") {
     SETUP("#define x\n#ifndef x\na\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "b");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -177,8 +153,8 @@ TEST_CASE("Preprocessor::next #undef then #ifndef") {
     SETUP("#define x\n#undef x\n#ifndef x\nabc\n#endif");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "abc");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "abc");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -196,7 +172,7 @@ TEST_CASE(
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 
-    REQUIRE(c.errors.len() == 0);
+    REQUIRE(context.errors.len() == 0);
 }
 
 TEST_CASE(
@@ -205,12 +181,12 @@ TEST_CASE(
     SETUP("#ifndef x\n#\nendif\n#endif\n");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "endif");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "endif");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 
-    REQUIRE(c.errors.len() == 0);
+    REQUIRE(context.errors.len() == 0);
 }
 
 TEST_CASE("Preprocessor::next random #endif is error") {
@@ -218,7 +194,7 @@ TEST_CASE("Preprocessor::next random #endif is error") {
 
     REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
 
-    REQUIRE(c.errors.len() > 0);
+    REQUIRE(context.errors.len() > 0);
 }
 
 TEST_CASE("Preprocessor::next unterminated untaken #if is error") {
@@ -226,7 +202,7 @@ TEST_CASE("Preprocessor::next unterminated untaken #if is error") {
 
     REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
 
-    REQUIRE(c.errors.len() > 0);
+    REQUIRE(context.errors.len() > 0);
 }
 
 TEST_CASE("Preprocessor::next unterminated taken #if is error") {
@@ -234,28 +210,28 @@ TEST_CASE("Preprocessor::next unterminated taken #if is error") {
 
     REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
 
-    REQUIRE(c.errors.len() > 0);
+    REQUIRE(context.errors.len() > 0);
 }
 
 TEST_CASE("Preprocessor::next #if isn't terminated by # newline endif") {
     SETUP("#ifndef x\n#\nendif");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "endif");
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "endif");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 
-    REQUIRE(c.errors.len() > 0);
+    REQUIRE(context.errors.len() > 0);
 }
 
 TEST_CASE("Preprocessor::next continue over #error and record error") {
     SETUP("#error\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "abc");
-    REQUIRE(c.errors.len() > 0);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "abc");
+    REQUIRE(context.errors.len() > 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -264,9 +240,9 @@ TEST_CASE("Preprocessor::next continue over #random and record error") {
     SETUP("#ooooo\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "abc");
-    REQUIRE(c.errors.len() > 0);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "abc");
+    REQUIRE(context.errors.len() > 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -275,9 +251,9 @@ TEST_CASE("Preprocessor::next #random inside #if false is ignored") {
     SETUP("#ifdef x\n#ooooo\n#endif\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "abc");
-    REQUIRE(c.errors.len() == 0);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "abc");
+    REQUIRE(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -286,9 +262,9 @@ TEST_CASE("Preprocessor::next #random inside #if true is error and continue") {
     SETUP("#ifndef x\n#ooooo\n#endif\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "abc");
-    REQUIRE(c.errors.len() > 0);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "abc");
+    REQUIRE(context.errors.len() > 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -303,9 +279,9 @@ TEST_CASE("Preprocessor::next #define one value") {
     SETUP("#define abc def\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
-    REQUIRE(token.type == Token::Label);
-    REQUIRE(label_value == "def");
-    REQUIRE(c.errors.len() > 0);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "def");
+    REQUIRE(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }

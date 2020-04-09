@@ -18,9 +18,11 @@ struct File_Contents {
     size_t buffers_len;
     size_t len;
 
-    Result read(const char* cstr_file_name);
+    Result read(const char* cstr_file_name, cz::Allocator buffers_array_allocator);
+    void load_str(cz::Str contents, cz::Allocator buffers_array_allocator);
 
-    void drop();
+    void drop_buffers();
+    void drop_array(cz::Allocator buffers_array_allocator);
 
     char get(size_t index) const {
         CZ_DEBUG_ASSERT(index < len);

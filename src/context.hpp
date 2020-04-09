@@ -15,16 +15,19 @@ struct Context {
 
     Files files;
 
-    cz::Vector<CompilerError> errors;
+    cz::Vector<Compiler_Error> errors;
+    cz::Vector<cz::Str> unspanned_errors;
     cz::Buffer_Array error_message_buffer_array;
+
+    cz::Buffer_Array temp_buffer_array;
 
     void init();
     void destroy();
 
     template <class... Ts>
     void report_error(Span span, Ts... ts) {
-        cz::AllocatedString message;
-        message.allocator = error_mesage_buffer_array.allocator();
+        cz::AllocatedString message = {};
+        message.allocator = error_message_buffer_array.allocator();
         // ignore errors in return value
         cz::write(cz::string_writer(&message), ts...);
         message.realloc();
@@ -33,8 +36,8 @@ struct Context {
     }
 
     void report_error_str(Span span, cz::Str message);
-};
 
-using C = Context;
+    void report_error_unspanned(cz::Str message);
+};
 
 }

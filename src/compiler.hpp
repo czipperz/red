@@ -1,10 +1,9 @@
 #pragma once
 
-#include "context.hpp"
-#include "result.hpp"
-
 namespace red {
+struct Context;
+struct Result;
 
-Result compile_file(C* c, const char* file_name);
+Result compile_file(Context*, const char* file_name);
 
 }

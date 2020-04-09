@@ -6,7 +6,7 @@
 
 namespace red {
 
-Result File_Contents::read(const char* cstr_file_name) {
+Result File_Contents::read(const char* cstr_file_name, cz::Allocator buffers_array_allocator) {
     FILE* file = fopen(cstr_file_name, "r");
     if (!file) {
         return Result::last_system_error();
@@ -14,7 +14,8 @@ Result File_Contents::read(const char* cstr_file_name) {
     CZ_DEFER(fclose(file));
 
     size_t buffers_capacity = 8;
-    buffers = static_cast<char**>(malloc(buffers_capacity * sizeof(char*)));
+    buffers = static_cast<char**>(
+        buffers_array_allocator.alloc({buffers_capacity * sizeof(char*), alignof(char*)}));
     buffers_len = 0;
 
     while (1) {
@@ -32,7 +33,9 @@ Result File_Contents::read(const char* cstr_file_name) {
         // reserve a spot
         if (buffers_len + 1 == buffers_capacity) {
             size_t new_cap = buffers_capacity * 2;
-            char** new_buffers = static_cast<char**>(realloc(buffers, new_cap * sizeof(char*)));
+            char** new_buffers = static_cast<char**>(
+                buffers_array_allocator.realloc({buffers, buffers_capacity * sizeof(char*)},
+                                                {new_cap * sizeof(char*), alignof(char*)}));
             CZ_ASSERT(new_buffers);
 
             buffers = new_buffers;
@@ -59,36 +62,47 @@ Result File_Contents::read(const char* cstr_file_name) {
 
     if (feof(file)) {
         // we most likely overallocated so shrink to size
-        char** shrunk_buffers =
-            static_cast<char**>(allocator
-                                    .realloc({buffers, buffers_capacity * sizeof(char*)},
-                                             {buffers_len * sizeof(char*), alignof(char*)})
-                                    .buffer);
+        char** shrunk_buffers = static_cast<char**>(
+            buffers_array_allocator.realloc({buffers, buffers_capacity * sizeof(char*)},
+                                            {buffers_len * sizeof(char*), alignof(char*)}));
         CZ_ASSERT(shrunk_buffers);
         buffers = shrunk_buffers;
 
         return Result::ok();
     } else {
-        // clean up
-        for (size_t i = 0; i + 1 < buffers_len; ++i) {
-            allocator.dealloc({buffers[i], buffer_size});
-        }
-        if (buffers_len > 0) {
-            allocator.dealloc({buffers[buffers_len - 1], last_len});
-        }
-        allocator.dealloc({buffers, buffers_capacity * sizeof(char*)});
-
-        *this = {};
-
         return {Result::ErrorFile};
     }
 }
 
-void File_Contents::drop(cz::Allocator allocator) {
+void File_Contents::load_str(cz::Str contents, cz::Allocator allocator) {
+    buffers_len = (contents.len + File_Contents::buffer_size - 1) / File_Contents::buffer_size;
+    len = contents.len;
+    buffers = static_cast<char**>(allocator.alloc({sizeof(char*) * buffers_len, alignof(char*)}));
+
+    for (size_t i = 0; i < buffers_len; ++i) {
+        size_t offset = i * File_Contents::buffer_size;
+        size_t size;
+        if (i + 1 < buffers_len) {
+            size = File_Contents::buffer_size;
+        } else {
+            size = len - offset;
+        }
+
+        char* buffer = static_cast<char*>(malloc(size));
+        buffers[i] = buffer;
+        memcpy(buffer, contents.buffer + offset, size);
+    }
+}
+
+void File_Contents::drop_buffers() {
     for (size_t i = 0; i < buffers_len; ++i) {
         free(buffers[i]);
     }
-    free(buffers);
+}
+
+void File_Contents::drop_array(cz::Allocator allocator) {
+    drop_buffers();
+    allocator.dealloc({buffers, buffers_len * sizeof(char*)});
 }
 
 }

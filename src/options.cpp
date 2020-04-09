@@ -1,21 +1,21 @@
 #include "options.hpp"
 
-#include <cz/log.hpp>
+#include <cz/heap.hpp>
 #include <cz/path.hpp>
+#include "context.hpp"
 
 namespace red {
 
-void Options::destroy(cz::C* c) {
-    input_files.drop(c->allocator);
-
-    for (size_t i = 4; i < include_paths.len(); ++i) {
-        c->allocator.dealloc({const_cast<char*>(include_paths[i].buffer), include_paths[i].len});
-    }
-    include_paths.drop(c->allocator);
+void Options::destroy() {
+    input_files.drop(cz::heap_allocator());
+    include_paths.drop(cz::heap_allocator());
+    buffer_array.drop();
 }
 
-int Options::parse(cz::C* c, int argc, char** argv) {
-    include_paths.reserve(c->allocator, 4);
+int Options::parse(Context* context, int argc, char** argv) {
+    buffer_array.create();
+
+    include_paths.reserve(cz::heap_allocator(), 4);
     include_paths.push("/usr/local/include");
     include_paths.push("/usr/lib/gcc/x86_64-pc-linux-gnu/9.1.0/include-fixed");
     include_paths.push("/usr/include");
@@ -24,18 +24,17 @@ int Options::parse(cz::C* c, int argc, char** argv) {
     for (size_t i = 0; i < argc; ++i) {
         char* arg = argv[i];
         if (arg[0] == '-' && arg[1] == 'I') {
-            include_paths.reserve(c->allocator, 1);
+            include_paths.reserve(cz::heap_allocator(), 1);
             cz::Str relpath = arg + 2;
-            cz::String path;
-            if (cz::path::make_absolute(relpath, c->allocator, &path).is_err()) {
-                path.drop(c->allocator);
-                CZ_LOG(c, Fatal, "Could not access working directory");
+            cz::String path = {};
+            if (cz::path::make_absolute(relpath, buffer_array.allocator(), &path).is_err()) {
+                context->report_error_unspanned("Could not access working directory");
                 return 1;
             }
-            path.realloc_null_terminate(c->allocator);
+            path.realloc_null_terminate(buffer_array.allocator());
             include_paths.push(path);
         } else {
-            input_files.reserve(c->allocator, 1);
+            input_files.reserve(cz::heap_allocator(), 1);
             input_files.push(arg);
         }
     }

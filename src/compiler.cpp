@@ -3,38 +3,45 @@
 #include <cz/defer.hpp>
 #include <cz/path.hpp>
 #include <cz/try.hpp>
+#include "context.hpp"
+#include "hashed_str.hpp"
+#include "lex.hpp"
 #include "load.hpp"
 #include "preprocess.hpp"
+#include "result.hpp"
+#include "token.hpp"
 
 namespace red {
 
-Result compile_file(C* c, const char* file_name) {
-    cpp::Preprocessor preprocessor;
-    CZ_DEFER(preprocessor.destroy(c));
+Result compile_file(Context* context, const char* file_name) {
+    lex::Lexer lexer = {};
+    lexer.init();
+    CZ_DEFER(lexer.drop());
 
-    cz::String file_path;
-    cz::Result abs_result = cz::path::make_absolute(file_name, c->allocator, &file_path);
+    cpp::Preprocessor preprocessor = {};
+    CZ_DEFER(preprocessor.destroy());
+
+    cz::String file_path = {};
+    cz::Result abs_result = cz::path::make_absolute(
+        file_name, context->files.file_buffer_array.allocator(), &file_path);
     if (abs_result.is_err()) {
-        file_path.drop(c->allocator);
+        file_path.drop(context->files.file_buffer_array.allocator());
         return Result::from(abs_result);
     }
-    file_path.realloc_null_terminate(c->allocator);
+    file_path.realloc_null_terminate(context->files.file_buffer_array.allocator());
 
-    CZ_TRY(load_file(c, &preprocessor, file_path));
+    CZ_TRY(include_file(&context->files, &preprocessor, file_path));
 
-    Result result;
-    cz::AllocatedString label_value;
-    label_value.allocator = c->allocator;
-    CZ_DEFER(label_value.drop());
     Token token;
-    while ((result = preprocessor.next(c, &token, &label_value)).is_ok()) {
+    while (1) {
+        Result result = cpp::next_token(context, &preprocessor, &lexer, &token);
+        if (result.is_err()) {
+            return result;
+        }
         if (result.type == Result::Done) {
-            result.type = Result::Success;
-            break;
+            return Result::ok();
         }
     }
-
-    return result;
 }
 
 }

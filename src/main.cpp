@@ -1,84 +1,75 @@
 #include <chrono>
+#include <stdint.h>
+#include <inttypes.h>
 #include <cz/assert.hpp>
+#include <cz/defer.hpp>
 #include <cz/heap.hpp>
-#include <cz/log.hpp>
 #include <cz/slice.hpp>
+#include <cz/try.hpp>
 #include "compiler.hpp"
 #include "context.hpp"
+#include "file.hpp"
+#include "result.hpp"
 
 namespace red {
 
-static FILE* choose_file(cz::LogLevel level) {
-    if (level < cz::LogLevel::Warning) {
-        return stderr;
-    } else {
-        return stdout;
-    }
-}
-
-static cz::Result log_prefix(void*, const cz::LogInfo& info) {
-    FILE* out = choose_file(info.level);
-    return cz::write(cz::file_writer(out), info.level, ": ");
-}
-
-static cz::Result log_chunk(void*, const cz::LogInfo& info, cz::Str chunk) {
-    FILE* out = choose_file(info.level);
-    return cz::write(cz::file_writer(out), chunk);
-}
-
-static cz::Result log_suffix(void*, const cz::LogInfo& info) {
-    FILE* out = choose_file(info.level);
-    return cz::write(cz::file_writer(out), '\n');
-}
-
-static Result run_main(C* c) {
-    for (size_t i = 0; i < c->options.input_files.len(); ++i) {
-        CZ_TRY(compile_file(c, c->options.input_files[i]));
+static Result run_main(Context* context) {
+    for (size_t i = 0; i < context->options.input_files.len(); ++i) {
+        CZ_TRY(compile_file(context, context->options.input_files[i]));
     }
     return Result::ok();
 }
 
-static int try_run_main(C* c) {
+static int try_run_main(Context* context) {
     try {
-        Result result = run_main(c);
+        Result result = run_main(context);
 
-        for (size_t i = 0; i < c->errors.len(); ++i) {
-            const CompilerError& error = c->errors[i];
-            const FileBuffer& buffer = c->files.buffers[error.span.start.file];
-            const char* file_name = c->files.names[error.span.start.file];
-            cz::write(cz::cerr(), "Error: ", file_name, ":", error.span.start.line + 1, ":",
-                      error.span.start.column + 1, ": ", c->errors[i].message, ":\n");
+        for (size_t i = 0; i < context->unspanned_errors.len(); ++i) {
+            fprintf(stderr, "Error: ");
+            cz::Str error = context->unspanned_errors[i];
+            fwrite(error.buffer, 1, error.len, stderr);
+            fputc('\n', stderr);
+        }
 
-            cz::write(cz::cerr(), "~   ");
+        for (size_t i = 0; i < context->errors.len(); ++i) {
+            const Compiler_Error& error = context->errors[i];
+            const File& file = context->files.files[error.span.start.file];
+
+            fputs("Error: ", stderr);
+            fwrite(file.path.buffer, 1, file.path.len, stderr);
+            fprintf(stderr, ":%zu:%zu: ", error.span.start.line + 1, error.span.start.column + 1);
+            fwrite(context->errors[i].message.buffer, 1, context->errors[i].message.len, stderr);
+            fputs(":\n~   ", stderr);
 
             size_t line = error.span.start.line;
             size_t line_start = error.span.start.index - error.span.start.column;
             for (size_t i = line_start;; ++i) {
-                cz::write(cz::cerr(), buffer.get(i));
+                char ch = file.contents.get(i);
+                putc(ch, stderr);
 
-                if (buffer.get(i) == '\n') {
-                    cz::write(cz::cerr(), "    ");
+                if (ch == '\n') {
+                    fputs("    ", stderr);
 
                     size_t j = 0;
                     if (line == error.span.start.line) {
                         for (; j < error.span.start.column; ++j) {
-                            cz::write(cz::cerr(), ' ');
+                            putc(' ', stderr);
                         }
                     }
 
                     if (line == error.span.end.line) {
                         for (; j < error.span.end.column; ++j) {
-                            cz::write(cz::cerr(), '^');
+                            putc('^', stderr);
                         }
                     } else {
-                        for (; buffer.get(j + line_start) != '\n'; ++j) {
-                            cz::write(cz::cerr(), '^');
+                        for (; file.contents.get(j + line_start) != '\n'; ++j) {
+                            putc('^', stderr);
                         }
                     }
 
-                    cz::write(cz::cerr(), '\n');
+                    putc('\n', stderr);
                     if (i < error.span.end.index) {
-                        cz::write(cz::cerr(), "~   ");
+                        fputs("~   ", stderr);
                     }
 
                     ++line;
@@ -90,16 +81,16 @@ static int try_run_main(C* c) {
                 }
             }
 
-            cz::write(cz::cerr(), '\n');
+            putc('\n', stderr);
         }
 
         if (result.is_err()) {
             return 1;
         } else {
-            return c->errors.len() > 0;
+            return context->unspanned_errors.len() > 0 || context->errors.len() > 0;
         }
     } catch (cz::PanicReachedException& e) {
-        CZ_LOG(c, Fatal, "Compiler crash: ", e.what());
+        fprintf(stderr, "Fatal: Compiler crash: %s\n", e.what());
         return 2;
     }
 }
@@ -122,18 +113,18 @@ int main(int argc, char** argv) {
     auto end_time = std::chrono::high_resolution_clock::now();
 
     size_t bytes = 0;
-    for (size_t i = 0; i < context.files.buffers.len(); ++i) {
-        bytes += context.files.buffers[i].len();
+    for (size_t i = 0; i < context.files.files.len(); ++i) {
+        bytes += context.files.files[i].contents.len;
     }
-    CZ_LOG(&context, Information, "Bytes processed: ", bytes);
+    printf("Bytes processed: %zu\n", bytes);
 
     auto duration = end_time - start_time;
-    using time_t = std::chrono::microseconds;
-    auto as_micros = std::chrono::duration_cast<time_t>(duration).count();
-    auto seconds = as_micros / time_t::period::den;
-    auto micros = as_micros % time_t::period::den;
+    using std::chrono::microseconds;
+    auto as_micros = std::chrono::duration_cast<microseconds>(duration).count();
+    uint64_t seconds = as_micros / microseconds::period::den;
+    uint64_t micros = as_micros % microseconds::period::den;
 
-    CZ_LOG(&context, Information, "Elapsed: ", seconds, ".", cz::format::width(6, micros), "s");
+    printf("Elapsed: %" PRIu64 ".%.6" PRIu64 "s", seconds, micros);
 
     return code;
 }

@@ -1,199 +1,206 @@
 #include "test_base.hpp"
 
-#include "preprocess.hpp"
+#include "file_contents.hpp"
+#include "lex.hpp"
+#include "location.hpp"
 
-using red::cpp::next_character;
+using red::lex::next_character;
 
 TEST_CASE("next_character() empty file") {
-    red::FileBuffer file_buffer;
+    red::File_Contents file_contents = {};
 
     red::Location location = {};
-    char ch = next_character(file_buffer, &location);
+    char ch;
 
-    REQUIRE(ch == '\0');
-    REQUIRE(location.index == 0);
-    REQUIRE(location.line == 0);
-    REQUIRE(location.column == 0);
+    REQUIRE_FALSE(next_character(file_contents, &location, &ch));
+    CHECK(location.index == 0);
+    CHECK(location.line == 0);
+    CHECK(location.column == 0);
 }
 
 TEST_CASE("next_character() normal chars") {
-    red::FileBuffer file_buffer;
+    red::File_Contents file_contents = {};
     char* buffer = (char*)"abc";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    file_contents.buffers = &buffer;
+    file_contents.buffers_len = 1;
+    file_contents.len = strlen(buffer);
 
     red::Location location = {};
-    char ch = next_character(file_buffer, &location);
-    REQUIRE(ch == 'a');
-    REQUIRE(location.index == 1);
+    char ch;
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == 'a');
+    CHECK(location.index == 1);
 
-    ch = next_character(file_buffer, &location);
-    REQUIRE(ch == 'b');
-    REQUIRE(location.index == 2);
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == 'b');
+    CHECK(location.index == 2);
 
-    ch = next_character(file_buffer, &location);
-    REQUIRE(ch == 'c');
-    REQUIRE(location.index == 3);
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == 'c');
+    CHECK(location.index == 3);
 
-    ch = next_character(file_buffer, &location);
-    REQUIRE(ch == '\0');
-    REQUIRE(location.index == 3);
-    REQUIRE(location.line == 0);
-    REQUIRE(location.column == 3);
+    REQUIRE_FALSE(next_character(file_contents, &location, &ch));
+    CHECK(location.index == 3);
+    CHECK(location.line == 0);
+    CHECK(location.column == 3);
 }
 
 TEST_CASE("next_character() trigraph") {
-    red::FileBuffer file_buffer;
+    red::File_Contents file_contents = {};
     char* buffer = (char*)"??""<";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    file_contents.buffers = &buffer;
+    file_contents.buffers_len = 1;
+    file_contents.len = strlen(buffer);
 
     red::Location location = {};
-    char ch = next_character(file_buffer, &location);
+    char ch;
 
-    REQUIRE(ch == '{');
-    REQUIRE(location.index == 3);
-    REQUIRE(location.line == 0);
-    REQUIRE(location.column == 3);  // @Fix: this fails right now
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == '{');
+    CHECK(location.index == 3);
+    CHECK(location.line == 0);
+    CHECK(location.column == 3);
 }
 
 TEST_CASE("next_character() question mark chain no trigraphs") {
-    red::FileBuffer file_buffer;
+    red::File_Contents file_contents = {};
     char* buffer = (char*)"??????";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    file_contents.buffers = &buffer;
+    file_contents.buffers_len = 1;
+    file_contents.len = strlen(buffer);
 
     red::Location location = {};
-    char ch = next_character(file_buffer, &location);
+    char ch;
+    REQUIRE(next_character(file_contents, &location, &ch));
     REQUIRE(ch == '?');
-    REQUIRE(location.index == 1);
+    CHECK(location.index == 1);
 
-    ch = next_character(file_buffer, &location);
+    REQUIRE(next_character(file_contents, &location, &ch));
     REQUIRE(ch == '?');
-    REQUIRE(location.index == 2);
+    CHECK(location.index == 2);
 
-    ch = next_character(file_buffer, &location);
+    REQUIRE(next_character(file_contents, &location, &ch));
     REQUIRE(ch == '?');
-    REQUIRE(location.index == 3);
+    CHECK(location.index == 3);
 
-    ch = next_character(file_buffer, &location);
+    REQUIRE(next_character(file_contents, &location, &ch));
     REQUIRE(ch == '?');
-    REQUIRE(location.index == 4);
+    CHECK(location.index == 4);
 
-    ch = next_character(file_buffer, &location);
+    REQUIRE(next_character(file_contents, &location, &ch));
     REQUIRE(ch == '?');
-    REQUIRE(location.index == 5);
+    CHECK(location.index == 5);
 
-    ch = next_character(file_buffer, &location);
+    REQUIRE(next_character(file_contents, &location, &ch));
     REQUIRE(ch == '?');
-    REQUIRE(location.index == 6);
+    CHECK(location.index == 6);
 
-    ch = next_character(file_buffer, &location);
-    REQUIRE(ch == '\0');
-    REQUIRE(location.index == 6);
+    REQUIRE_FALSE(next_character(file_contents, &location, &ch));
+    CHECK(location.index == 6);
 }
 
 TEST_CASE("next_character() backslash newline") {
-    red::FileBuffer file_buffer;
+    red::File_Contents file_contents = {};
     char* buffer = (char*)"\\\na";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    file_contents.buffers = &buffer;
+    file_contents.buffers_len = 1;
+    file_contents.len = strlen(buffer);
 
     red::Location location = {};
-    char ch = next_character(file_buffer, &location);
+    char ch;
 
+    REQUIRE(next_character(file_contents, &location, &ch));
     REQUIRE(ch == 'a');
-    REQUIRE(location.index == 3);
-    REQUIRE(location.line == 1);
-    REQUIRE(location.column == 1);
+    CHECK(location.index == 3);
+    CHECK(location.line == 1);
+    CHECK(location.column == 1);
 }
 
 TEST_CASE("next_character() backslash trigraph newline") {
-    red::FileBuffer file_buffer;
+    red::File_Contents file_contents = {};
     char* buffer = (char*)"??""/\na";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    file_contents.buffers = &buffer;
+    file_contents.buffers_len = 1;
+    file_contents.len = strlen(buffer);
 
     red::Location location = {};
-    char ch = next_character(file_buffer, &location);
+    char ch;
 
-    REQUIRE(ch == 'a');
-    REQUIRE(location.index == 5);
-    REQUIRE(location.line == 1);
-    REQUIRE(location.column == 1);
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == 'a');
+    CHECK(location.index == 5);
+    CHECK(location.line == 1);
+    CHECK(location.column == 1);
 }
 
 TEST_CASE("next_character() newline") {
-    red::FileBuffer file_buffer;
+    red::File_Contents file_contents = {};
     char* buffer = (char*)"a\nb";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    file_contents.buffers = &buffer;
+    file_contents.buffers_len = 1;
+    file_contents.len = strlen(buffer);
 
     red::Location location = {};
-    char ch = next_character(file_buffer, &location);
-    REQUIRE(ch == 'a');
-    REQUIRE(location.index == 1);
-    REQUIRE(location.line == 0);
-    REQUIRE(location.column == 1);
+    char ch;
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == 'a');
+    CHECK(location.index == 1);
+    CHECK(location.line == 0);
+    CHECK(location.column == 1);
 
-    ch = next_character(file_buffer, &location);
-    REQUIRE(ch == '\n');
-    REQUIRE(location.index == 2);
-    REQUIRE(location.line == 1);
-    REQUIRE(location.column == 0);
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == '\n');
+    CHECK(location.index == 2);
+    CHECK(location.line == 1);
+    CHECK(location.column == 0);
 
-    ch = next_character(file_buffer, &location);
-    REQUIRE(ch == 'b');
-    REQUIRE(location.index == 3);
-    REQUIRE(location.line == 1);
-    REQUIRE(location.column == 1);
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == 'b');
+    CHECK(location.index == 3);
+    CHECK(location.line == 1);
+    CHECK(location.column == 1);
 }
 
 TEST_CASE("next_character() trigraph interrupted by backslash newline isn't a trigraph") {
-    red::FileBuffer file_buffer;
+    red::File_Contents file_contents = {};
     char* buffer = (char*)"??""\\\n>a";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    file_contents.buffers = &buffer;
+    file_contents.buffers_len = 1;
+    file_contents.len = strlen(buffer);
 
     red::Location location = {};
-    char ch = next_character(file_buffer, &location);
-    REQUIRE(ch == '?');
-    REQUIRE(location.index == 1);
+    char ch;
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == '?');
+    CHECK(location.index == 1);
 
-    ch = next_character(file_buffer, &location);
-    REQUIRE(ch == '?');
-    REQUIRE(location.index == 2);
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == '?');
+    CHECK(location.index == 2);
 
-    ch = next_character(file_buffer, &location);
-    REQUIRE(ch == '>');
-    REQUIRE(location.index == 5);
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == '>');
+    CHECK(location.index == 5);
 
-    ch = next_character(file_buffer, &location);
-    REQUIRE(ch == 'a');
-    REQUIRE(location.index == 6);
-    REQUIRE(location.line == 1);
-    REQUIRE(location.column == 2);
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(ch == 'a');
+    CHECK(location.index == 6);
+    CHECK(location.line == 1);
+    CHECK(location.column == 2);
 }
 
 TEST_CASE("next_character() backslash newline repeatedly handled") {
-    red::FileBuffer file_buffer;
+    red::File_Contents file_contents = {};
     char* buffer = (char*)"\\\n\\\n\\\n0";
-    file_buffer.buffers = &buffer;
-    file_buffer.buffers_len = 1;
-    file_buffer.last_len = strlen(buffer);
+    file_contents.buffers = &buffer;
+    file_contents.buffers_len = 1;
+    file_contents.len = strlen(buffer);
 
     red::Location location = {};
-    char ch = next_character(file_buffer, &location);
+    char ch;
 
-    REQUIRE(ch == '0');
-    REQUIRE(location.index == 7);
-    REQUIRE(location.line == 3);
-    REQUIRE(location.column == 1);
+    REQUIRE(next_character(file_contents, &location, &ch));
+    CHECK(location.index == 7);
+    CHECK(location.line == 3);
+    CHECK(location.column == 1);
 }

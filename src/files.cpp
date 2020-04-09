@@ -1,18 +1,17 @@
 #include "files.hpp"
 
+#include <cz/heap.hpp>
+#include "file.hpp"
+
 namespace red {
 
-void Files::destroy(cz::Allocator allocator) {
-    for (size_t i = 0; i < files.cap; ++i) {
-        if (files.is_present(i)) {
-            files.values[i].drop(allocator);
-        }
+void Files::destroy() {
+    for (size_t i = 0; i < files.len(); ++i) {
+        files[i].contents.drop_buffers();
     }
-    files.drop(allocator);
-
-    file_name_buffer_array.drop();
-
-    indexes.drop(allocator);
+    files.drop(cz::heap_allocator());
+    file_path_hashes.drop(cz::heap_allocator());
+    file_buffer_array.drop();
 }
 
 }

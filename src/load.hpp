@@ -1,18 +1,31 @@
 #pragma once
 
 #include <cz/string.hpp>
-#include "context.hpp"
-#include "preprocess.hpp"
 
 namespace red {
+struct Files;
+struct Hashed_Str;
+struct File_Contents;
+struct Result;
 
-void load_file_reserve(C* c, cpp::Preprocessor* p);
-void load_file_push(C* c,
-                    cpp::Preprocessor* p,
-                    cz::String file_path,
-                    Hash file_path_hash,
-                    FileBuffer file_buffer);
+namespace cpp {
+struct Preprocessor;
+}
 
-Result load_file(C* c, cpp::Preprocessor* p, cz::String file_path);
+/// Reserve a slot for an unloaded file to be included into the compilation unit.  This is exposed
+/// for testing.
+void include_file_reserve(Files* files, cpp::Preprocessor* preprocessor);
+
+/// Force an unloaded file to be included into the compilation unit.  This is exposed for testing.
+void force_include_file(Files* files,
+                        cpp::Preprocessor* preprocessor,
+                        Hashed_Str file_path,
+                        File_Contents file_contents);
+
+/// Process the file at `file_path` being included into the compilation unit.
+///
+/// The `file_path` must be allocated from `files.file_buffer_array` as it will be deallocated if
+/// the file is already included.  It must also be null terminated so we can load it.
+Result include_file(Files* files, cpp::Preprocessor* preprocessor, cz::String file_path);
 
 }

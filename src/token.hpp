@@ -14,6 +14,7 @@ struct Token {
         CloseCurly,
         OpenSquare,
         CloseSquare,
+
         LessThan,
         LessEqual,
         GreaterThan,
@@ -32,14 +33,15 @@ struct Token {
         Or,
         Semicolon,
         Not,
-        Namespace,
         Colon,
+        ColonColon,
         Hash,
         HashHash,
         String,
         Integer,
-        Label,
-        // keywords
+        Identifier,
+
+        // Keywords
         Auto,
         Break,
         Case,
@@ -75,14 +77,15 @@ struct Token {
 
         // Special parameter value used in preprocessor definitions
         Preprocessor_Parameter,
-        Preprocessor_Varargs,
+        Preprocessor_Varargs_Parameter_Indicator,
+        Preprocessor_Varargs_Keyword,
     };
 
     Type type;
     Span span;
     union Value {
-        Hashed_Str label;
-        Hashed_Str string;
+        Hashed_Str identifier;
+        cz::Str string;
         uint64_t integer;
     } v;
 };

@@ -1,51 +1,48 @@
 #pragma once
 
+#include <cz/str_map_removable.hpp>
 #include <cz/vector.hpp>
-#include "context.hpp"
-#include "definition.hpp"
-#include "files.hpp"
 #include "location.hpp"
-#include "token.hpp"
 
 namespace red {
-namespace cpp {
+namespace lex {
+struct Lexer;
+}
 
-struct IncludeInfo {
+struct Context;
+struct Result;
+struct Token;
+
+namespace cpp {
+struct Definition;
+
+struct Include_Info {
     Location location;
     size_t if_depth;
 };
 
-struct DefinitionInfo {
+struct Definition_Info {
+    // Since it is imposible to change the definitions table while in a definition, it is safe to
+    // store a pointer here.
     Definition* definition;
     size_t index;
+    size_t argument_index;
+    cz::Vector<cz::Vector<Token> > arguments;
 };
 
 struct Preprocessor {
     cz::Vector<bool> file_pragma_once;
-    cz::Vector<IncludeInfo> include_stack;
-    DefinitionMap definitions;
-    cz::Vector<DefinitionInfo> definition_stack;
+    cz::Str_Map_Removable<Definition> definitions;
 
-    void destroy(C* c);
+    cz::Vector<Include_Info> include_stack;
+    cz::Vector<Definition_Info> definition_stack;
 
-    Result next(C* c, Token* token_out, cz::AllocatedString* label_value);
+    void destroy();
 
     Location location() const;
 };
 
-char next_character(const FileBuffer& file_buffer, Location* location);
-
-/**
- * at_bol is an out variable but is only set to true.  Set it to true before
- * calling if at the bof otherwise false.  This dictates whether (when not in a
- * macro) Token::Hash starts a macro.
- */
-bool next_token(C* c,
-                const FileBuffer& file_buffer,
-                Location* location,
-                Token* token_out,
-                bool* at_bol,
-                cz::AllocatedString* label_value);
+Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer, Token* token);
 
 }
 }
