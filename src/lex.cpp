@@ -414,13 +414,14 @@ top:
 
                 uint64_t value = 0;
                 while (1) {
+                    value *= 10;
+                    value += c - '0';
+
                     *location = point;
                     if (!next_character(file_contents, &point, &c) || !isdigit(c)) {
                         point = *location;
                         break;
                     }
-                    value *= 10;
-                    value += c - '0';
                 }
 
                 token_out->v.integer = value;

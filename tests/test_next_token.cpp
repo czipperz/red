@@ -47,6 +47,28 @@ TEST_CASE("next_token() basic symbol") {
     CHECK(is_bol == false);
 }
 
+TEST_CASE("next_token() integer") {
+    SETUP("123123");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.type == red::Token::Integer);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 6);
+    CHECK(is_bol == false);
+    CHECK(token.v.integer == 123123);
+}
+
+TEST_CASE("next_token() integer 0") {
+    SETUP("0");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.type == red::Token::Integer);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 1);
+    CHECK(is_bol == false);
+    CHECK(token.v.integer == 0);
+}
+
 TEST_CASE("next_token() basic identifier") {
     SETUP("abc");
 
