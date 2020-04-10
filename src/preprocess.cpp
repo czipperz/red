@@ -227,7 +227,7 @@ static Result process_if_true(Context* context,
                               Token* token) {
     ZoneScoped;
     Location* point = &preprocessor->include_stack.last().location;
-    bool at_bol = false;
+    bool at_bol = true;
     if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
                          &at_bol)) {
         context->report_error({*point, *point}, "Unterminated preprocessing branch");
@@ -322,7 +322,7 @@ static Result process_ifdef(Context* context,
     }
 
     if (token->type != Token::Identifier) {
-        context->report_error(token->span, "Must test a macro name");
+        context->report_error(token->span, "Must test an identifier");
         // It doesn't make sense to continue after #if because we can't deduce
         // which branch to include.
         return {Result::ErrorInvalidInput};
