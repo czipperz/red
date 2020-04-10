@@ -324,6 +324,17 @@ TEST_CASE("cpp::next_token #if defined(x) undefined is false") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
+TEST_CASE("cpp::next_token #if !defined(x) undefined is true (not operator works)") {
+    SETUP("#if !defined(x)\na\n#else\nb\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
 TEST_CASE("cpp::next_token #if 1 + 1 > 1 || 1 is true") {
     SETUP("#if 1 + 1 > 1 || 1\na\n#else\nb\n#endif");
 

@@ -370,6 +370,13 @@ static Result parse_and_eval_expression(Context* context,
             break;
         }
 
+        case Token::Not: {
+            ++*index;
+            CZ_TRY(parse_and_eval_expression(context, tokens, index, span, value, 0));
+            *value = !*value;
+            break;
+        }
+
         case Token::Integer: {
             *value = tokens[*index].v.integer;
             ++*index;
