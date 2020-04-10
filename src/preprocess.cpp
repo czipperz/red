@@ -351,11 +351,245 @@ static Result next_token_in_definition(Context* context,
                                        Token* token,
                                        bool this_line_only);
 
+struct Expression {
+    enum Tag {
+        Binary,
+        Integer,
+    };
+
+    Expression(Tag tag) : tag(tag) {}
+
+    Tag tag;
+};
+
+struct Expression_Binary : Expression {
+    Expression_Binary() : Expression(Binary) {}
+
+    Token::Type op;
+    Expression* left;
+    Expression* right;
+};
+
+struct Expression_Integer : Expression {
+    Expression_Integer() : Expression(Integer) {}
+    int64_t integer;
+};
+
+static Result parse_expression(Context* context,
+                               cz::Slice<Token> tokens,
+                               size_t* index,
+                               Span span,
+                               Expression** eout,
+                               int max_precedence) {
+    if (*index == tokens.len) {
+        context->report_error(span, "Unterminated expression");
+        return {Result::ErrorInvalidInput};
+    }
+
+    switch (tokens[*index].type) {
+        case Token::Integer: {
+            Expression_Integer* e =
+                context->temp_buffer_array.allocator().create<Expression_Integer>();
+            e->integer = tokens[*index].v.integer;
+            *eout = e;
+            break;
+        }
+
+        case Token::OpenParen: {
+            Span open_paren_span = tokens[*index - 1].span;
+            ++*index;
+            CZ_TRY(parse_expression(context, tokens, index, open_paren_span, eout, 100));
+            if (*index == tokens.len || tokens[*index].type != Token::CloseParen) {
+                context->report_error(open_paren_span, "Unterminated expression");
+                return {Result::ErrorInvalidInput};
+            }
+            break;
+        }
+
+        default:
+            context->report_error(tokens[*index].span, "#if expects a constant expression");
+            return {Result::ErrorInvalidInput};
+    }
+
+    ++*index;
+
+    while (1) {
+        if (*index == tokens.len) {
+            return Result::ok();
+        }
+
+        int precedence;
+        Token::Type op = tokens[*index].type;
+        switch (op) {
+            case Token::CloseParen:
+                return Result::ok();
+
+            case Token::LessThan:
+            case Token::LessEqual:
+            case Token::GreaterThan:
+            case Token::GreaterEqual:
+                precedence = 9;
+                break;
+            case Token::Equals:
+            case Token::NotEquals:
+                precedence = 10;
+                break;
+            case Token::Comma:
+                precedence = 17;
+                break;
+            case Token::Plus:
+            case Token::Minus:
+                precedence = 6;
+                break;
+            case Token::Divide:
+            case Token::Star:
+                precedence = 5;
+                break;
+            case Token::Ampersand:
+                precedence = 11;
+                break;
+            case Token::And:
+                precedence = 14;
+                break;
+            case Token::Pipe:
+                precedence = 13;
+                break;
+            case Token::Or:
+                precedence = 15;
+                break;
+            default:
+                context->report_error(span, "Expected binary operator here to connect expressions");
+                return {Result::ErrorInvalidInput};
+        }
+
+        if (precedence >= max_precedence) {
+            return Result::ok();
+        }
+
+        ++*index;
+        Expression* right;
+        CZ_TRY(parse_expression(context, tokens, index, span, &right, precedence));
+
+        Expression_Binary* binary =
+            context->temp_buffer_array.allocator().create<Expression_Binary>();
+        binary->op = op;
+        binary->left = *eout;
+        binary->right = right;
+        *eout = binary;
+    }
+}
+
+static int64_t eval_expression(Expression* e) {
+    switch (e->tag) {
+        case Expression::Integer: {
+            Expression_Integer* expression = (Expression_Integer*)e;
+            return expression->integer;
+        }
+        case Expression::Binary: {
+            Expression_Binary* expression = (Expression_Binary*)e;
+            int64_t l = eval_expression(expression->left);
+            int64_t r = eval_expression(expression->right);
+            switch (expression->op) {
+                case Token::LessThan:
+                    return l < r;
+                case Token::LessEqual:
+                    return l <= r;
+                case Token::GreaterThan:
+                    return l > r;
+                case Token::GreaterEqual:
+                    return l > r;
+                case Token::Equals:
+                    return l == r;
+                case Token::NotEquals:
+                    return l != r;
+                case Token::Comma:
+                    return r;
+                case Token::Plus:
+                    return l + r;
+                case Token::Minus:
+                    return l - r;
+                case Token::Divide:
+                    return l / r;
+                case Token::Star:
+                    return l * r;
+                case Token::Ampersand:
+                    return l & r;
+                case Token::And:
+                    return l && r;
+                case Token::Pipe:
+                    return l | r;
+                case Token::Or:
+                    return l || r;
+                default:
+                    CZ_PANIC("Unimplemented eval_expression operator");
+            }
+        }
+    }
+    CZ_PANIC("");
+}
+
+static Result process_defined_macro(Context* context,
+                                    Preprocessor* preprocessor,
+                                    lex::Lexer* lexer,
+                                    Token* token) {
+    Location* point = &preprocessor->include_stack.last().location;
+    Span defined_span = token->span;
+    bool at_bol = false;
+    if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
+                         &at_bol)) {
+        context->report_error(defined_span, "`defined` must be given a macro to test");
+        return {Result::ErrorInvalidInput};
+    }
+    if (at_bol) {
+        lexer->back = *token;
+        context->report_error(defined_span, "`defined` must be given a macro to test");
+        return {Result::ErrorInvalidInput};
+    }
+    bool defined;
+    if (token->type == Token::Identifier) {
+        defined = preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
+    } else if (token->type == Token::OpenParen) {
+        Span open_paren_span = token->span;
+        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                             token, &at_bol)) {
+            context->report_error(defined_span, "`defined` must be given a macro to test");
+            return {Result::ErrorInvalidInput};
+        }
+        if (at_bol || token->type != Token::Identifier) {
+            lexer->back = *token;
+            context->report_error(defined_span, "`defined` must be given a macro to test");
+            return {Result::ErrorInvalidInput};
+        }
+
+        defined = preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
+
+        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                             token, &at_bol)) {
+            context->report_error(open_paren_span, "Unpaired parenthesis (`(`) here");
+            return {Result::ErrorInvalidInput};
+        }
+        if (at_bol || token->type != Token::CloseParen) {
+            lexer->back = *token;
+            context->report_error(open_paren_span, "Unpaired parenthesis (`(`) here");
+            return {Result::ErrorInvalidInput};
+        }
+    } else {
+        context->report_error(defined_span, "`defined` must be given a macro to test");
+        return {Result::ErrorInvalidInput};
+    }
+
+    token->type = Token::Integer;
+    token->v.integer = defined;
+    return Result::ok();
+}
+
 static Result process_if(Context* context,
                          Preprocessor* preprocessor,
                          lex::Lexer* lexer,
                          Token* token) {
     ZoneScoped;
+
+    Span if_span = token->span;
 
     // Todo: make this more efficient by not storing all the tokens.
     cz::Vector<Token> tokens = {};
@@ -380,6 +614,11 @@ static Result process_if(Context* context,
         }
 
         if (token->type == Token::Identifier) {
+            if (token->v.identifier.str == "defined") {
+                CZ_TRY(process_defined_macro(context, preprocessor, lexer, token));
+                goto add_token;
+            }
+
             if (preprocessor->definition_stack.len() > 0) {
                 // This identifier is either undefined or currently expanded and treated as
                 // undefined because otherwise the ntid would've eaten it.
@@ -406,26 +645,31 @@ static Result process_if(Context* context,
             }
         }
 
+    add_token:
         tokens.reserve(context->temp_buffer_array.allocator(), 1);
         tokens.push(*token);
     }
 
     point->if_depth++;
 
-    if (tokens.len() > 1) {
-        CZ_PANIC("Unimplemented complex #if");
+    int64_t value;
+    {
+        cz::Buffer_Array::Save_Point save_point = context->temp_buffer_array.save();
+        CZ_DEFER(context->temp_buffer_array.restore(save_point));
+        size_t index = 0;
+        Expression* expression;
+        CZ_TRY(parse_expression(context, tokens, &index, if_span, &expression, 100));
+        if (index < tokens.len()) {
+            CZ_DEBUG_ASSERT(tokens[index].type == Token::CloseParen);
+            context->report_error(tokens[index].span, "Unmatched closing parenthesis (`)`)");
+            return {Result::ErrorInvalidInput};
+        }
+        value = eval_expression(expression);
     }
-
-    switch (tokens[0].type) {
-        case Token::Integer:
-            if (tokens[0].v.integer != 0) {
-                return process_if_true(context, preprocessor, lexer, token);
-            }
-            return process_if_false(context, preprocessor, lexer, token, true);
-
-        default:
-            context->report_error(tokens[0].span, "#if expects a constant expression");
-            return process_if_false(context, preprocessor, lexer, token, true);
+    if (value) {
+        return process_if_true(context, preprocessor, lexer, token);
+    } else {
+        return process_if_false(context, preprocessor, lexer, token, true);
     }
 }
 

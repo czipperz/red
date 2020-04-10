@@ -302,6 +302,61 @@ TEST_CASE("cpp::next_token #if x defined 1 is true") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
+TEST_CASE("cpp::next_token #if defined(x) defined 0 is true") {
+    SETUP("#define x 0\n#if defined(x)\na\n#else\nb\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #if defined(x) undefined is false") {
+    SETUP("#if defined(x)\na\n#else\nb\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #if 1 + 1 > 1 || 1 is true") {
+    SETUP("#if 1 + 1 > 1 || 1\na\n#else\nb\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #if 1 + 1 > 1 is true") {
+    SETUP("#if 1 + 1 > 1\na\n#else\nb\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #if 1 + 1 > 2 is false") {
+    SETUP("#if 1 + 1 > 2\na\n#else\nb\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
 TEST_CASE("cpp::next_token #define no value") {
     SETUP("#define abc\nabc");
 
