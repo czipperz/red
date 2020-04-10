@@ -18,16 +18,6 @@
 namespace red {
 namespace cpp {
 
-static void discard_token(lex::Lexer* lexer, Token* token) {
-    if (token->type == Token::Identifier) {
-        cz::Str str = token->v.identifier.str;
-        lexer->identifier_buffer_array.allocator().dealloc({(char*)str.buffer, str.len});
-    } else if (token->type == Token::String) {
-        cz::Str str = token->v.string;
-        lexer->string_buffer_array.allocator().dealloc({(char*)str.buffer, str.len});
-    }
-}
-
 void Preprocessor::destroy() {
     file_pragma_once.drop(cz::heap_allocator());
 
@@ -411,7 +401,6 @@ static Result process_if(Context* context,
             } else {
             undefined_identifier:
                 // According to the C standard, undefined tokens are converted to 0.
-                discard_token(lexer, token);
                 token->type = Token::Integer;
                 token->v.integer = 0;
             }
