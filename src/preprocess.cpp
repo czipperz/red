@@ -96,7 +96,6 @@ static Result process_include(Context* context,
     Span included_span;
     included_span.start = *point;
     cz::String relative_path = {};
-    CZ_DEFER(relative_path.drop(context->temp_buffer_array.allocator()));
     CZ_TRY(read_include(context->files.files[point->file].contents, point, &included_span.end,
                         ch == '<' ? '>' : '"', context->temp_buffer_array.allocator(),
                         &relative_path));
@@ -134,12 +133,14 @@ static Result process_include(Context* context,
         file_name.null_terminate();
 
         if (include_file(&context->files, preprocessor, file_name).is_ok()) {
+            relative_path.drop(context->temp_buffer_array.allocator());
             return next_token(context, preprocessor, lexer, token);
         }
     }
 
     context->report_error(included_span, "Couldn't include file '", relative_path, "'");
     file_name.drop(context->files.file_path_buffer_array.allocator());
+    relative_path.drop(context->temp_buffer_array.allocator());
     return {Result::ErrorInvalidInput};
 }
 
