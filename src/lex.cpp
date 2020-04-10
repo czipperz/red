@@ -286,9 +286,17 @@ top:
         case ';':
             token_out->type = Token::Semicolon;
             break;
-        case '!':
-            token_out->type = Token::Not;
+        case '!': {
+            *location = point;
+            char next;
+            if (next_character(file_contents, &point, &next) && next == '=') {
+                token_out->type = Token::NotEquals;
+            } else {
+                token_out->type = Token::Not;
+                point = *location;
+            }
             break;
+        }
         case '#': {
             *location = point;
             char next;
