@@ -355,25 +355,25 @@ static Result next_token_in_definition(Context* context,
 static Result parse_and_eval_expression(Context* context,
                                         cz::Slice<Token> tokens,
                                         size_t* index,
-                                        Span span,
                                         int64_t* value,
                                         int max_precedence) {
     if (*index == tokens.len) {
-        context->report_error(span, "Unterminated expression");
+        CZ_DEBUG_ASSERT(*index >= 1);
+        context->report_error(tokens[*index - 1].span, "Unterminated expression");
         return {Result::ErrorInvalidInput};
     }
 
     switch (tokens[*index].type) {
         case Token::Minus: {
             ++*index;
-            CZ_TRY(parse_and_eval_expression(context, tokens, index, span, value, 0));
+            CZ_TRY(parse_and_eval_expression(context, tokens, index, value, 0));
             *value = -*value;
             break;
         }
 
         case Token::Not: {
             ++*index;
-            CZ_TRY(parse_and_eval_expression(context, tokens, index, span, value, 0));
+            CZ_TRY(parse_and_eval_expression(context, tokens, index, value, 0));
             *value = !*value;
             break;
         }
@@ -385,11 +385,12 @@ static Result parse_and_eval_expression(Context* context,
         }
 
         case Token::OpenParen: {
-            Span open_paren_span = tokens[*index - 1].span;
+            Location open_paren = tokens[*index].span.start;
             ++*index;
-            CZ_TRY(parse_and_eval_expression(context, tokens, index, open_paren_span, value, 100));
+            CZ_TRY(parse_and_eval_expression(context, tokens, index, value, 100));
             if (*index == tokens.len || tokens[*index].type != Token::CloseParen) {
-                context->report_error(open_paren_span, "Unterminated expression");
+                context->report_error({open_paren, tokens[*index - 1].span.end},
+                                      "Unterminated parenthesized expression");
                 return {Result::ErrorInvalidInput};
             }
             ++*index;
@@ -446,7 +447,8 @@ static Result parse_and_eval_expression(Context* context,
                 precedence = 15;
                 break;
             default:
-                context->report_error(span, "Expected binary operator here to connect expressions");
+                context->report_error(tokens[*index].span,
+                                      "Expected binary operator here to connect expressions");
                 return {Result::ErrorInvalidInput};
         }
 
@@ -456,7 +458,7 @@ static Result parse_and_eval_expression(Context* context,
 
         ++*index;
         int64_t right;
-        CZ_TRY(parse_and_eval_expression(context, tokens, index, span, &right, precedence));
+        CZ_TRY(parse_and_eval_expression(context, tokens, index, &right, precedence));
 
         switch (op) {
 #define CASE(TYPE, OP)            \
@@ -550,76 +552,85 @@ static Result process_if(Context* context,
                          Token* token) {
     ZoneScoped;
 
-    Span if_span = token->span;
-
-    // Todo: make this more efficient by not storing all the tokens.
-    cz::Vector<Token> tokens = {};
-    CZ_DEFER(tokens.drop(context->temp_buffer_array.allocator()));
-    tokens.reserve(context->temp_buffer_array.allocator(), 8);
-
-    Include_Info* point;
-    while (1) {
-        Result ntid_result = next_token_in_definition(context, preprocessor, lexer, token, true);
-        if (ntid_result.type == Result::Done) {
-            bool at_bol = false;
-            point = &preprocessor->include_stack.last();
-            if (!lex::next_token(context, lexer,
-                                 context->files.files[point->location.file].contents,
-                                 &point->location, token, &at_bol)) {
-                break;
-            }
-            if (at_bol) {
-                lexer->back = *token;
-                break;
-            }
-        }
-
-        if (token->type == Token::Identifier) {
-            if (token->v.identifier.str == "defined") {
-                CZ_TRY(process_defined_macro(context, preprocessor, lexer, token));
-                goto add_token;
-            }
-
-            if (preprocessor->definition_stack.len() > 0) {
-                // This identifier is either undefined or currently expanded and treated as
-                // undefined because otherwise the ntid would've eaten it.
-                goto undefined_identifier;
-            }
-
-            Definition* definition;
-            definition =
-                preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
-            if (definition) {
-                Result pdi_result = process_defined_identifier(context, preprocessor, lexer, token,
-                                                               definition, true);
-                if (pdi_result.is_err()) {
-                    return pdi_result;
-                } else if (pdi_result.type == Result::Done) {
-                    // Empty definition.
-                    continue;
-                }
-            } else {
-            undefined_identifier:
-                // According to the C standard, undefined tokens are converted to 0.
-                token->type = Token::Integer;
-                token->v.integer = 0;
-            }
-        }
-
-    add_token:
-        tokens.reserve(context->temp_buffer_array.allocator(), 1);
-        tokens.push(*token);
-    }
-
-    point->if_depth++;
-
     int64_t value;
-    size_t index = 0;
-    CZ_TRY(parse_and_eval_expression(context, tokens, &index, if_span, &value, 100));
-    if (index < tokens.len()) {
-        CZ_DEBUG_ASSERT(tokens[index].type == Token::CloseParen);
-        context->report_error(tokens[index].span, "Unmatched closing parenthesis (`)`)");
-        return {Result::ErrorInvalidInput};
+    {
+        Span if_span = token->span;
+
+        // Todo: make this more efficient by not storing all the tokens.
+        cz::Vector<Token> tokens = {};
+        CZ_DEFER(tokens.drop(context->temp_buffer_array.allocator()));
+        tokens.reserve(context->temp_buffer_array.allocator(), 8);
+
+        Include_Info* point;
+        while (1) {
+            Result ntid_result =
+                next_token_in_definition(context, preprocessor, lexer, token, true);
+            if (ntid_result.type == Result::Done) {
+                bool at_bol = false;
+                point = &preprocessor->include_stack.last();
+                if (!lex::next_token(context, lexer,
+                                     context->files.files[point->location.file].contents,
+                                     &point->location, token, &at_bol)) {
+                    break;
+                }
+                if (at_bol) {
+                    lexer->back = *token;
+                    break;
+                }
+            }
+
+            if (token->type == Token::Identifier) {
+                if (token->v.identifier.str == "defined") {
+                    CZ_TRY(process_defined_macro(context, preprocessor, lexer, token));
+                    goto add_token;
+                }
+
+                if (preprocessor->definition_stack.len() > 0) {
+                    // This identifier is either undefined or currently expanded and treated as
+                    // undefined because otherwise the ntid would've eaten it.
+                    goto undefined_identifier;
+                }
+
+                Definition* definition;
+                definition = preprocessor->definitions.get(token->v.identifier.str,
+                                                           token->v.identifier.hash);
+                if (definition) {
+                    Result pdi_result = process_defined_identifier(context, preprocessor, lexer,
+                                                                   token, definition, true);
+                    if (pdi_result.is_err()) {
+                        return pdi_result;
+                    } else if (pdi_result.type == Result::Done) {
+                        // Empty definition.
+                        continue;
+                    }
+                } else {
+                undefined_identifier:
+                    // According to the C standard, undefined tokens are converted to 0.
+                    token->type = Token::Integer;
+                    token->v.integer = 0;
+                }
+            }
+
+        add_token:
+            tokens.reserve(context->temp_buffer_array.allocator(), 1);
+            tokens.push(*token);
+        }
+
+        point->if_depth++;
+
+        size_t index = 0;
+        if (index == tokens.len()) {
+            context->report_error(if_span, "No expression to test");
+            return {Result::ErrorInvalidInput};
+        }
+
+        CZ_TRY(parse_and_eval_expression(context, tokens, &index, &value, 100));
+
+        if (index < tokens.len()) {
+            CZ_DEBUG_ASSERT(tokens[index].type == Token::CloseParen);
+            context->report_error(tokens[index].span, "Unmatched closing parenthesis (`)`)");
+            return {Result::ErrorInvalidInput};
+        }
     }
 
     if (value) {

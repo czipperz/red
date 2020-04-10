@@ -379,6 +379,17 @@ TEST_CASE("cpp::next_token order of operations #if 0 - 1 - 2 == -3 is true") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
+TEST_CASE("cpp::next_token #if parenthesis and order of operations") {
+    SETUP("#if 0 - (1 - 2) == 1\na\n#else\nb\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
 TEST_CASE("cpp::next_token #if inside #if parsed correctly") {
     SETUP("#if 1\n#if 1\na\n#else\nb\n#endif\n#else\nc\n#endif");
 
