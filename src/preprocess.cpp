@@ -351,58 +351,40 @@ static Result next_token_in_definition(Context* context,
                                        Token* token,
                                        bool this_line_only);
 
-struct Expression {
-    enum Tag {
-        Binary,
-        Integer,
-    };
-
-    Expression(Tag tag) : tag(tag) {}
-
-    Tag tag;
-};
-
-struct Expression_Binary : Expression {
-    Expression_Binary() : Expression(Binary) {}
-
-    Token::Type op;
-    Expression* left;
-    Expression* right;
-};
-
-struct Expression_Integer : Expression {
-    Expression_Integer() : Expression(Integer) {}
-    int64_t integer;
-};
-
-static Result parse_expression(Context* context,
-                               cz::Slice<Token> tokens,
-                               size_t* index,
-                               Span span,
-                               Expression** eout,
-                               int max_precedence) {
+static Result parse_and_eval_expression(Context* context,
+                                        cz::Slice<Token> tokens,
+                                        size_t* index,
+                                        Span span,
+                                        int64_t* value,
+                                        int max_precedence) {
     if (*index == tokens.len) {
         context->report_error(span, "Unterminated expression");
         return {Result::ErrorInvalidInput};
     }
 
     switch (tokens[*index].type) {
+        case Token::Minus: {
+            ++*index;
+            CZ_TRY(parse_and_eval_expression(context, tokens, index, span, value, 0));
+            *value = -*value;
+            break;
+        }
+
         case Token::Integer: {
-            Expression_Integer* e =
-                context->temp_buffer_array.allocator().create<Expression_Integer>();
-            e->integer = tokens[*index].v.integer;
-            *eout = e;
+            *value = tokens[*index].v.integer;
+            ++*index;
             break;
         }
 
         case Token::OpenParen: {
             Span open_paren_span = tokens[*index - 1].span;
             ++*index;
-            CZ_TRY(parse_expression(context, tokens, index, open_paren_span, eout, 100));
+            CZ_TRY(parse_and_eval_expression(context, tokens, index, open_paren_span, value, 100));
             if (*index == tokens.len || tokens[*index].type != Token::CloseParen) {
                 context->report_error(open_paren_span, "Unterminated expression");
                 return {Result::ErrorInvalidInput};
             }
+            ++*index;
             break;
         }
 
@@ -410,8 +392,6 @@ static Result parse_expression(Context* context,
             context->report_error(tokens[*index].span, "#if expects a constant expression");
             return {Result::ErrorInvalidInput};
     }
-
-    ++*index;
 
     while (1) {
         if (*index == tokens.len) {
@@ -467,65 +447,38 @@ static Result parse_expression(Context* context,
         }
 
         ++*index;
-        Expression* right;
-        CZ_TRY(parse_expression(context, tokens, index, span, &right, precedence));
+        int64_t right;
+        CZ_TRY(parse_and_eval_expression(context, tokens, index, span, &right, precedence));
 
-        Expression_Binary* binary =
-            context->temp_buffer_array.allocator().create<Expression_Binary>();
-        binary->op = op;
-        binary->left = *eout;
-        binary->right = right;
-        *eout = binary;
-    }
-}
-
-static int64_t eval_expression(Expression* e) {
-    switch (e->tag) {
-        case Expression::Integer: {
-            Expression_Integer* expression = (Expression_Integer*)e;
-            return expression->integer;
-        }
-        case Expression::Binary: {
-            Expression_Binary* expression = (Expression_Binary*)e;
-            int64_t l = eval_expression(expression->left);
-            int64_t r = eval_expression(expression->right);
-            switch (expression->op) {
-                case Token::LessThan:
-                    return l < r;
-                case Token::LessEqual:
-                    return l <= r;
-                case Token::GreaterThan:
-                    return l > r;
-                case Token::GreaterEqual:
-                    return l > r;
-                case Token::Equals:
-                    return l == r;
-                case Token::NotEquals:
-                    return l != r;
+        switch (op) {
+#define CASE(TYPE, OP)            \
+    case TYPE:                    \
+        *value = *value OP right; \
+        break
+            CASE(Token::LessThan, <);
+            CASE(Token::LessEqual, <=);
+            CASE(Token::GreaterThan, >);
+            CASE(Token::GreaterEqual, >);
+            CASE(Token::Equals, ==);
+            CASE(Token::NotEquals, !=);
+            {
                 case Token::Comma:
-                    return r;
-                case Token::Plus:
-                    return l + r;
-                case Token::Minus:
-                    return l - r;
-                case Token::Divide:
-                    return l / r;
-                case Token::Star:
-                    return l * r;
-                case Token::Ampersand:
-                    return l & r;
-                case Token::And:
-                    return l && r;
-                case Token::Pipe:
-                    return l | r;
-                case Token::Or:
-                    return l || r;
-                default:
-                    CZ_PANIC("Unimplemented eval_expression operator");
+                    *value = right;
+                    break;
             }
+            CASE(Token::Plus, +);
+            CASE(Token::Minus, -);
+            CASE(Token::Divide, /);
+            CASE(Token::Star, *);
+            CASE(Token::Ampersand, &);
+            CASE(Token::And, &&);
+            CASE(Token::Pipe, |);
+            CASE(Token::Or, ||);
+#undef CASE
+            default:
+                CZ_PANIC("Unimplemented eval_expression operator");
         }
     }
-    CZ_PANIC("");
 }
 
 static Result process_defined_macro(Context* context,
@@ -653,19 +606,14 @@ static Result process_if(Context* context,
     point->if_depth++;
 
     int64_t value;
-    {
-        cz::Buffer_Array::Save_Point save_point = context->temp_buffer_array.save();
-        CZ_DEFER(context->temp_buffer_array.restore(save_point));
-        size_t index = 0;
-        Expression* expression;
-        CZ_TRY(parse_expression(context, tokens, &index, if_span, &expression, 100));
-        if (index < tokens.len()) {
-            CZ_DEBUG_ASSERT(tokens[index].type == Token::CloseParen);
-            context->report_error(tokens[index].span, "Unmatched closing parenthesis (`)`)");
-            return {Result::ErrorInvalidInput};
-        }
-        value = eval_expression(expression);
+    size_t index = 0;
+    CZ_TRY(parse_and_eval_expression(context, tokens, &index, if_span, &value, 100));
+    if (index < tokens.len()) {
+        CZ_DEBUG_ASSERT(tokens[index].type == Token::CloseParen);
+        context->report_error(tokens[index].span, "Unmatched closing parenthesis (`)`)");
+        return {Result::ErrorInvalidInput};
     }
+
     if (value) {
         return process_if_true(context, preprocessor, lexer, token);
     } else {
