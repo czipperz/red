@@ -42,13 +42,13 @@ static void setup(Context* context, Preprocessor* preprocessor, cz::Str contents
 
 #define EAT_NEXT() next_token(&context, &preprocessor, &lexer, &token)
 
-TEST_CASE("Preprocessor::next empty file") {
+TEST_CASE("cpp::next_token empty file") {
     SETUP("");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next ignores empty #pragma") {
+TEST_CASE("cpp::next_token ignores empty #pragma") {
     SETUP("#pragma\n<");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -65,13 +65,13 @@ TEST_CASE("Preprocessor::next ignores empty #pragma") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next define is skipped with value") {
+TEST_CASE("cpp::next_token define is skipped with value") {
     SETUP("#define x a\n");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next define is skipped no value") {
+TEST_CASE("cpp::next_token define is skipped no value") {
     SETUP("#define x\na");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -81,7 +81,7 @@ TEST_CASE("Preprocessor::next define is skipped no value") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next ifdef without definition is skipped") {
+TEST_CASE("cpp::next_token ifdef without definition is skipped") {
     SETUP("#ifdef x\na\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -91,7 +91,7 @@ TEST_CASE("Preprocessor::next ifdef without definition is skipped") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next ifdef without definition empty body") {
+TEST_CASE("cpp::next_token ifdef without definition empty body") {
     SETUP("#ifdef x\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -101,7 +101,7 @@ TEST_CASE("Preprocessor::next ifdef without definition empty body") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next ifndef without definition is preserved") {
+TEST_CASE("cpp::next_token ifndef without definition is preserved") {
     SETUP("#ifndef x\na\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -115,7 +115,7 @@ TEST_CASE("Preprocessor::next ifndef without definition is preserved") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next ifndef without definition empty body") {
+TEST_CASE("cpp::next_token ifndef without definition empty body") {
     SETUP("#ifndef x\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -125,7 +125,7 @@ TEST_CASE("Preprocessor::next ifndef without definition empty body") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next ifdef with definition is preserved") {
+TEST_CASE("cpp::next_token ifdef with definition is preserved") {
     SETUP("#define x\n#ifdef x\na\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -139,7 +139,7 @@ TEST_CASE("Preprocessor::next ifdef with definition is preserved") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next ifndef with definition is skipped") {
+TEST_CASE("cpp::next_token ifndef with definition is skipped") {
     SETUP("#define x\n#ifndef x\na\n#endif\nb");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -149,7 +149,7 @@ TEST_CASE("Preprocessor::next ifndef with definition is skipped") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next #undef then #ifndef") {
+TEST_CASE("cpp::next_token #undef then #ifndef") {
     SETUP("#define x\n#undef x\n#ifndef x\nabc\n#endif");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -159,14 +159,14 @@ TEST_CASE("Preprocessor::next #undef then #ifndef") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next #undef then #ifdef") {
+TEST_CASE("cpp::next_token #undef then #ifdef") {
     SETUP("#define x\n#undef x\n#ifdef x\nabc\n#endif");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
 TEST_CASE(
-    "Preprocessor::next in not taken #if, newline between # and endif shouldn't recognize it as "
+    "cpp::next_token in not taken #if, newline between # and endif shouldn't recognize it as "
     "#endif") {
     SETUP("#ifdef x\n#\nendif\n#endif\n");
 
@@ -176,7 +176,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "Preprocessor::next in taken #if, newline between # and endif shouldn't recognize it as "
+    "cpp::next_token in taken #if, newline between # and endif shouldn't recognize it as "
     "#endif") {
     SETUP("#ifndef x\n#\nendif\n#endif\n");
 
@@ -189,7 +189,7 @@ TEST_CASE(
     REQUIRE(context.errors.len() == 0);
 }
 
-TEST_CASE("Preprocessor::next random #endif is error") {
+TEST_CASE("cpp::next_token random #endif is error") {
     SETUP("#endif");
 
     REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
@@ -197,7 +197,7 @@ TEST_CASE("Preprocessor::next random #endif is error") {
     REQUIRE(context.errors.len() > 0);
 }
 
-TEST_CASE("Preprocessor::next unterminated untaken #if is error") {
+TEST_CASE("cpp::next_token unterminated untaken #if is error") {
     SETUP("#ifdef x");
 
     REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
@@ -205,7 +205,7 @@ TEST_CASE("Preprocessor::next unterminated untaken #if is error") {
     REQUIRE(context.errors.len() > 0);
 }
 
-TEST_CASE("Preprocessor::next unterminated taken #if is error") {
+TEST_CASE("cpp::next_token unterminated taken #if is error") {
     SETUP("#ifndef x");
 
     REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
@@ -213,7 +213,7 @@ TEST_CASE("Preprocessor::next unterminated taken #if is error") {
     REQUIRE(context.errors.len() > 0);
 }
 
-TEST_CASE("Preprocessor::next #if isn't terminated by # newline endif") {
+TEST_CASE("cpp::next_token #if isn't terminated by # newline endif") {
     SETUP("#ifndef x\n#\nendif");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -225,7 +225,7 @@ TEST_CASE("Preprocessor::next #if isn't terminated by # newline endif") {
     REQUIRE(context.errors.len() > 0);
 }
 
-TEST_CASE("Preprocessor::next continue over #error and record error") {
+TEST_CASE("cpp::next_token continue over #error and record error") {
     SETUP("#error\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -236,7 +236,7 @@ TEST_CASE("Preprocessor::next continue over #error and record error") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next continue over #random and record error") {
+TEST_CASE("cpp::next_token continue over #random and record error") {
     SETUP("#ooooo\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -247,7 +247,7 @@ TEST_CASE("Preprocessor::next continue over #random and record error") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next #random inside #if false is ignored") {
+TEST_CASE("cpp::next_token #random inside #if false is ignored") {
     SETUP("#ifdef x\n#ooooo\n#endif\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -258,7 +258,7 @@ TEST_CASE("Preprocessor::next #random inside #if false is ignored") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next #random inside #if true is error and continue") {
+TEST_CASE("cpp::next_token #random inside #if true is error and continue") {
     SETUP("#ifndef x\n#ooooo\n#endif\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -269,7 +269,7 @@ TEST_CASE("Preprocessor::next #random inside #if true is error and continue") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next #if undefined is false") {
+TEST_CASE("cpp::next_token #if x undefined is false") {
     SETUP("#if x\na\n#else\nb\n#endif");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -280,7 +280,7 @@ TEST_CASE("Preprocessor::next #if undefined is false") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next #if defined 0 is false") {
+TEST_CASE("cpp::next_token #if x defined 0 is false") {
     SETUP("#define x 0\n#if x\na\n#else\nb\n#endif");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -291,7 +291,7 @@ TEST_CASE("Preprocessor::next #if defined 0 is false") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next #if defined 1 is true") {
+TEST_CASE("cpp::next_token #if x defined 1 is true") {
     SETUP("#define x 1\n#if x\na\n#else\nb\n#endif");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
@@ -302,13 +302,13 @@ TEST_CASE("Preprocessor::next #if defined 1 is true") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next #define no value") {
+TEST_CASE("cpp::next_token #define no value") {
     SETUP("#define abc\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("Preprocessor::next #define one value") {
+TEST_CASE("cpp::next_token #define one value") {
     SETUP("#define abc def\nabc");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
