@@ -379,7 +379,7 @@ static Result parse_and_eval_expression(Context* context,
         }
 
         case Token::Integer: {
-            *value = tokens[*index].v.integer;
+            *value = tokens[*index].v.integer.value;
             ++*index;
             break;
         }
@@ -542,7 +542,8 @@ static Result process_defined_macro(Context* context,
     }
 
     token->type = Token::Integer;
-    token->v.integer = defined;
+    token->v.integer.value = defined;
+    token->v.integer.suffix = 0;
     return Result::ok();
 }
 
@@ -607,7 +608,8 @@ static Result process_if(Context* context,
                 undefined_identifier:
                     // According to the C standard, undefined tokens are converted to 0.
                     token->type = Token::Integer;
-                    token->v.integer = 0;
+                    token->v.integer.value = 0;
+                    token->v.integer.suffix = 0;
                 }
             }
 
@@ -891,7 +893,7 @@ static Result next_token_in_definition(Context* context,
         Token* tk = &info->definition->tokens[info->index];
         if (tk->type == Token::Preprocessor_Parameter) {
             // Run through the tokens in the argument.
-            cz::Slice<Token> argument_tokens = info->arguments[tk->v.integer];
+            cz::Slice<Token> argument_tokens = info->arguments[tk->v.integer.value];
             if (info->argument_index == argument_tokens.len) {
                 // We're at the end of this argument.
                 ++info->index;

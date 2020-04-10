@@ -8,6 +8,7 @@
 #include "lex.hpp"
 #include "token.hpp"
 
+using red::Integer_Suffix;
 using red::lex::Lexer;
 using red::lex::next_token;
 
@@ -55,7 +56,8 @@ TEST_CASE("next_token() integer") {
     CHECK(token.span.start.index == 0);
     CHECK(token.span.end.index == 6);
     CHECK(is_bol == false);
-    CHECK(token.v.integer == 123123);
+    CHECK(token.v.integer.value == 123123);
+    CHECK(token.v.integer.suffix == 0);
 }
 
 TEST_CASE("next_token() integer 0") {
@@ -66,7 +68,20 @@ TEST_CASE("next_token() integer 0") {
     CHECK(token.span.start.index == 0);
     CHECK(token.span.end.index == 1);
     CHECK(is_bol == false);
-    CHECK(token.v.integer == 0);
+    CHECK(token.v.integer.value == 0);
+    CHECK(token.v.integer.suffix == 0);
+}
+
+TEST_CASE("next_token() integer 33ul") {
+    SETUP("33ul");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.type == red::Token::Integer);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 4);
+    CHECK(is_bol == false);
+    CHECK(token.v.integer.value == 33);
+    CHECK(token.v.integer.suffix == (Integer_Suffix::Unsigned | Integer_Suffix::Long));
 }
 
 TEST_CASE("next_token() basic identifier") {

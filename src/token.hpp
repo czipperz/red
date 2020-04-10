@@ -89,8 +89,20 @@ struct Token {
     union Value {
         Hashed_Str identifier;
         cz::Str string;
-        uint64_t integer;
+        struct {
+            uint64_t value;
+            uint32_t suffix;
+        } integer;
     } v;
 };
+
+namespace Integer_Suffix_ {
+enum Integer_Suffix : uint32_t {
+    Unsigned,
+    Long,
+    LongLong,
+};
+}
+using Integer_Suffix_::Integer_Suffix;
 
 }

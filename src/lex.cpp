@@ -434,13 +434,46 @@ top:
                     value += c - '0';
 
                     *location = point;
-                    if (!next_character(file_contents, &point, &c) || !isdigit(c)) {
-                        point = *location;
+                    if (!next_character(file_contents, &point, &c)) {
+                        c = 0;
+                        break;
+                    }
+                    if (!isdigit(c)) {
                         break;
                     }
                 }
 
-                token_out->v.integer = value;
+                uint32_t suffix = 0;
+                while (1) {
+                    if (c == 'u' || c == 'U') {
+                        suffix |= Integer_Suffix::Unsigned;
+                        *location = point;
+                        if (!next_character(file_contents, &point, &c)) {
+                            c = 0;
+                        }
+                    } else if (c == 'l' || c == 'L') {
+                        char f = c;
+                        *location = point;
+                        if (!next_character(file_contents, &point, &c)) {
+                            c = 0;
+                        }
+                        if (c == f) {
+                            suffix |= Integer_Suffix::LongLong;
+                            *location = point;
+                            if (!next_character(file_contents, &point, &c)) {
+                                c = 0;
+                            }
+                        } else {
+                            suffix |= Integer_Suffix::Long;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                point = *location;
+                token_out->v.integer.value = value;
+                token_out->v.integer.suffix = suffix;
                 token_out->type = Token::Integer;
                 break;
             }
