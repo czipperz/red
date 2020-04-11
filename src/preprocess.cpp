@@ -351,7 +351,8 @@ static Result next_token_in_definition(Context* context,
                                        Preprocessor* preprocessor,
                                        lex::Lexer* lexer,
                                        Token* token,
-                                       bool this_line_only);
+                                       bool this_line_only,
+                                       bool expand_macros);
 
 static Result parse_and_eval_expression(Context* context,
                                         cz::Slice<Token> tokens,
@@ -564,7 +565,7 @@ static Result process_if(Context* context,
         Include_Info* point;
         while (1) {
             Result ntid_result =
-                next_token_in_definition(context, preprocessor, lexer, token, true);
+                next_token_in_definition(context, preprocessor, lexer, token, true, true);
             if (ntid_result.type == Result::Done) {
                 bool at_bol = false;
                 point = &preprocessor->include_stack.last();
@@ -907,30 +908,38 @@ static Result process_defined_identifier(Context* context,
 
         // We expect an open parenthesis here.  If there isn't one, just don't expand the macro.
         bool at_bol = false;
-        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                             token, &at_bol)) {
-            *point = backup_point_open_paren;
-            *token = identifier_token;
-            return Result::ok();
-        }
-        if (token->type != Token::OpenParen || (at_bol && this_line_only)) {
-            *point = backup_point_open_paren;
-            *token = identifier_token;
-            return Result::ok();
+        Result ntid_result =
+            next_token_in_definition(context, preprocessor, lexer, token, this_line_only, false);
+        if (ntid_result.type == Result::Done) {
+            if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                                 token, &at_bol)) {
+                *point = backup_point_open_paren;
+                *token = identifier_token;
+                return Result::ok();
+            }
+            if (token->type != Token::OpenParen || (at_bol && this_line_only)) {
+                *point = backup_point_open_paren;
+                *token = identifier_token;
+                return Result::ok();
+            }
         }
 
         Span open_paren_span = token->span;
 
         // Get the first token of the body.  After this point no more tokens form errors.
         at_bol = false;
-        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                             token, &at_bol)) {
-            context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
-            return {Result::ErrorInvalidInput};
-        }
-        if (at_bol && this_line_only) {
-            context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
-            return {Result::ErrorInvalidInput};
+        ntid_result =
+            next_token_in_definition(context, preprocessor, lexer, token, this_line_only, false);
+        if (ntid_result.type == Result::Done) {
+            if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                                 token, &at_bol)) {
+                context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                return {Result::ErrorInvalidInput};
+            }
+            if (at_bol && this_line_only) {
+                context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                return {Result::ErrorInvalidInput};
+            }
         }
 
         if (token->type == Token::CloseParen) {
@@ -999,14 +1008,18 @@ static Result process_defined_identifier(Context* context,
             argument_tokens.push(*token);
 
         next_argument_token:
-            if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                                 token, &at_bol)) {
-                context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                return {Result::ErrorInvalidInput};
-            }
-            if (at_bol && this_line_only) {
-                context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                return {Result::ErrorInvalidInput};
+            ntid_result = next_token_in_definition(context, preprocessor, lexer, token,
+                                                   this_line_only, false);
+            if (ntid_result.type == Result::Done) {
+                if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
+                                     point, token, &at_bol)) {
+                    context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (at_bol && this_line_only) {
+                    context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                    return {Result::ErrorInvalidInput};
+                }
             }
         }
     }
@@ -1114,7 +1127,8 @@ static Result next_token_in_definition(Context* context,
                                        Preprocessor* preprocessor,
                                        lex::Lexer* lexer,
                                        Token* token,
-                                       bool this_line_only) {
+                                       bool this_line_only,
+                                       bool expand_macros) {
     while (preprocessor->definition_stack.len() > 0) {
         Definition_Info* info = &preprocessor->definition_stack.last();
         if (info->index == info->definition->tokens.len()) {
@@ -1145,7 +1159,7 @@ static Result next_token_in_definition(Context* context,
 
         // Todo: handle # and ##
 
-        if (token->type == Token::Identifier) {
+        if (token->type == Token::Identifier && expand_macros) {
             Definition* definition =
                 preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
             if (!definition) {
@@ -1171,7 +1185,7 @@ static Result next_token_in_definition(Context* context,
 Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer, Token* token) {
     ZoneScoped;
 
-    Result result = next_token_in_definition(context, preprocessor, lexer, token, false);
+    Result result = next_token_in_definition(context, preprocessor, lexer, token, false, true);
     if (result.type != Result::Done) {
         return result;
     }
