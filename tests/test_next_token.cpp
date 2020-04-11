@@ -386,3 +386,11 @@ TEST_CASE("next_token() ampersand") {
 TEST_CASE("next_token() and") {
     check_keyword("&&", red::Token::And);
 }
+
+TEST_CASE("next_token() __VAR_ARGS__") {
+    check_keyword("__VAR_ARGS__", red::Token::Preprocessor_Varargs_Keyword);
+}
+
+TEST_CASE("next_token() ...") {
+    check_keyword("...", red::Token::Preprocessor_Varargs_Parameter_Indicator);
+}

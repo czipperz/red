@@ -192,9 +192,22 @@ top:
             }
             break;
         }
-        case '.':
-            token_out->type = Token::Dot;
+        case '.': {
+            *location = point;
+            char next;
+            if (next_character(file_contents, &point, &next) && next == '.') {
+                if (next_character(file_contents, &point, &next) && next == '.') {
+                    token_out->type = Token::Preprocessor_Varargs_Parameter_Indicator;
+                } else {
+                    token_out->type = Token::Dot;
+                    point = *location;
+                }
+            } else {
+                token_out->type = Token::Dot;
+                point = *location;
+            }
             break;
+        }
         case ',':
             token_out->type = Token::Comma;
             break;
