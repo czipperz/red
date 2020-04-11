@@ -504,10 +504,10 @@ static Result process_defined_macro(Context* context,
         return {Result::ErrorInvalidInput};
     }
     if (at_bol) {
-        lexer->back = *token;
         context->report_error(defined_span, "`defined` must be given a macro to test");
         return {Result::ErrorInvalidInput};
     }
+
     bool defined;
     if (token->type == Token::Identifier) {
         defined = preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
@@ -519,7 +519,6 @@ static Result process_defined_macro(Context* context,
             return {Result::ErrorInvalidInput};
         }
         if (at_bol || token->type != Token::Identifier) {
-            lexer->back = *token;
             context->report_error(defined_span, "`defined` must be given a macro to test");
             return {Result::ErrorInvalidInput};
         }
@@ -532,7 +531,6 @@ static Result process_defined_macro(Context* context,
             return {Result::ErrorInvalidInput};
         }
         if (at_bol || token->type != Token::CloseParen) {
-            lexer->back = *token;
             context->report_error(open_paren_span, "Unpaired parenthesis (`(`) here");
             return {Result::ErrorInvalidInput};
         }
@@ -569,13 +567,14 @@ static Result process_if(Context* context,
             if (ntid_result.type == Result::Done) {
                 bool at_bol = false;
                 point = &preprocessor->include_stack.last();
+                Location backup_point = point->location;
                 if (!lex::next_token(context, lexer,
                                      context->files.files[point->location.file].contents,
                                      &point->location, token, &at_bol)) {
                     break;
                 }
                 if (at_bol) {
-                    lexer->back = *token;
+                    point->location = backup_point;
                     break;
                 }
             }

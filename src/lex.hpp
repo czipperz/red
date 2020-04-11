@@ -13,12 +13,10 @@ namespace lex {
 struct Lexer {
     cz::Buffer_Array string_buffer_array;
     cz::Buffer_Array identifier_buffer_array;
-    Token back;
 
     void init() {
         string_buffer_array.create();
         identifier_buffer_array.create();
-        back.type = Token::NullToken;
     }
 
     void drop() {
