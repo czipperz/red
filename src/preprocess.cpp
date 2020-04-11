@@ -827,10 +827,13 @@ static Result process_define(Context* context,
 
             // If the token matches a parameter, mark it as a parameter and replace its string value
             // with its index.
-            uint64_t* parameter = parameters.get(token->v.identifier.str, token->v.identifier.hash);
-            if (parameter) {
-                token->type = Token::Preprocessor_Parameter;
-                token->v.integer.value = *parameter;
+            if (token->type == Token::Identifier) {
+                uint64_t* parameter =
+                    parameters.get(token->v.identifier.str, token->v.identifier.hash);
+                if (parameter) {
+                    token->type = Token::Preprocessor_Parameter;
+                    token->v.integer.value = *parameter;
+                }
             }
 
             definition.tokens.reserve(cz::heap_allocator(), 1);
