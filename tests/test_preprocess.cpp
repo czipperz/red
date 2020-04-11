@@ -497,3 +497,29 @@ TEST_CASE("cpp::next_token #define function higher order") {
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
+
+TEST_CASE("cpp::next_token #define varargs only param and no args") {
+    SETUP("#define abc(...) 2 __VAR_ARGS__ 3\n1 abc() 4");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Integer);
+    CHECK(token.v.integer.value == 1);
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Integer);
+    CHECK(token.v.integer.value == 2);
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Integer);
+    CHECK(token.v.integer.value == 3);
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Integer);
+    CHECK(token.v.integer.value == 4);
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}

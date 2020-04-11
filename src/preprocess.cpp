@@ -799,14 +799,29 @@ static Result process_define(Context* context,
                         return SKIP_UNTIL_EOL();
                     }
                 }
+            } else if (token->type == Token::Preprocessor_Varargs_Parameter_Indicator) {
+                definition.has_varargs = true;
+
+                if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
+                                     point, token, &at_bol)) {
+                    context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                    return next_token(context, preprocessor, lexer, token);
+                }
+                if (at_bol) {
+                    context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                    return process_token(context, preprocessor, lexer, token, at_bol);
+                }
+
+                if (token->type != Token::CloseParen) {
+                    context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                    return SKIP_UNTIL_EOL();
+                }
             } else if (token->type == Token::CloseParen) {
-                goto finish_function;
             } else {
                 context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
                 return SKIP_UNTIL_EOL();
             }
 
-        finish_function:
             definition.parameter_len = parameters.count;
             definition.is_function = true;
         } else {
@@ -834,6 +849,8 @@ static Result process_define(Context* context,
                     token->type = Token::Preprocessor_Parameter;
                     token->v.integer.value = *parameter;
                 }
+            } else if (token->type == Token::Preprocessor_Varargs_Keyword) {
+                token->v.integer.value = parameters.count;
             }
 
             definition.tokens.reserve(cz::heap_allocator(), 1);
@@ -1137,7 +1154,8 @@ static Result next_token_in_definition(Context* context,
         }
 
         Token* tk = &info->definition->tokens[info->index];
-        if (tk->type == Token::Preprocessor_Parameter) {
+        if (tk->type == Token::Preprocessor_Parameter ||
+            tk->type == Token::Preprocessor_Varargs_Keyword) {
             // Run through the tokens in the argument.
             cz::Slice<Token> argument_tokens = info->arguments[tk->v.integer.value];
             if (info->argument_index == argument_tokens.len) {
