@@ -723,8 +723,7 @@ static Result process_define(Context* context,
         // the macro.  This makes macro expansion much simpler and faster, which is the more common
         // case.
         cz::Str_Map<size_t> parameters = {};
-        cz::Buffer_Array::Save_Point save_point = context->temp_buffer_array.save();
-        CZ_DEFER(context->temp_buffer_array.restore(save_point));
+        CZ_DEFER(parameters.drop(cz::heap_allocator()));
 
         if (token->span.start == identifier_end && token->type == Token::OpenParen) {
             // Functional macro
@@ -745,7 +744,7 @@ static Result process_define(Context* context,
             // Basically in `(a, b, c)` we are at `a` and need to process it then continue into `,`
             // and identifier pairs.
             if (token->type == Token::Identifier) {
-                parameters.reserve(context->temp_buffer_array.allocator(), 1);
+                parameters.reserve(cz::heap_allocator(), 1);
                 parameters.insert(token->v.identifier.str, token->v.identifier.hash,
                                   parameters.count);
                 while (1) {
@@ -786,7 +785,7 @@ static Result process_define(Context* context,
                     }
 
                     if (token->type == Token::Identifier) {
-                        parameters.reserve(context->temp_buffer_array.allocator(), 1);
+                        parameters.reserve(cz::heap_allocator(), 1);
                         if (parameters.get(token->v.identifier.str, token->v.identifier.hash)) {
                             context->report_error(token->span, "Parameter already used");
                             return SKIP_UNTIL_EOL();
