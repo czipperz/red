@@ -701,11 +701,45 @@ static Result process_define(Context* context,
     }
 
     Hashed_Str identifier = token->v.identifier;
+    Location identifier_end = token->span.end;
 
     Definition definition = {};
     definition.is_function = false;
 
     at_bol = false;
+    if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
+                         &at_bol)) {
+        at_bol = false;
+        goto end_definition;
+    }
+    if (at_bol) {
+        goto end_definition;
+    }
+
+    if (token->span.start == identifier_end && token->type == Token::OpenParen) {
+        // Functional macro
+        Span open_paren_span = token->span;
+        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                             token, &at_bol)) {
+            context->report_error(open_paren_span, "Unmatched parenthesis (`(`)");
+            return next_token(context, preprocessor, lexer, token);
+        }
+        if (at_bol) {
+            context->report_error(open_paren_span, "Unmatched parenthesis (`(`)");
+            return process_token(context, preprocessor, lexer, token, at_bol);
+        }
+        if (token->type != Token::CloseParen) {
+            CZ_PANIC("unimplemented");
+        }
+
+        definition.parameter_len = 0;
+        definition.is_function = true;
+        definition.has_varargs = true;
+    } else {
+        definition.tokens.reserve(cz::heap_allocator(), 1);
+        definition.tokens.push(*token);
+    }
+
     while (1) {
         if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                              token, &at_bol)) {
@@ -720,6 +754,7 @@ static Result process_define(Context* context,
         definition.tokens.push(*token);
     }
 
+end_definition:
     preprocessor->definitions.reserve(cz::heap_allocator(), 1);
     preprocessor->definitions.insert(identifier.str, identifier.hash, definition);
 
@@ -777,7 +812,42 @@ static Result process_defined_identifier(Context* context,
 
     // Todo: Process arguments.  When doing so, if `this_line_only` is defined, only parse arguments
     // on this line.
+    if (definition->is_function) {
+        Token identifier_token = *token;
+        Location* point = &preprocessor->include_stack.last().location;
+        Location backup_point_open_paren = *point;
 
+        bool at_bol = false;
+        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                             token, &at_bol)) {
+            goto dont_expand;
+        }
+        if (token->type != Token::OpenParen || (at_bol && this_line_only)) {
+            goto dont_expand;
+        }
+
+        at_bol = false;
+        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                             token, &at_bol)) {
+            goto dont_expand;
+        }
+        if (at_bol && this_line_only) {
+            goto dont_expand;
+        }
+        if (token->type == Token::CloseParen) {
+            goto do_expand;
+        }
+
+        CZ_PANIC("Unimplemented definition arguments");
+        goto do_expand;
+
+    dont_expand:
+        *point = backup_point_open_paren;
+        *token = identifier_token;
+        return Result::ok();
+    }
+
+do_expand:
     preprocessor->definition_stack.push(info);
     return next_token(context, preprocessor, lexer, token);
 }
