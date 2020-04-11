@@ -934,6 +934,15 @@ static Result process_defined_identifier(Context* context,
         }
 
         if (token->type == Token::CloseParen) {
+            if (info.arguments.len() < definition->parameter_len) {
+                context->report_error(open_paren_span, "Too few arguments to macro (expected ",
+                                      definition->parameter_len, ")");
+                return {Result::ErrorInvalidInput};
+            }
+            if (definition->has_varargs) {
+                info.arguments.reserve(cz::heap_allocator(), 1);
+                info.arguments.push({});
+            }
             goto do_expand;
         }
 
@@ -950,19 +959,46 @@ static Result process_defined_identifier(Context* context,
                     argument_tokens.realloc(cz::heap_allocator());
                     info.arguments.reserve(cz::heap_allocator(), 1);
                     info.arguments.push(argument_tokens);
+
+                    if (info.arguments.len() < definition->parameter_len) {
+                        context->report_error(open_paren_span,
+                                              "Too few arguments to macro (expected ",
+                                              definition->parameter_len, ")");
+                        return {Result::ErrorInvalidInput};
+                    }
+                    if (info.arguments.len() >
+                        definition->parameter_len + definition->has_varargs) {
+                        context->report_error(open_paren_span,
+                                              "Too many arguments to macro (expected ",
+                                              definition->parameter_len, ")");
+                        return {Result::ErrorInvalidInput};
+                    }
+
+                    if (info.arguments.len() == definition->parameter_len &&
+                        definition->has_varargs) {
+                        info.arguments.reserve(cz::heap_allocator(), 1);
+                        info.arguments.push({});
+                    }
+
                     goto do_expand;
                 }
             } else if (token->type == Token::Comma) {
+                if (definition->has_varargs && info.arguments.len() == definition->parameter_len) {
+                    goto append_argument_token;
+                }
+
                 argument_tokens.realloc(cz::heap_allocator());
                 info.arguments.reserve(cz::heap_allocator(), 1);
                 info.arguments.push(argument_tokens);
                 argument_tokens = {};
-                continue;
+                goto next_argument_token;
             }
 
+        append_argument_token:
             argument_tokens.reserve(cz::heap_allocator(), 1);
             argument_tokens.push(*token);
 
+        next_argument_token:
             if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                                  token, &at_bol)) {
                 context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");

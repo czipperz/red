@@ -459,12 +459,35 @@ TEST_CASE("cpp::next_token #define function macro no parameters is replaced when
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("cpp::next_token #define function macro one parameter works correctly") {
+TEST_CASE("cpp::next_token #define function macro one parameter basic case") {
     SETUP("#define abc(def) def\nabc(a) b");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #define function macro one parameter no arguments is error") {
+    SETUP("#define abc(def) def\nabc() b");
+
+    REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
+    REQUIRE(context.errors.len() == 1);
+}
+
+TEST_CASE("cpp::next_token #define function higher order") {
+    SETUP("#define abc(def) def(1)\n#define mac(x) 2\nabc(mac) b");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Integer);
+    CHECK(token.v.integer.value == 2);
     REQUIRE(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Success);
