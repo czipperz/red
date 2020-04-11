@@ -6,6 +6,7 @@
 #include <cz/defer.hpp>
 #include <cz/heap.hpp>
 #include <cz/path.hpp>
+#include <cz/str_map.hpp>
 #include <cz/try.hpp>
 #include "context.hpp"
 #include "definition.hpp"
@@ -716,42 +717,127 @@ static Result process_define(Context* context,
         goto end_definition;
     }
 
-    if (token->span.start == identifier_end && token->type == Token::OpenParen) {
-        // Functional macro
-        Span open_paren_span = token->span;
-        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                             token, &at_bol)) {
-            context->report_error(open_paren_span, "Unmatched parenthesis (`(`)");
-            return next_token(context, preprocessor, lexer, token);
-        }
-        if (at_bol) {
-            context->report_error(open_paren_span, "Unmatched parenthesis (`(`)");
-            return process_token(context, preprocessor, lexer, token, at_bol);
-        }
-        if (token->type != Token::CloseParen) {
-            CZ_PANIC("unimplemented");
+    {
+        // We map the parameters names to indexes and then look them up while parsing the body of
+        // the macro.  This makes macro expansion much simpler and faster, which is the more common
+        // case.
+        cz::Str_Map<size_t> parameters = {};
+        cz::Buffer_Array::Save_Point save_point = context->temp_buffer_array.save();
+        CZ_DEFER(context->temp_buffer_array.restore(save_point));
+
+        if (token->span.start == identifier_end && token->type == Token::OpenParen) {
+            // Functional macro
+            Span open_paren_span = token->span;
+            if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                                 token, &at_bol)) {
+                context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                return next_token(context, preprocessor, lexer, token);
+            }
+            if (at_bol) {
+                context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                return process_token(context, preprocessor, lexer, token, at_bol);
+            }
+
+            definition.has_varargs = false;
+
+            // We have to do this crazy thing to deal with erroring on trailing `,`s.
+            // Basically in `(a, b, c)` we are at `a` and need to process it then continue into `,`
+            // and identifier pairs.
+            if (token->type == Token::Identifier) {
+                parameters.reserve(context->temp_buffer_array.allocator(), 1);
+                parameters.insert(token->v.identifier.str, token->v.identifier.hash,
+                                  parameters.count);
+                while (1) {
+                    // In `(a, b, c)`, we are at `,` or `)`.
+                    if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
+                                         point, token, &at_bol)) {
+                        context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                        return next_token(context, preprocessor, lexer, token);
+                    }
+                    if (at_bol) {
+                        context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                        return process_token(context, preprocessor, lexer, token, at_bol);
+                    }
+
+                    if (token->type == Token::CloseParen) {
+                        break;
+                    }
+                    if (definition.has_varargs) {
+                        context->report_error(open_paren_span,
+                                              "Varargs specifier (`...`) must be last parameter");
+                        return SKIP_UNTIL_EOL();
+                    }
+                    if (token->type != Token::Comma) {
+                        context->report_error(open_paren_span,
+                                              "Must have comma between parameters");
+                        return SKIP_UNTIL_EOL();
+                    }
+
+                    // In `(a, b, c)`, we are at `b` or `c`.
+                    if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
+                                         point, token, &at_bol)) {
+                        context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                        return next_token(context, preprocessor, lexer, token);
+                    }
+                    if (at_bol) {
+                        context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                        return process_token(context, preprocessor, lexer, token, at_bol);
+                    }
+
+                    if (token->type == Token::Identifier) {
+                        parameters.reserve(context->temp_buffer_array.allocator(), 1);
+                        if (parameters.get(token->v.identifier.str, token->v.identifier.hash)) {
+                            context->report_error(token->span, "Parameter already used");
+                            return SKIP_UNTIL_EOL();
+                        }
+                        parameters.insert(token->v.identifier.str, token->v.identifier.hash,
+                                          parameters.count);
+                    } else if (token->type == Token::Preprocessor_Varargs_Parameter_Indicator) {
+                        definition.has_varargs = true;
+                    } else {
+                        context->report_error(token->span, "Must have parameter name here");
+                        return SKIP_UNTIL_EOL();
+                    }
+                }
+            } else if (token->type == Token::CloseParen) {
+                goto finish_function;
+            } else {
+                context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                return SKIP_UNTIL_EOL();
+            }
+
+        finish_function:
+            definition.parameter_len = parameters.count;
+            definition.is_function = true;
+        } else {
+            definition.tokens.reserve(cz::heap_allocator(), 1);
+            definition.tokens.push(*token);
         }
 
-        definition.parameter_len = 0;
-        definition.is_function = true;
-        definition.has_varargs = true;
-    } else {
-        definition.tokens.reserve(cz::heap_allocator(), 1);
-        definition.tokens.push(*token);
-    }
+        // Process the definition body.
+        while (1) {
+            if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                                 token, &at_bol)) {
+                at_bol = false;
+                break;
+            }
+            if (at_bol) {
+                break;
+            }
 
-    while (1) {
-        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                             token, &at_bol)) {
-            at_bol = false;
-            break;
-        }
-        if (at_bol) {
-            break;
+            // If the token matches a parameter, mark it as a parameter and replace its string value
+            // with its index.
+            uint64_t* parameter = parameters.get(token->v.identifier.str, token->v.identifier.hash);
+            if (parameter) {
+                token->type = Token::Preprocessor_Parameter;
+                token->v.integer.value = *parameter;
+            }
+
+            definition.tokens.reserve(cz::heap_allocator(), 1);
+            definition.tokens.push(*token);
         }
 
-        definition.tokens.reserve(cz::heap_allocator(), 1);
-        definition.tokens.push(*token);
+        // kill parameters
     }
 
 end_definition:
@@ -810,41 +896,80 @@ static Result process_defined_identifier(Context* context,
     Definition_Info info = {};
     info.definition = definition;
 
-    // Todo: Process arguments.  When doing so, if `this_line_only` is defined, only parse arguments
-    // on this line.
     if (definition->is_function) {
+        // Process arguments.
         Token identifier_token = *token;
         Location* point = &preprocessor->include_stack.last().location;
         Location backup_point_open_paren = *point;
 
+        // We expect an open parenthesis here.  If there isn't one, just don't expand the macro.
         bool at_bol = false;
         if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                              token, &at_bol)) {
-            goto dont_expand;
+            *point = backup_point_open_paren;
+            *token = identifier_token;
+            return Result::ok();
         }
         if (token->type != Token::OpenParen || (at_bol && this_line_only)) {
-            goto dont_expand;
+            *point = backup_point_open_paren;
+            *token = identifier_token;
+            return Result::ok();
         }
 
+        Span open_paren_span = token->span;
+
+        // Get the first token of the body.  After this point no more tokens form errors.
         at_bol = false;
         if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                              token, &at_bol)) {
-            goto dont_expand;
+            context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+            return {Result::ErrorInvalidInput};
         }
         if (at_bol && this_line_only) {
-            goto dont_expand;
+            context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+            return {Result::ErrorInvalidInput};
         }
+
         if (token->type == Token::CloseParen) {
             goto do_expand;
         }
 
-        CZ_PANIC("Unimplemented definition arguments");
-        goto do_expand;
+        // Process arguments
+        cz::Vector<Token> argument_tokens = {};
+        size_t paren_depth = 0;
+        while (1) {
+            if (token->type == Token::OpenParen) {
+                ++paren_depth;
+            } else if (token->type == Token::CloseParen) {
+                if (paren_depth > 0) {
+                    --paren_depth;
+                } else {
+                    argument_tokens.realloc(cz::heap_allocator());
+                    info.arguments.reserve(cz::heap_allocator(), 1);
+                    info.arguments.push(argument_tokens);
+                    goto do_expand;
+                }
+            } else if (token->type == Token::Comma) {
+                argument_tokens.realloc(cz::heap_allocator());
+                info.arguments.reserve(cz::heap_allocator(), 1);
+                info.arguments.push(argument_tokens);
+                argument_tokens = {};
+                continue;
+            }
 
-    dont_expand:
-        *point = backup_point_open_paren;
-        *token = identifier_token;
-        return Result::ok();
+            argument_tokens.reserve(cz::heap_allocator(), 1);
+            argument_tokens.push(*token);
+
+            if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                                 token, &at_bol)) {
+                context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                return {Result::ErrorInvalidInput};
+            }
+            if (at_bol && this_line_only) {
+                context->report_error(open_paren_span, "Unpaired parenthesis (`(`)");
+                return {Result::ErrorInvalidInput};
+            }
+        }
     }
 
 do_expand:

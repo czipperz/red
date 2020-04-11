@@ -458,3 +458,19 @@ TEST_CASE("cpp::next_token #define function macro no parameters is replaced when
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
+
+TEST_CASE("cpp::next_token #define function macro one parameter works correctly") {
+    SETUP("#define abc(def) def\nabc(a) b");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
