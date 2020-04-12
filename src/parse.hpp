@@ -97,7 +97,7 @@ struct Parser {
     cz::Vector<cz::Str_Map<TypeP> > typedef_stack;
     cz::Vector<cz::Str_Map<Declaration> > declaration_stack;
 
-    cz::Buffer_Array type_buffer_array;
+    cz::Buffer_Array buffer_array;
     Type* type_char;
     Type* type_double;
     Type* type_float;

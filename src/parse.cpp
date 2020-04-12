@@ -17,14 +17,14 @@ static Type* make_primitive(cz::Allocator allocator, Type::Tag tag) {
 
 void Parser::init() {
     lexer.init();
-    type_buffer_array.create();
-    type_char = make_primitive(type_buffer_array.allocator(), Type::Builtin_Char);
-    type_double = make_primitive(type_buffer_array.allocator(), Type::Builtin_Double);
-    type_float = make_primitive(type_buffer_array.allocator(), Type::Builtin_Float);
-    type_int = make_primitive(type_buffer_array.allocator(), Type::Builtin_Int);
-    type_long = make_primitive(type_buffer_array.allocator(), Type::Builtin_Long);
-    type_short = make_primitive(type_buffer_array.allocator(), Type::Builtin_Short);
-    type_void = make_primitive(type_buffer_array.allocator(), Type::Builtin_Void);
+    buffer_array.create();
+    type_char = make_primitive(buffer_array.allocator(), Type::Builtin_Char);
+    type_double = make_primitive(buffer_array.allocator(), Type::Builtin_Double);
+    type_float = make_primitive(buffer_array.allocator(), Type::Builtin_Float);
+    type_int = make_primitive(buffer_array.allocator(), Type::Builtin_Int);
+    type_long = make_primitive(buffer_array.allocator(), Type::Builtin_Long);
+    type_short = make_primitive(buffer_array.allocator(), Type::Builtin_Short);
+    type_void = make_primitive(buffer_array.allocator(), Type::Builtin_Void);
     back.type = Token::Parser_Null_Token;
 
     type_stack.reserve(cz::heap_allocator(), 4);
@@ -51,7 +51,7 @@ void Parser::drop() {
     }
     declaration_stack.drop(cz::heap_allocator());
 
-    type_buffer_array.drop();
+    buffer_array.drop();
     preprocessor.destroy();
     lexer.drop();
 }
@@ -206,8 +206,7 @@ static Result parse_declaration_after_base_type(Context* context,
 
         switch (token->type) {
             case Token::Star: {
-                Type_Pointer* pointer =
-                    parser->type_buffer_array.allocator().create<Type_Pointer>();
+                Type_Pointer* pointer = parser->buffer_array.allocator().create<Type_Pointer>();
                 pointer->inner = declaration.type;
                 declaration.type.clear();
                 declaration.type.set_type(pointer);
