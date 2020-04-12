@@ -108,6 +108,7 @@ struct Statement {
     enum Tag {
         Expression,
         Block,
+        For,
     };
 
     Tag tag;
@@ -125,6 +126,15 @@ struct Statement_Block : Statement {
     Statement_Block() : Statement(Block) {}
 
     cz::Slice<Statement*> statements;
+};
+
+struct Statement_For : Statement {
+    Statement_For() : Statement(For) {}
+
+    struct Expression* initializer;
+    struct Expression* condition;
+    struct Expression* increment;
+    Statement* body;
 };
 
 struct Declaration {

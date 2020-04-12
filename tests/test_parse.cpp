@@ -353,3 +353,29 @@ TEST_CASE("parse_statement block with defined variable and expression usage") {
     Expression_Variable* e = (Expression_Variable*)expression;
     CHECK(e->variable.str == "abc");
 }
+
+TEST_CASE("parse_statement for loop") {
+    SETUP("int abc; for (abc = 0; abc < 5; abc = abc + 1) {}");
+
+    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    REQUIRE(statement);
+    REQUIRE(statement->tag == Statement::For);
+
+    Statement_For* sfor = (Statement_For*)statement;
+    REQUIRE(sfor->initializer);
+    REQUIRE(sfor->initializer->tag == Expression::Binary);
+
+    REQUIRE(sfor->condition);
+    REQUIRE(sfor->condition->tag == Expression::Binary);
+
+    REQUIRE(sfor->increment);
+    REQUIRE(sfor->increment->tag == Expression::Binary);
+
+    REQUIRE(sfor->body);
+    REQUIRE(sfor->body->tag == Statement::Block);
+    Statement_Block* block = (Statement_Block*)sfor->body;
+    CHECK(block->statements.len == 0);
+}

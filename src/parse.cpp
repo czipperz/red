@@ -617,6 +617,113 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             return Result::ok();
         }
 
+        case Token::For: {
+            Span for_span = token.span;
+            parser->back.type = Token::Parser_Null_Token;
+
+            result = next_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(for_span, "Expected open parenthesis here");
+                return {Result::ErrorInvalidInput};
+            }
+            if (token.type != Token::OpenParen) {
+                context->report_error(token.span, "Expected open parenthesis here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            result = peek_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(for_span, "Expected initializer or `;`");
+                return {Result::ErrorInvalidInput};
+            }
+            Expression* initializer = nullptr;
+            if (token.type == Token::Semicolon) {
+                parser->back.type = Token::Parser_Null_Token;
+            } else {
+                CZ_TRY(parse_expression(context, parser, &initializer));
+
+                result = next_token(context, parser, &token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(for_span, "Expected `;` to end initializer expression");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (token.type != Token::Semicolon) {
+                    context->report_error(token.span,
+                                          "Expected `;` here to end initializer expression");
+                    return {Result::ErrorInvalidInput};
+                }
+            }
+
+            result = peek_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(for_span, "Expected condition expression or `;` here");
+                return {Result::ErrorInvalidInput};
+            }
+            Expression* condition = nullptr;
+            if (token.type == Token::Semicolon) {
+                parser->back.type = Token::Parser_Null_Token;
+            } else {
+                CZ_TRY(parse_expression(context, parser, &condition));
+
+                result = next_token(context, parser, &token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(for_span, "Expected `;` to end condition expression");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (token.type != Token::Semicolon) {
+                    context->report_error(token.span,
+                                          "Expected `;` here to end condition expression");
+                    return {Result::ErrorInvalidInput};
+                }
+            }
+
+            result = peek_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(for_span, "Expected increment expression or `)`");
+                return {Result::ErrorInvalidInput};
+            }
+            Expression* increment = nullptr;
+            if (token.type == Token::CloseParen) {
+                parser->back.type = Token::Parser_Null_Token;
+            } else {
+                CZ_TRY(parse_expression(context, parser, &increment));
+
+                result = next_token(context, parser, &token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(for_span, "Expected `)` to end increment expression");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (token.type != Token::CloseParen) {
+                    context->report_error(token.span,
+                                          "Expected `)` here to end increment expression");
+                    return {Result::ErrorInvalidInput};
+                }
+            }
+
+            Statement* body;
+            result = parse_statement(context, parser, &body);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(for_span, "Expected body statement");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Statement_For* statement = parser->buffer_array.allocator().create<Statement_For>();
+            statement->initializer = initializer;
+            statement->condition = condition;
+            statement->increment = increment;
+            statement->body = body;
+            *sout = statement;
+            return Result::ok();
+        }
+
         default: {
             Expression* expression;
             CZ_TRY(parse_expression(context, parser, &expression));
