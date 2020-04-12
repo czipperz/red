@@ -357,6 +357,52 @@ Result parse_declaration(Context* context, Parser* parser) {
     return Result::ok();
 }
 
+Result parse_declaration_or_statement(Context* context,
+                                      Parser* parser,
+                                      Statement** statement,
+                                      Declaration_Or_Statement* which) {
+    Token token;
+    Result result = peek_token(context, parser, &token);
+    if (result.type != Result::Success) {
+        return result;
+    }
+
+    switch (token.type) {
+        case Token::Char:
+        case Token::Double:
+        case Token::Float:
+        case Token::Int:
+        case Token::Long:
+        case Token::Short:
+        case Token::Void:
+        case Token::Const:
+        case Token::Volatile: {
+            *which = Declaration_Or_Statement::Declaration;
+            return parse_declaration(context, parser);
+        }
+
+        case Token::Identifier: {
+            Declaration* declaration = lookup_declaration(parser, token.v.identifier);
+            TypeP* type = lookup_typedef(parser, token.v.identifier);
+            if (declaration) {
+                *which = Declaration_Or_Statement::Statement;
+                return parse_statement(context, parser, statement);
+            } else if (type) {
+                *which = Declaration_Or_Statement::Declaration;
+                return parse_declaration(context, parser);
+            } else {
+                context->report_error(token.span, "Undefined identifier `", token.v.identifier.str,
+                                      "`");
+                return {Result::ErrorInvalidInput};
+            }
+        }
+
+        default:
+            *which = Declaration_Or_Statement::Statement;
+            return parse_statement(context, parser, statement);
+    }
+}
+
 Result parse_expression_(Context* context, Parser* parser, Expression** eout, int max_precedence) {
     Token token;
     Result result = next_token(context, parser, &token);

@@ -126,6 +126,14 @@ struct Declaration {
     Expression* o_value;
 };
 
+namespace Declaration_Or_Statement_ {
+enum Declaration_Or_Statement {
+    Declaration,
+    Statement,
+};
+}
+using Declaration_Or_Statement_::Declaration_Or_Statement;
+
 struct Parser {
     cpp::Preprocessor preprocessor;
     lex::Lexer lexer;
@@ -152,6 +160,10 @@ struct Parser {
 Result parse_declaration(Context* context, Parser* parser);
 Result parse_expression(Context* context, Parser* parser, Expression** expression);
 Result parse_statement(Context* context, Parser* parser, Statement** statement);
+Result parse_declaration_or_statement(Context* context,
+                                      Parser* parser,
+                                      Statement** statement,
+                                      Declaration_Or_Statement* which);
 
 }
 }

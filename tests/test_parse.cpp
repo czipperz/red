@@ -284,3 +284,50 @@ TEST_CASE("parse_statement basic binary expression") {
     Expression_Integer* right = (Expression_Integer*)e->right;
     CHECK(right->value == 2);
 }
+
+TEST_CASE("parse_declaration_or_statement basic binary expression") {
+    SETUP("1 + 2;");
+
+    Statement* statement;
+    Declaration_Or_Statement which;
+    REQUIRE(parse_declaration_or_statement(&context, &parser, &statement, &which).type ==
+            Result::Success);
+    REQUIRE(which == Declaration_Or_Statement::Statement);
+    REQUIRE(statement);
+    REQUIRE(statement->tag == Statement::Expression);
+    Expression* expression = ((Statement_Expression*)statement)->expression;
+
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+    Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->op == Token::Plus);
+
+    REQUIRE(e->left);
+    REQUIRE(e->left->tag == Expression::Integer);
+    Expression_Integer* left = (Expression_Integer*)e->left;
+    CHECK(left->value == 1);
+
+    REQUIRE(e->right);
+    REQUIRE(e->right->tag == Expression::Integer);
+    Expression_Integer* right = (Expression_Integer*)e->right;
+    CHECK(right->value == 2);
+}
+
+TEST_CASE("parse_declaration_or_statement type with identifier") {
+    SETUP("int abc;");
+
+    Statement* statement;
+    Declaration_Or_Statement which;
+    REQUIRE(parse_declaration_or_statement(&context, &parser, &statement, &which).type ==
+            Result::Success);
+    REQUIRE(which == Declaration_Or_Statement::Declaration);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_int);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+    CHECK(abc->o_value == nullptr);
+}
