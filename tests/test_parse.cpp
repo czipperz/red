@@ -159,3 +159,14 @@ TEST_CASE("parse_expression undefined variable") {
     Expression* expression;
     REQUIRE(parse_expression(&context, &parser, &expression).is_err());
 }
+
+TEST_CASE("parse_expression integer") {
+    SETUP("123;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).is_ok());
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Integer);
+    Expression_Integer* e = (Expression_Integer*)expression;
+    CHECK(e->value == 123);
+}
