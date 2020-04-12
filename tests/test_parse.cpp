@@ -33,7 +33,7 @@ static void setup(Context* context, Parser* parser, cz::Str contents) {
 TEST_CASE("parse_declaration type but no identifier") {
     SETUP("int;");
 
-    REQUIRE(parse_declaration(&context, &parser).is_ok());
+    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 0);
 }
@@ -41,7 +41,7 @@ TEST_CASE("parse_declaration type but no identifier") {
 TEST_CASE("parse_declaration type with identifier") {
     SETUP("int abc;");
 
-    REQUIRE(parse_declaration(&context, &parser).is_ok());
+    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 1);
 
@@ -56,7 +56,7 @@ TEST_CASE("parse_declaration type with identifier") {
 TEST_CASE("parse_declaration two variables same type") {
     SETUP("int abc, def;");
 
-    REQUIRE(parse_declaration(&context, &parser).is_ok());
+    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 2);
 
@@ -78,7 +78,7 @@ TEST_CASE("parse_declaration two variables same type") {
 TEST_CASE("parse_declaration const applies to both variables") {
     SETUP("int const abc, def;");
 
-    REQUIRE(parse_declaration(&context, &parser).is_ok());
+    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 2);
 
@@ -100,7 +100,7 @@ TEST_CASE("parse_declaration const applies to both variables") {
 TEST_CASE("parse_declaration second variable is pointer") {
     SETUP("int abc, *def;");
 
-    REQUIRE(parse_declaration(&context, &parser).is_ok());
+    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 2);
 
@@ -128,7 +128,7 @@ TEST_CASE("parse_declaration second variable is pointer") {
 TEST_CASE("parse_declaration const cannot be used after an identifier") {
     SETUP("int abc, const *def;");
 
-    REQUIRE(parse_declaration(&context, &parser).is_err());
+    REQUIRE(parse_declaration(&context, &parser).type == Result::ErrorInvalidInput);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 1);
 
@@ -143,10 +143,10 @@ TEST_CASE("parse_declaration const cannot be used after an identifier") {
 TEST_CASE("parse_expression defined variable") {
     SETUP("int abc; abc;");
 
-    REQUIRE(parse_declaration(&context, &parser).is_ok());
+    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
 
     Expression* expression;
-    REQUIRE(parse_expression(&context, &parser, &expression).is_ok());
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
     REQUIRE(expression);
     REQUIRE(expression->tag == Expression::Variable);
     Expression_Variable* e = (Expression_Variable*)expression;
@@ -157,14 +157,14 @@ TEST_CASE("parse_expression undefined variable") {
     SETUP("abc;");
 
     Expression* expression;
-    REQUIRE(parse_expression(&context, &parser, &expression).is_err());
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::ErrorInvalidInput);
 }
 
 TEST_CASE("parse_expression integer") {
     SETUP("123;");
 
     Expression* expression;
-    REQUIRE(parse_expression(&context, &parser, &expression).is_ok());
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
     REQUIRE(expression);
     REQUIRE(expression->tag == Expression::Integer);
     Expression_Integer* e = (Expression_Integer*)expression;
