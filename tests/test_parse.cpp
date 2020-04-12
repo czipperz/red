@@ -379,3 +379,23 @@ TEST_CASE("parse_statement for loop") {
     Statement_Block* block = (Statement_Block*)sfor->body;
     CHECK(block->statements.len == 0);
 }
+
+TEST_CASE("parse_statement while loop") {
+    SETUP("while (0) {}");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    REQUIRE(statement);
+    REQUIRE(statement->tag == Statement::While);
+
+    Statement_While* swhile = (Statement_While*)statement;
+    REQUIRE(swhile->condition);
+    REQUIRE(swhile->condition->tag == Expression::Integer);
+    Expression_Integer* condition = (Expression_Integer*)swhile->condition;
+    REQUIRE(condition->value == 0);
+
+    REQUIRE(swhile->body);
+    REQUIRE(swhile->body->tag == Statement::Block);
+    Statement_Block* block = (Statement_Block*)swhile->body;
+    CHECK(block->statements.len == 0);
+}

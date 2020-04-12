@@ -109,6 +109,7 @@ struct Statement {
         Expression,
         Block,
         For,
+        While,
     };
 
     Tag tag;
@@ -134,6 +135,13 @@ struct Statement_For : Statement {
     struct Expression* initializer;
     struct Expression* condition;
     struct Expression* increment;
+    Statement* body;
+};
+
+struct Statement_While : Statement {
+    Statement_While() : Statement(While) {}
+
+    struct Expression* condition;
     Statement* body;
 };
 

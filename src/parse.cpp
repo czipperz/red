@@ -617,6 +617,54 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             return Result::ok();
         }
 
+        case Token::While: {
+            Span while_span = token.span;
+            parser->back.type = Token::Parser_Null_Token;
+
+            result = next_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(while_span, "Expected open parenthesis here");
+                return {Result::ErrorInvalidInput};
+            }
+            if (token.type != Token::OpenParen) {
+                context->report_error(token.span, "Expected open parenthesis here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Expression* condition;
+            result = parse_expression(context, parser, &condition);
+            if (result.type == Result::Done) {
+                context->report_error(while_span, "Expected condition expression here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            result = next_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(while_span, "Expected `)` to end condition expression");
+                return {Result::ErrorInvalidInput};
+            }
+            if (token.type != Token::CloseParen) {
+                context->report_error(token.span, "Expected `)` here to end condition expression");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Statement* body;
+            result = parse_statement(context, parser, &body);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(while_span, "Expected body statement");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Statement_While* statement = parser->buffer_array.allocator().create<Statement_While>();
+            statement->condition = condition;
+            statement->body = body;
+            *sout = statement;
+            return Result::ok();
+        }
+
         case Token::For: {
             Span for_span = token.span;
             parser->back.type = Token::Parser_Null_Token;
