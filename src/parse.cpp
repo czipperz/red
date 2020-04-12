@@ -397,7 +397,7 @@ Result parse_expression_(Context* context, Parser* parser, Expression** eout, in
             }
 
             Span open_paren_span = token.span;
-            result = peek_token(context, parser, &token);
+            result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
                 context->report_error(open_paren_span, "Unmatched parenthesis (`(`)");
