@@ -107,6 +107,7 @@ struct Expression_Binary : Expression {
 struct Statement {
     enum Tag {
         Expression,
+        Block,
     };
 
     Tag tag;
@@ -118,6 +119,12 @@ struct Statement_Expression : Statement {
     Statement_Expression() : Statement(Expression) {}
 
     struct Expression* expression;
+};
+
+struct Statement_Block : Statement {
+    Statement_Block() : Statement(Block) {}
+
+    cz::Slice<Statement*> statements;
 };
 
 struct Declaration {

@@ -331,3 +331,25 @@ TEST_CASE("parse_declaration_or_statement type with identifier") {
     CHECK_FALSE(abc->type.is_volatile());
     CHECK(abc->o_value == nullptr);
 }
+
+TEST_CASE("parse_statement block with defined variable and expression usage") {
+    SETUP("{ int abc; abc; }");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    REQUIRE(statement);
+    REQUIRE(statement->tag == Statement::Block);
+
+    Statement_Block* block = (Statement_Block*)statement;
+    REQUIRE(block->statements.len == 1);
+
+    Statement* se = block->statements[0];
+    REQUIRE(se);
+    REQUIRE(se->tag == Statement::Expression);
+
+    Expression* expression = ((Statement_Expression*)se)->expression;
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Variable);
+    Expression_Variable* e = (Expression_Variable*)expression;
+    CHECK(e->variable.str == "abc");
+}

@@ -1,5 +1,6 @@
 #include "parse.hpp"
 
+#include <cz/defer.hpp>
 #include <cz/heap.hpp>
 #include <cz/try.hpp>
 #include <new>
@@ -554,6 +555,68 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
     }
 
     switch (token.type) {
+        case Token::OpenCurly: {
+            Span open_curly_span = token.span;
+            parser->back.type = Token::Parser_Null_Token;
+
+            cz::Vector<Statement*> statements = {};
+            CZ_DEFER(statements.drop(cz::heap_allocator()));
+            while (1) {
+                result = peek_token(context, parser, &token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(
+                        open_curly_span,
+                        "Expected end of block to match start of block (`{`) here");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (token.type == Token::CloseCurly) {
+                    parser->back.type = Token::Parser_Null_Token;
+                    goto finish_block;
+                }
+
+                Statement* statement;
+                Declaration_Or_Statement which;
+                CZ_TRY(parse_declaration_or_statement(context, parser, &statement, &which));
+
+                if (which == Declaration_Or_Statement::Declaration) {
+                    continue;
+                }
+
+                statements.reserve(cz::heap_allocator(), 1);
+                statements.push(statement);
+                break;
+            }
+
+            while (1) {
+                result = peek_token(context, parser, &token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(
+                        open_curly_span,
+                        "Expected end of block to match start of block (`{`) here");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (token.type == Token::CloseCurly) {
+                    parser->back.type = Token::Parser_Null_Token;
+                    goto finish_block;
+                }
+
+                Statement* statement;
+                CZ_TRY(parse_statement(context, parser, &statement));
+
+                statements.reserve(cz::heap_allocator(), 1);
+                statements.push(statement);
+            }
+
+        finish_block:
+            Statement_Block* statement = parser->buffer_array.allocator().create<Statement_Block>();
+            statement->statements =
+                parser->buffer_array.allocator().duplicate(statements.as_slice());
+            *sout = statement;
+            return Result::ok();
+        }
+
         default: {
             Expression* expression;
             CZ_TRY(parse_expression(context, parser, &expression));
