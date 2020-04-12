@@ -75,12 +75,33 @@ struct Type_Pointer : Type {
 struct Expression {
     enum Tag {
         Integer,
+        Variable,
         Binary,
     };
 
     Tag tag;
 
     Expression(Tag tag) : tag(tag) {}
+};
+
+struct Expression_Integer : Expression {
+    Expression_Integer() : Expression(Integer) {}
+
+    uint64_t value;
+};
+
+struct Expression_Variable : Expression {
+    Expression_Variable() : Expression(Variable) {}
+
+    Hashed_Str variable;
+};
+
+struct Expression_Binary : Expression {
+    Expression_Binary() : Expression(Binary) {}
+
+    Token::Type op;
+    Expression* left;
+    Expression* right;
 };
 
 struct Declaration {

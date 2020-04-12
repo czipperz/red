@@ -139,3 +139,23 @@ TEST_CASE("parse_declaration const cannot be used after an identifier") {
     CHECK_FALSE(abc->type.is_volatile());
     CHECK(abc->o_value == nullptr);
 }
+
+TEST_CASE("parse_expression defined variable") {
+    SETUP("int abc; abc;");
+
+    REQUIRE(parse_declaration(&context, &parser).is_ok());
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).is_ok());
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Variable);
+    Expression_Variable* e = (Expression_Variable*)expression;
+    CHECK(e->variable.str == "abc");
+}
+
+TEST_CASE("parse_expression undefined variable") {
+    SETUP("abc;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).is_err());
+}

@@ -357,8 +357,65 @@ Result parse_declaration(Context* context, Parser* parser) {
     return Result::ok();
 }
 
-Result parse_expression(Context* context, Parser* parser, Expression** expression) {
-    CZ_PANIC("Unimplemented");
+Result parse_expression(Context* context, Parser* parser, Expression** eout) {
+    Token token;
+    Result result = next_token(context, parser, &token);
+    if (result.type != Result::Success) {
+        return result;
+    }
+
+    // Parse one atom
+    switch (token.type) {
+        case Token::Integer: {
+            Expression_Integer* expression =
+                parser->buffer_array.allocator().create<Expression_Integer>();
+            expression->value = token.v.integer.value;
+            *eout = expression;
+            break;
+        }
+
+        case Token::Identifier: {
+            if (lookup_declaration(parser, token.v.identifier)) {
+                Expression_Variable* expression =
+                    parser->buffer_array.allocator().create<Expression_Variable>();
+                expression->variable = token.v.identifier;
+                *eout = expression;
+                break;
+            } else {
+                context->report_error(token.span, "Undefined variable `", token.v.identifier.str,
+                                      "`");
+                return {Result::ErrorInvalidInput};
+            }
+        }
+
+        case Token::OpenParen: {
+            result = parse_expression(context, parser, eout);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(token.span, "Unmatched parenthesis (`(`)");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Span open_paren_span = token.span;
+            result = peek_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(open_paren_span, "Unmatched parenthesis (`(`)");
+                return {Result::ErrorInvalidInput};
+            }
+            if (token.type != Token::CloseParen) {
+                context->report_error(token.span, "Expected close parenthesis (`(`) here");
+                return {Result::ErrorInvalidInput};
+            }
+            break;
+        }
+
+        default:
+            context->report_error(token.span, "Expected expression here");
+            return {Result::ErrorInvalidInput};
+    }
+
+    return Result::ok();
 }
 
 }
