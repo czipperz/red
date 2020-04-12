@@ -500,5 +500,34 @@ Result parse_expression(Context* context, Parser* parser, Expression** eout) {
     return parse_expression_(context, parser, eout, 100);
 }
 
+Result parse_statement(Context* context, Parser* parser, Statement** sout) {
+    Token token;
+    Result result = peek_token(context, parser, &token);
+    if (result.type != Result::Success) {
+        return result;
+    }
+
+    switch (token.type) {
+        default: {
+            Expression* expression;
+            CZ_TRY(parse_expression(context, parser, &expression));
+
+            Span span = token.span;
+            result = next_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(span, "Expected semicolon here to end expression statement");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Statement_Expression* statement =
+                parser->buffer_array.allocator().create<Statement_Expression>();
+            statement->expression = expression;
+            *sout = statement;
+            return Result::ok();
+        }
+    }
+}
+
 }
 }

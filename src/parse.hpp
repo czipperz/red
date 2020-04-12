@@ -104,6 +104,22 @@ struct Expression_Binary : Expression {
     Expression* right;
 };
 
+struct Statement {
+    enum Tag {
+        Expression,
+    };
+
+    Tag tag;
+
+    Statement(Tag tag) : tag(tag) {}
+};
+
+struct Statement_Expression : Statement {
+    Statement_Expression() : Statement(Expression) {}
+
+    struct Expression* expression;
+};
+
 struct Declaration {
     TypeP type;
     Type_Pointer* o_type_pointer;
@@ -135,6 +151,7 @@ struct Parser {
 
 Result parse_declaration(Context* context, Parser* parser);
 Result parse_expression(Context* context, Parser* parser, Expression** expression);
+Result parse_statement(Context* context, Parser* parser, Statement** statement);
 
 }
 }

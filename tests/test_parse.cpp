@@ -259,3 +259,28 @@ TEST_CASE("parse_expression binary expression right to left parenthesis") {
     REQUIRE(e->right);
     CHECK(e->right->tag == Expression::Integer);
 }
+
+TEST_CASE("parse_statement basic binary expression") {
+    SETUP("1 + 2;");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    REQUIRE(statement);
+    REQUIRE(statement->tag == Statement::Expression);
+    Expression* expression = ((Statement_Expression*)statement)->expression;
+
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+    Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->op == Token::Plus);
+
+    REQUIRE(e->left);
+    REQUIRE(e->left->tag == Expression::Integer);
+    Expression_Integer* left = (Expression_Integer*)e->left;
+    CHECK(left->value == 1);
+
+    REQUIRE(e->right);
+    REQUIRE(e->right->tag == Expression::Integer);
+    Expression_Integer* right = (Expression_Integer*)e->right;
+    CHECK(right->value == 2);
+}
