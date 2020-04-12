@@ -170,3 +170,58 @@ TEST_CASE("parse_expression integer") {
     Expression_Integer* e = (Expression_Integer*)expression;
     CHECK(e->value == 123);
 }
+
+TEST_CASE("parse_expression basic binary expression") {
+    SETUP("1 + 2;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+    Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->op == Token::Plus);
+
+    REQUIRE(e->left);
+    REQUIRE(e->left->tag == Expression::Integer);
+    Expression_Integer* left = (Expression_Integer*)e->left;
+    CHECK(left->value == 1);
+
+    REQUIRE(e->right);
+    REQUIRE(e->right->tag == Expression::Integer);
+    Expression_Integer* right = (Expression_Integer*)e->right;
+    CHECK(right->value == 2);
+}
+
+TEST_CASE("parse_expression binary expression left to right") {
+    SETUP("1 + 2 + 3;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+    Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->op == Token::Plus);
+
+    REQUIRE(e->left);
+    CHECK(e->left->tag == Expression::Binary);
+
+    REQUIRE(e->right);
+    CHECK(e->right->tag == Expression::Integer);
+}
+
+TEST_CASE("parse_expression binary expression right to left") {
+    SETUP("1 = 2 = 3;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+    Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->op == Token::Set);
+
+    REQUIRE(e->left);
+    CHECK(e->left->tag == Expression::Integer);
+
+    REQUIRE(e->right);
+    CHECK(e->right->tag == Expression::Binary);
+}

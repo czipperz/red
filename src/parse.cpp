@@ -357,7 +357,7 @@ Result parse_declaration(Context* context, Parser* parser) {
     return Result::ok();
 }
 
-Result parse_expression(Context* context, Parser* parser, Expression** eout) {
+Result parse_expression_(Context* context, Parser* parser, Expression** eout, int max_precedence) {
     Token token;
     Result result = next_token(context, parser, &token);
     if (result.type != Result::Success) {
@@ -415,7 +415,89 @@ Result parse_expression(Context* context, Parser* parser, Expression** eout) {
             return {Result::ErrorInvalidInput};
     }
 
+    while (1) {
+        result = peek_token(context, parser, &token);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            return Result::ok();
+        }
+
+        int precedence;
+        bool ltr = true;
+        switch (token.type) {
+            case Token::CloseParen:
+            case Token::Semicolon:
+                return Result::ok();
+
+            case Token::LessThan:
+            case Token::LessEqual:
+            case Token::GreaterThan:
+            case Token::GreaterEqual:
+                precedence = 9;
+                break;
+            case Token::Set:
+                precedence = 16;
+                ltr = false;
+                break;
+            case Token::Equals:
+            case Token::NotEquals:
+                precedence = 10;
+                break;
+            case Token::Comma:
+                precedence = 17;
+                break;
+            case Token::Plus:
+            case Token::Minus:
+                precedence = 6;
+                break;
+            case Token::Divide:
+            case Token::Star:
+                precedence = 5;
+                break;
+            case Token::Ampersand:
+                precedence = 11;
+                break;
+            case Token::And:
+                precedence = 14;
+                break;
+            case Token::Pipe:
+                precedence = 13;
+                break;
+            case Token::Or:
+                precedence = 15;
+                break;
+            default:
+                context->report_error(token.span,
+                                      "Expected binary operator here to connect expressions");
+                return {Result::ErrorInvalidInput};
+        }
+
+        if (precedence >= max_precedence) {
+            return Result::ok();
+        }
+
+        parser->back.type = Token::Parser_Null_Token;
+
+        Expression* right;
+        result = parse_expression_(context, parser, &right, precedence + !ltr);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            context->report_error(token.span, "Expected right side for binary operator here");
+            return {Result::ErrorInvalidInput};
+        }
+
+        Expression_Binary* binary = parser->buffer_array.allocator().create<Expression_Binary>();
+        binary->op = token.type;
+        binary->left = *eout;
+        binary->right = right;
+        *eout = binary;
+    }
+
     return Result::ok();
+}
+
+Result parse_expression(Context* context, Parser* parser, Expression** eout) {
+    return parse_expression_(context, parser, eout, 100);
 }
 
 }
