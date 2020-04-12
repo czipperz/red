@@ -80,6 +80,9 @@ struct Token {
         Preprocessor_Parameter,
         Preprocessor_Varargs_Parameter_Indicator,
         Preprocessor_Varargs_Keyword,
+
+        // Special case used for peek.
+        Parser_Null_Token,
     };
 
     Type type;
