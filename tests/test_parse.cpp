@@ -348,6 +348,28 @@ TEST_CASE("parse_declaration_or_statement type with identifier") {
     CHECK_FALSE(abc->type.is_volatile());
 }
 
+TEST_CASE("parse_declaration two variables first has initializer") {
+    SETUP("int abc = 13, def;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 2);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_int);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+
+    Declaration* def = parser.declaration_stack[0].get_hash("def");
+    REQUIRE(def);
+    CHECK(def->type.get_type() == parser.type_int);
+    CHECK_FALSE(def->type.is_const());
+    CHECK_FALSE(def->type.is_volatile());
+}
+
 TEST_CASE("parse_statement block with defined variable and expression usage") {
     SETUP("{ int abc; abc; }");
 

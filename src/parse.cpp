@@ -129,6 +129,11 @@ static bool parse_type_qualifier(Context* context, TypeP* type, Token token) {
     }
 }
 
+static Result parse_expression_(Context* context,
+                                Parser* parser,
+                                Expression** eout,
+                                int max_precedence);
+
 static Result parse_declaration_after_identifier(Context* context,
                                                  Parser* parser,
                                                  Declaration* declaration,
@@ -147,7 +152,7 @@ static Result parse_declaration_after_identifier(Context* context,
     if (token->type == Token::Set) {
         // Eat the value.
         Expression* value;
-        result = parse_expression(context, parser, &value);
+        result = parse_expression_(context, parser, &value, 17);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
             context->report_error(previous_span, "Expected ';' to end declaration here");
@@ -434,7 +439,10 @@ Result parse_declaration_or_statement(Context* context,
     }
 }
 
-Result parse_expression_(Context* context, Parser* parser, Expression** eout, int max_precedence) {
+static Result parse_expression_(Context* context,
+                                Parser* parser,
+                                Expression** eout,
+                                int max_precedence) {
     Token token;
     Result result = next_token(context, parser, &token);
     if (result.type != Result::Success) {
