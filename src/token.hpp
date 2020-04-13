@@ -34,6 +34,7 @@ struct Token {
         Or,
         Semicolon,
         Not,
+        QuestionMark,
         Colon,
         ColonColon,
         Hash,

@@ -380,6 +380,10 @@ TEST_CASE("next_token() or") {
     check_keyword("||", red::Token::Or);
 }
 
+TEST_CASE("next_token() question mark") {
+    check_keyword("?", red::Token::QuestionMark);
+}
+
 TEST_CASE("next_token() ampersand") {
     check_keyword("&", red::Token::Ampersand);
 }

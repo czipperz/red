@@ -293,6 +293,9 @@ top:
         case ';':
             token_out->type = Token::Semicolon;
             break;
+        case '?':
+            token_out->type = Token::QuestionMark;
+            break;
         case '!': {
             *location = point;
             char next;
