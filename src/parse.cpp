@@ -268,6 +268,78 @@ static Result parse_composite_body(Context* context,
     }
 }
 
+static Result parse_enum_body(Context* context,
+                              Parser* parser,
+                              cz::Str_Map<int64_t>* values,
+                              uint32_t* flags,
+                              Span enum_span) {
+    for (int64_t value = 0;; ++value) {
+        Token token;
+        Result result = next_token(context, parser, &token);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            context->report_error(enum_span, "Expected close curly (`}`) to end enum body");
+            return {Result::ErrorInvalidInput};
+        }
+        if (token.type == Token::CloseCurly) {
+            return Result::ok();
+        }
+
+        if (token.type != Token::Identifier) {
+            context->report_error(token.span, "Expected identifier for enum member");
+            return {Result::ErrorInvalidInput};
+        }
+
+        Hashed_Str name = token.v.identifier;
+        Span name_span = token.span;
+
+        result = next_token(context, parser, &token);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            context->report_error(enum_span, "Expected close curly (`}`) to end enum body");
+            return {Result::ErrorInvalidInput};
+        }
+        if (token.type == Token::Set) {
+            result = next_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(enum_span, "Expected close curly (`}`) to end enum body");
+                return {Result::ErrorInvalidInput};
+            }
+
+            if (token.type != Token::Integer) {
+                CZ_PANIC("Unimplemented expression enum value");
+            }
+
+            value = token.v.integer.value;
+
+            result = next_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(enum_span, "Expected close curly (`}`) to end enum body");
+                return {Result::ErrorInvalidInput};
+            }
+        }
+
+        values->reserve(cz::heap_allocator(), 1);
+        if (!values->get(name.str, name.hash)) {
+            values->insert(name.str, name.hash, value);
+        } else {
+            context->report_error(name_span, "Enum member is already defined");
+        }
+
+        if (token.type == Token::CloseCurly) {
+            return Result::ok();
+        }
+        if (token.type != Token::Comma) {
+            context->report_error(
+                enum_span,
+                "Expected `,` to continue enum body or close curly (`}`) to end enum body");
+            return {Result::ErrorInvalidInput};
+        }
+    }
+}
+
 static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type) {
     Token token;
     Result result;
@@ -548,6 +620,114 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
             }
         }
 
+        case Token::Enum: {
+            Span enum_span = token.span;
+            result = next_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(enum_span, "Expected enum name, body, or `;` here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Span identifier_span;
+            Hashed_Str identifier = {};
+            if (token.type == Token::Identifier) {
+                identifier = token.v.identifier;
+                identifier_span = token.span;
+
+                result = next_token(context, parser, &token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(enum_span, "Expected declaration, union body, `;` here");
+                    return {Result::ErrorInvalidInput};
+                }
+            }
+
+            if (token.type == Token::Semicolon) {
+                if (identifier.str.len > 0) {
+                    Type** type = lookup_type(parser, identifier);
+                    if (type) {
+                        if ((*type)->tag != Type::Enum) {
+                            context->report_error(identifier_span, "Type `", identifier.str,
+                                                  "` is not an enum");
+                            return {Result::ErrorInvalidInput};
+                        }
+                    } else {
+                        Type_Enum* enum_type = parser->buffer_array.allocator().create<Type_Enum>();
+                        enum_type->values = {};
+                        enum_type->flags = 0;
+                        cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                        types->reserve(cz::heap_allocator(), 1);
+                        types->insert(identifier.str, identifier.hash, enum_type);
+                    }
+                }
+                parser->back = token;
+                return Result::ok();
+            }
+
+            if (token.type == Token::OpenCurly) {
+                Type** type = lookup_type(parser, identifier);
+                Type_Enum* enum_type = nullptr;
+                if (type) {
+                    if ((*type)->tag != Type::Enum) {
+                        context->report_error(identifier_span, "Type `", identifier.str,
+                                              "` is not a union");
+                        return {Result::ErrorInvalidInput};
+                    }
+                    enum_type = (Type_Enum*)*type;
+                    if (enum_type->flags & Type_Enum::Defined) {
+                        context->report_error(identifier_span, "Type `", identifier.str,
+                                              "` is already defined");
+                        return {Result::ErrorInvalidInput};
+                    }
+                }
+
+                uint32_t flags = Type_Enum::Defined;
+
+                cz::Str_Map<int64_t> values = {};
+                bool destroy_values = true;
+                CZ_DEFER(if (destroy_values) { values.drop(cz::heap_allocator()); });
+
+                CZ_TRY(parse_enum_body(context, parser, &values, &flags, enum_span));
+
+                if (!enum_type) {
+                    enum_type = parser->buffer_array.allocator().create<Type_Enum>();
+                    if (identifier.str.len > 0) {
+                        cz::Str_Map<Type*>* types =
+                            &parser->type_stack[parser->type_stack.len() - 2];
+                        types->reserve(cz::heap_allocator(), 1);
+                        types->insert(identifier.str, identifier.hash, enum_type);
+                    }
+                }
+
+                destroy_values = false;
+                enum_type->values = values;
+                enum_type->flags = flags;
+
+                base_type->set_type(enum_type);
+                break;
+            } else {
+                parser->back = token;
+                Type** type = lookup_type(parser, identifier);
+                if (type) {
+                    if ((*type)->tag != Type::Enum) {
+                        context->report_error(identifier_span, "Type `", identifier.str,
+                                              "` is not a union");
+                    }
+                    base_type->set_type(*type);
+                } else {
+                    Type_Enum* enum_type = parser->buffer_array.allocator().create<Type_Enum>();
+                    enum_type->values = {};
+                    enum_type->flags = 0;
+                    cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                    types->reserve(cz::heap_allocator(), 1);
+                    types->insert(identifier.str, identifier.hash, enum_type);
+                    base_type->set_type(enum_type);
+                }
+                break;
+            }
+        }
+
         case Token::Identifier: {
             Declaration* declaration = lookup_declaration(parser, token.v.identifier);
             TypeP* type = lookup_typedef(parser, token.v.identifier);
@@ -729,6 +909,7 @@ Result parse_declaration_or_statement(Context* context,
         case Token::Long:
         case Token::Short:
         case Token::Void:
+        case Token::Enum:
         case Token::Struct:
         case Token::Union:
         case Token::Typedef:

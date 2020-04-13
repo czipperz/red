@@ -48,8 +48,12 @@ struct TypeP {
 struct Type_Enum : Type {
     Type_Enum() : Type(Enum) {}
 
-    cz::Slice<cz::Str> names;
-    cz::Slice<int64_t> values;
+    cz::Str_Map<int64_t> values;
+
+    enum Flags : uint32_t {
+        Defined = 1,
+    };
+    uint32_t flags;
 };
 
 struct Type_Composite : Type {
