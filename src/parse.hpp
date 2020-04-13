@@ -52,19 +52,16 @@ struct Type_Enum : Type {
     cz::Slice<int64_t> values;
 };
 
-namespace Composite_Flags_ {
-enum Composite_Flags : uint32_t {
-    Defined,
-};
-}
-using Composite_Flags_::Composite_Flags;
-
 struct Type_Composite : Type {
     Type_Composite(Tag tag) : Type(tag) {}
 
     cz::Str_Map<Type*> types;
     cz::Str_Map<TypeP> typedefs;
     cz::Str_Map<Declaration> declarations;
+
+    enum Flags : uint32_t {
+        Defined = 1,
+    };
     uint32_t flags;
 };
 

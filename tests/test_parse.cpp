@@ -195,7 +195,7 @@ TEST_CASE("parse_declaration struct named empty body") {
     REQUIRE(ts->typedefs.count == 0);
     REQUIRE(ts->declarations.count == 0);
     REQUIRE(ts->initializers.len == 0);
-    REQUIRE(ts->flags == Composite_Flags::Defined);
+    REQUIRE(ts->flags == Type_Struct::Defined);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);
@@ -236,7 +236,7 @@ TEST_CASE("parse_declaration struct named two fields") {
     CHECK(ts->initializers[0]->tag == Statement::Initializer_Copy);
     REQUIRE(ts->initializers[1]);
     CHECK(ts->initializers[1]->tag == Statement::Initializer_Default);
-    REQUIRE(ts->flags == Composite_Flags::Defined);
+    REQUIRE(ts->flags == Type_Struct::Defined);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);
@@ -263,7 +263,7 @@ TEST_CASE("parse_declaration struct named with variable") {
     REQUIRE(ts->typedefs.count == 0);
     REQUIRE(ts->declarations.count == 0);
     REQUIRE(ts->initializers.len == 0);
-    REQUIRE(ts->flags == Composite_Flags::Defined);
+    REQUIRE(ts->flags == Type_Struct::Defined);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);
@@ -309,7 +309,7 @@ TEST_CASE("parse_declaration union named empty body") {
     REQUIRE(ts->types.count == 0);
     REQUIRE(ts->typedefs.count == 0);
     REQUIRE(ts->declarations.count == 0);
-    REQUIRE(ts->flags == Composite_Flags::Defined);
+    REQUIRE(ts->flags == Type_Union::Defined);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);
@@ -345,7 +345,7 @@ TEST_CASE("parse_declaration union named two fields") {
     CHECK(y->type.get_type() == parser.type_float);
     CHECK_FALSE(y->type.is_const());
     CHECK_FALSE(y->type.is_volatile());
-    REQUIRE(ts->flags == Composite_Flags::Defined);
+    REQUIRE(ts->flags == Type_Union::Defined);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);
@@ -371,7 +371,7 @@ TEST_CASE("parse_declaration union named with variable") {
     REQUIRE(ts->types.count == 0);
     REQUIRE(ts->typedefs.count == 0);
     REQUIRE(ts->declarations.count == 0);
-    REQUIRE(ts->flags == Composite_Flags::Defined);
+    REQUIRE(ts->flags == Type_Union::Defined);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);

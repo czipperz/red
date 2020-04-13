@@ -256,7 +256,7 @@ static Result parse_composite_body(Context* context,
         Result result = peek_token(context, parser, &token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(composite_span, "Expected close curly (`}`) to end struct body");
+            context->report_error(composite_span, "Expected close curly (`}`) to end body");
             return {Result::ErrorInvalidInput};
         }
         if (token.type == Token::CloseCurly) {
@@ -347,14 +347,14 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         return {Result::ErrorInvalidInput};
                     }
                     struct_type = (Type_Struct*)*type;
-                    if (struct_type->flags & Composite_Flags::Defined) {
+                    if (struct_type->flags & Type_Struct::Defined) {
                         context->report_error(identifier_span, "Type `", identifier.str,
                                               "` is already defined");
                         return {Result::ErrorInvalidInput};
                     }
                 }
 
-                uint32_t flags = Composite_Flags::Defined;
+                uint32_t flags = Type_Struct::Defined;
 
                 parser->type_stack.reserve(cz::heap_allocator(), 1);
                 parser->typedef_stack.reserve(cz::heap_allocator(), 1);
@@ -475,14 +475,14 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         return {Result::ErrorInvalidInput};
                     }
                     union_type = (Type_Union*)*type;
-                    if (union_type->flags & Composite_Flags::Defined) {
+                    if (union_type->flags & Type_Union::Defined) {
                         context->report_error(identifier_span, "Type `", identifier.str,
                                               "` is already defined");
                         return {Result::ErrorInvalidInput};
                     }
                 }
 
-                uint32_t flags = Composite_Flags::Defined;
+                uint32_t flags = Type_Union::Defined;
 
                 parser->type_stack.reserve(cz::heap_allocator(), 1);
                 parser->typedef_stack.reserve(cz::heap_allocator(), 1);
