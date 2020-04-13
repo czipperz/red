@@ -21,6 +21,7 @@ struct alignas(4) Type {
         Builtin_Long,
         Builtin_Short,
         Builtin_Void,
+        Builtin_Error,
         Enum,
         Struct,
         Union,
@@ -205,6 +206,7 @@ struct Parser {
     Type* type_long;
     Type* type_short;
     Type* type_void;
+    Type* type_error;
 
     Token back;
 

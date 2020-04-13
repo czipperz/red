@@ -26,6 +26,7 @@ void Parser::init() {
     type_long = make_primitive(buffer_array.allocator(), Type::Builtin_Long);
     type_short = make_primitive(buffer_array.allocator(), Type::Builtin_Short);
     type_void = make_primitive(buffer_array.allocator(), Type::Builtin_Void);
+    type_error = make_primitive(buffer_array.allocator(), Type::Builtin_Error);
     back.type = Token::Parser_Null_Token;
 
     type_stack.reserve(cz::heap_allocator(), 4);
@@ -468,25 +469,31 @@ static Result parse_base_type(Context* context,
                 break;
             } else {
                 parser->back = token;
-                Type** type = lookup_type(parser, identifier);
-                if (type) {
-                    if ((*type)->tag != Type::Struct) {
-                        context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is not a struct");
+                if (identifier.str.len > 0) {
+                    Type** type = lookup_type(parser, identifier);
+                    if (type) {
+                        if ((*type)->tag != Type::Struct) {
+                            context->report_error(identifier_span, "Type `", identifier.str,
+                                                  "` is not a struct");
+                        }
+                        base_type->set_type(*type);
+                    } else {
+                        Type_Struct* struct_type =
+                            parser->buffer_array.allocator().create<Type_Struct>();
+                        struct_type->types = {};
+                        struct_type->typedefs = {};
+                        struct_type->declarations = {};
+                        struct_type->initializers = {};
+                        struct_type->flags = 0;
+                        cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                        types->reserve(cz::heap_allocator(), 1);
+                        types->insert(identifier.str, identifier.hash, struct_type);
+                        base_type->set_type(struct_type);
                     }
-                    base_type->set_type(*type);
                 } else {
-                    Type_Struct* struct_type =
-                        parser->buffer_array.allocator().create<Type_Struct>();
-                    struct_type->types = {};
-                    struct_type->typedefs = {};
-                    struct_type->declarations = {};
-                    struct_type->initializers = {};
-                    struct_type->flags = 0;
-                    cz::Str_Map<Type*>* types = &parser->type_stack.last();
-                    types->reserve(cz::heap_allocator(), 1);
-                    types->insert(identifier.str, identifier.hash, struct_type);
-                    base_type->set_type(struct_type);
+                    context->report_error(struct_span,
+                                          "Structs must be either named or anonymously defined");
+                    base_type->set_type(parser->type_error);
                 }
                 break;
             }
@@ -601,23 +608,30 @@ static Result parse_base_type(Context* context,
                 break;
             } else {
                 parser->back = token;
-                Type** type = lookup_type(parser, identifier);
-                if (type) {
-                    if ((*type)->tag != Type::Union) {
-                        context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is not a union");
+                if (identifier.str.len > 0) {
+                    Type** type = lookup_type(parser, identifier);
+                    if (type) {
+                        if ((*type)->tag != Type::Union) {
+                            context->report_error(identifier_span, "Type `", identifier.str,
+                                                  "` is not a union");
+                        }
+                        base_type->set_type(*type);
+                    } else {
+                        Type_Union* union_type =
+                            parser->buffer_array.allocator().create<Type_Union>();
+                        union_type->types = {};
+                        union_type->typedefs = {};
+                        union_type->declarations = {};
+                        union_type->flags = 0;
+                        cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                        types->reserve(cz::heap_allocator(), 1);
+                        types->insert(identifier.str, identifier.hash, union_type);
+                        base_type->set_type(union_type);
                     }
-                    base_type->set_type(*type);
                 } else {
-                    Type_Union* union_type = parser->buffer_array.allocator().create<Type_Union>();
-                    union_type->types = {};
-                    union_type->typedefs = {};
-                    union_type->declarations = {};
-                    union_type->flags = 0;
-                    cz::Str_Map<Type*>* types = &parser->type_stack.last();
-                    types->reserve(cz::heap_allocator(), 1);
-                    types->insert(identifier.str, identifier.hash, union_type);
-                    base_type->set_type(union_type);
+                    context->report_error(union_span,
+                                          "Unions must be either named or anonymously defined");
+                    base_type->set_type(parser->type_error);
                 }
                 break;
             }

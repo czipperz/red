@@ -516,6 +516,31 @@ TEST_CASE("parse_declaration enum with two values") {
     CHECK(initializers.len() == 2);
 }
 
+TEST_CASE("parse_declaration unnamed struct no body") {
+    SETUP("struct* a;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 1);
+    REQUIRE(parser.type_stack.len() == 1);
+    CHECK(parser.type_stack[0].count == 0);
+    REQUIRE(parser.typedef_stack.len() == 1);
+    CHECK(parser.typedef_stack[0].count == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+
+    REQUIRE(parser.declaration_stack[0].count == 1);
+    Declaration* a = parser.declaration_stack[0].get_hash("a");
+    REQUIRE(a);
+    REQUIRE(a->type.get_type());
+    CHECK(a->type.get_type()->tag == Type::Pointer);
+    Type_Pointer* ap = (Type_Pointer*)a->type.get_type();
+    REQUIRE(ap->inner.get_type());
+    CHECK(ap->inner.get_type()->tag == Type::Builtin_Error);
+
+    CHECK(initializers.len() == 1);
+}
+
 TEST_CASE("parse_expression defined variable") {
     SETUP("int abc; abc;");
     cz::Vector<Statement*> initializers = {};
