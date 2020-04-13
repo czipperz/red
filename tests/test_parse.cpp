@@ -490,12 +490,30 @@ TEST_CASE("parse_declaration enum with no values does nothing") {
     CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
     REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
     REQUIRE(parser.type_stack.len() == 1);
     CHECK(parser.type_stack[0].count == 0);
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 0);
+    CHECK(initializers.len() == 0);
+}
+
+TEST_CASE("parse_declaration enum with two values") {
+    SETUP("enum { A, B };");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.type_stack.len() == 1);
+    CHECK(parser.type_stack[0].count == 0);
+    REQUIRE(parser.typedef_stack.len() == 1);
+    CHECK(parser.typedef_stack[0].count == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 2);
+    CHECK(initializers.len() == 2);
 }
 
 TEST_CASE("parse_expression defined variable") {

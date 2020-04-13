@@ -340,7 +340,10 @@ static Result parse_enum_body(Context* context,
     }
 }
 
-static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type) {
+static Result parse_base_type(Context* context,
+                              Parser* parser,
+                              cz::Vector<Statement*>* initializers,
+                              TypeP* base_type) {
     Token token;
     Result result;
     while (1) {
@@ -690,6 +693,32 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
 
                 CZ_TRY(parse_enum_body(context, parser, &values, &flags, enum_span));
 
+                cz::Str_Map<Declaration>* declarations = &parser->declaration_stack.last();
+                declarations->reserve(cz::heap_allocator(), values.cap);
+                initializers->reserve(cz::heap_allocator(), values.cap);
+                for (size_t i = 0; i < values.cap; ++i) {
+                    if (values.is_present(i)) {
+                        Hashed_Str key = Hashed_Str::from_str(values.keys[i]);
+                        if (!declarations->get(key.str, key.hash)) {
+                            Declaration declaration = {};
+                            // Todo: expand to long / long long when values are too big
+                            declaration.type.set_type(parser->type_int);
+                            declaration.type.set_const();
+                            declarations->insert(key.str, key.hash, declaration);
+
+                            Statement_Initializer_Copy* initializer =
+                                parser->buffer_array.allocator()
+                                    .create<Statement_Initializer_Copy>();
+                            initializer->identifier = key;
+                            Expression_Integer* value =
+                                parser->buffer_array.allocator().create<Expression_Integer>();
+                            value->value = values.values[i];
+                            initializer->value = value;
+                            initializers->push(initializer);
+                        }
+                    }
+                }
+
                 if (!enum_type) {
                     enum_type = parser->buffer_array.allocator().create<Type_Enum>();
                     if (identifier.str.len > 0) {
@@ -826,7 +855,7 @@ Result parse_declaration_(Context* context, Parser* parser, cz::Vector<Statement
     //            declaration 1 = *a
     //            declaration 2 = b
     TypeP base_type = {};
-    CZ_TRY(parse_base_type(context, parser, &base_type));
+    CZ_TRY(parse_base_type(context, parser, initializers, &base_type));
 
     Token token;
     Result result = peek_token(context, parser, &token);
