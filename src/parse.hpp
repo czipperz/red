@@ -52,18 +52,29 @@ struct Type_Enum : Type {
     cz::Slice<int64_t> values;
 };
 
-struct Type_Struct : Type {
-    Type_Struct() : Type(Struct) {}
+namespace Composite_Flags_ {
+enum Composite_Flags : uint32_t {
+    Defined,
+};
+}
+using Composite_Flags_::Composite_Flags;
 
-    cz::Slice<cz::Str> names;
-    cz::Slice<Declaration> declarations;
+struct Type_Composite : Type {
+    Type_Composite(Tag tag) : Type(tag) {}
+
+    cz::Str_Map<Type*> types;
+    cz::Str_Map<TypeP> typedefs;
+    cz::Str_Map<Declaration> declarations;
+    cz::Slice<struct Statement*> initializers;
+    uint32_t flags;
 };
 
-struct Type_Union : Type {
-    Type_Union() : Type(Union) {}
+struct Type_Struct : Type_Composite {
+    Type_Struct() : Type_Composite(Struct) {}
+};
 
-    cz::Slice<cz::Str> names;
-    cz::Slice<Declaration> declarations;
+struct Type_Union : Type_Composite {
+    Type_Union() : Type_Composite(Union) {}
 };
 
 struct Type_Pointer : Type {

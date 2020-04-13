@@ -246,6 +246,28 @@ static Result parse_declaration_after_base_type(Context* context,
     }
 }
 
+static Result parse_composite_body(Context* context,
+                                   Parser* parser,
+                                   cz::Vector<Statement*>* initializers,
+                                   uint32_t* flags,
+                                   Span composite_span) {
+    while (1) {
+        Token token;
+        Result result = peek_token(context, parser, &token);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            context->report_error(composite_span, "Expected close curly (`}`) to end struct body");
+            return {Result::ErrorInvalidInput};
+        }
+        if (token.type == Token::CloseCurly) {
+            parser->back.type = Token::Parser_Null_Token;
+            return Result::ok();
+        }
+
+        CZ_TRY(parse_declaration(context, parser, initializers));
+    }
+}
+
 static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type) {
     Token token;
     Result result;
@@ -265,6 +287,112 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
     }
 
     switch (token.type) {
+        case Token::Struct: {
+            Span struct_span = token.span;
+            result = next_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(struct_span, "Expected struct name, body, or `;` here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Span identifier_span;
+            Hashed_Str identifier = {};
+            if (token.type == Token::Identifier) {
+                identifier = token.v.identifier;
+                identifier_span = token.span;
+
+                result = next_token(context, parser, &token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(struct_span,
+                                          "Expected declaration, struct body, `;` here");
+                    return {Result::ErrorInvalidInput};
+                }
+            }
+
+            if (token.type == Token::Semicolon) {
+                if (identifier.str.len > 0) {
+                    Type** type = lookup_type(parser, identifier);
+                    if (type) {
+                        if ((*type)->tag != Type::Struct) {
+                            context->report_error(identifier_span, "Type `", identifier.str,
+                                                  "` is not a struct");
+                            return {Result::ErrorInvalidInput};
+                        }
+                    } else {
+                        Type_Struct* struct_type =
+                            parser->buffer_array.allocator().create<Type_Struct>();
+                        struct_type->types = {};
+                        struct_type->typedefs = {};
+                        struct_type->declarations = {};
+                        struct_type->initializers = {};
+                        struct_type->flags = 0;
+                        parser->type_stack.last().insert(identifier.str, identifier.hash,
+                                                         struct_type);
+                    }
+                }
+                parser->back = token;
+                return Result::ok();
+            }
+
+            if (token.type == Token::OpenCurly) {
+                Type** type = lookup_type(parser, identifier);
+                Type_Struct* struct_type = nullptr;
+                if (type) {
+                    if ((*type)->tag != Type::Struct) {
+                        context->report_error(identifier_span, "Type `", identifier.str,
+                                              "` is not a struct");
+                        return {Result::ErrorInvalidInput};
+                    }
+                    struct_type = (Type_Struct*)*type;
+                    if (struct_type->flags & Composite_Flags::Defined) {
+                        context->report_error(identifier_span, "Type `", identifier.str,
+                                              "` is already defined");
+                        return {Result::ErrorInvalidInput};
+                    }
+                }
+
+                uint32_t flags = Composite_Flags::Defined;
+
+                parser->type_stack.reserve(cz::heap_allocator(), 1);
+                parser->typedef_stack.reserve(cz::heap_allocator(), 1);
+                parser->declaration_stack.reserve(cz::heap_allocator(), 1);
+                parser->type_stack.push({});
+                parser->typedef_stack.push({});
+                parser->declaration_stack.push({});
+                CZ_DEFER({
+                    parser->type_stack.pop();
+                    parser->typedef_stack.pop();
+                    parser->declaration_stack.pop();
+                });
+
+                cz::Vector<Statement*> initializers = {};
+                CZ_DEFER(initializers.drop(cz::heap_allocator()));
+                CZ_TRY(parse_composite_body(context, parser, &initializers, &flags, struct_span));
+
+                if (!struct_type) {
+                    struct_type = parser->buffer_array.allocator().create<Type_Struct>();
+                    if (identifier.str.len > 0) {
+                        cz::Str_Map<Type*>* types =
+                            &parser->type_stack[parser->type_stack.len() - 2];
+                        types->reserve(cz::heap_allocator(), 1);
+                        types->insert(identifier.str, identifier.hash, struct_type);
+                    }
+                }
+
+                struct_type->types = parser->type_stack.last();
+                struct_type->typedefs = parser->typedef_stack.last();
+                struct_type->declarations = parser->declaration_stack.last();
+                struct_type->initializers =
+                    parser->buffer_array.allocator().duplicate(initializers.as_slice());
+                struct_type->flags = flags;
+
+                base_type->set_type(struct_type);
+                break;
+            }
+        }
+
         case Token::Identifier: {
             Declaration* declaration = lookup_declaration(parser, token.v.identifier);
             TypeP* type = lookup_typedef(parser, token.v.identifier);
@@ -396,6 +524,7 @@ Result parse_declaration_or_statement(Context* context,
         case Token::Long:
         case Token::Short:
         case Token::Void:
+        case Token::Struct:
         case Token::Const:
         case Token::Volatile: {
             *which = Declaration_Or_Statement::Declaration;
