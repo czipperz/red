@@ -391,6 +391,7 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                 base_type->set_type(struct_type);
                 break;
             } else {
+                parser->back = token;
                 Type** type = lookup_type(parser, identifier);
                 if (type) {
                     if ((*type)->tag != Type::Struct) {
@@ -520,6 +521,7 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                 base_type->set_type(union_type);
                 break;
             } else {
+                parser->back = token;
                 Type** type = lookup_type(parser, identifier);
                 if (type) {
                     if ((*type)->tag != Type::Union) {
