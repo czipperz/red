@@ -189,7 +189,6 @@ static Result parse_declaration_after_identifier(Context* context,
         declarations->insert(identifier.str, identifier.hash, *declaration);
     } else {
         context->report_error(previous_span, "Declaration with same name also in scope");
-        return {Result::ErrorInvalidInput};
     }
 
     if (token->type == Token::Comma) {
@@ -394,7 +393,6 @@ static Result parse_base_type(Context* context,
                         if ((*type)->tag != Type::Struct) {
                             context->report_error(identifier_span, "Type `", identifier.str,
                                                   "` is not a struct");
-                            return {Result::ErrorInvalidInput};
                         }
                     } else {
                         Type_Struct* struct_type =
@@ -417,16 +415,17 @@ static Result parse_base_type(Context* context,
                 Type** type = lookup_type(parser, identifier);
                 Type_Struct* struct_type = nullptr;
                 if (type) {
-                    if ((*type)->tag != Type::Struct) {
+                    if ((*type)->tag == Type::Struct) {
+                        struct_type = (Type_Struct*)*type;
+                        if (struct_type->flags & Type_Struct::Defined) {
+                            context->report_error(identifier_span, "Type `", identifier.str,
+                                                  "` is already defined");
+                        } else {
+                            type = nullptr;
+                        }
+                    } else {
                         context->report_error(identifier_span, "Type `", identifier.str,
                                               "` is not a struct");
-                        return {Result::ErrorInvalidInput};
-                    }
-                    struct_type = (Type_Struct*)*type;
-                    if (struct_type->flags & Type_Struct::Defined) {
-                        context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is already defined");
-                        return {Result::ErrorInvalidInput};
                     }
                 }
 
@@ -438,7 +437,13 @@ static Result parse_base_type(Context* context,
                 parser->type_stack.push({});
                 parser->typedef_stack.push({});
                 parser->declaration_stack.push({});
+                bool cleanup_last_stack = true;
                 CZ_DEFER({
+                    if (cleanup_last_stack) {
+                        parser->type_stack.last().drop(cz::heap_allocator());
+                        parser->typedef_stack.last().drop(cz::heap_allocator());
+                        parser->declaration_stack.last().drop(cz::heap_allocator());
+                    }
                     parser->type_stack.pop();
                     parser->typedef_stack.pop();
                     parser->declaration_stack.pop();
@@ -448,24 +453,31 @@ static Result parse_base_type(Context* context,
                 CZ_DEFER(initializers.drop(cz::heap_allocator()));
                 CZ_TRY(parse_composite_body(context, parser, &initializers, &flags, struct_span));
 
-                if (!struct_type) {
-                    struct_type = parser->buffer_array.allocator().create<Type_Struct>();
-                    if (identifier.str.len > 0) {
-                        cz::Str_Map<Type*>* types =
-                            &parser->type_stack[parser->type_stack.len() - 2];
-                        types->reserve(cz::heap_allocator(), 1);
-                        types->insert(identifier.str, identifier.hash, struct_type);
+                // If type is already defined, just don't define it again.  This allows us to
+                // continue parsing which is good.
+                if (!type) {
+                    if (!struct_type) {
+                        struct_type = parser->buffer_array.allocator().create<Type_Struct>();
+                        if (identifier.str.len > 0) {
+                            cz::Str_Map<Type*>* types =
+                                &parser->type_stack[parser->type_stack.len() - 2];
+                            types->reserve(cz::heap_allocator(), 1);
+                            types->insert(identifier.str, identifier.hash, struct_type);
+                        }
                     }
+
+                    cleanup_last_stack = false;
+                    struct_type->types = parser->type_stack.last();
+                    struct_type->typedefs = parser->typedef_stack.last();
+                    struct_type->declarations = parser->declaration_stack.last();
+                    struct_type->initializers =
+                        parser->buffer_array.allocator().duplicate(initializers.as_slice());
+                    struct_type->flags = flags;
+
+                    base_type->set_type(struct_type);
+                } else {
+                    base_type->set_type(*type);
                 }
-
-                struct_type->types = parser->type_stack.last();
-                struct_type->typedefs = parser->typedef_stack.last();
-                struct_type->declarations = parser->declaration_stack.last();
-                struct_type->initializers =
-                    parser->buffer_array.allocator().duplicate(initializers.as_slice());
-                struct_type->flags = flags;
-
-                base_type->set_type(struct_type);
                 break;
             } else {
                 parser->back = token;
@@ -551,16 +563,17 @@ static Result parse_base_type(Context* context,
                 Type** type = lookup_type(parser, identifier);
                 Type_Union* union_type = nullptr;
                 if (type) {
-                    if ((*type)->tag != Type::Union) {
+                    if ((*type)->tag == Type::Union) {
+                        union_type = (Type_Union*)*type;
+                        if (union_type->flags & Type_Union::Defined) {
+                            context->report_error(identifier_span, "Type `", identifier.str,
+                                                  "` is already defined");
+                        } else {
+                            type = nullptr;
+                        }
+                    } else {
                         context->report_error(identifier_span, "Type `", identifier.str,
                                               "` is not a union");
-                        return {Result::ErrorInvalidInput};
-                    }
-                    union_type = (Type_Union*)*type;
-                    if (union_type->flags & Type_Union::Defined) {
-                        context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is already defined");
-                        return {Result::ErrorInvalidInput};
                     }
                 }
 
@@ -572,7 +585,13 @@ static Result parse_base_type(Context* context,
                 parser->type_stack.push({});
                 parser->typedef_stack.push({});
                 parser->declaration_stack.push({});
+                bool cleanup_last_stack = true;
                 CZ_DEFER({
+                    if (cleanup_last_stack) {
+                        parser->type_stack.last().drop(cz::heap_allocator());
+                        parser->typedef_stack.last().drop(cz::heap_allocator());
+                        parser->declaration_stack.last().drop(cz::heap_allocator());
+                    }
                     parser->type_stack.pop();
                     parser->typedef_stack.pop();
                     parser->declaration_stack.pop();
@@ -589,22 +608,27 @@ static Result parse_base_type(Context* context,
                     }
                 }
 
-                if (!union_type) {
-                    union_type = parser->buffer_array.allocator().create<Type_Union>();
-                    if (identifier.str.len > 0) {
-                        cz::Str_Map<Type*>* types =
-                            &parser->type_stack[parser->type_stack.len() - 2];
-                        types->reserve(cz::heap_allocator(), 1);
-                        types->insert(identifier.str, identifier.hash, union_type);
+                if (!type) {
+                    if (!union_type) {
+                        union_type = parser->buffer_array.allocator().create<Type_Union>();
+                        if (identifier.str.len > 0) {
+                            cz::Str_Map<Type*>* types =
+                                &parser->type_stack[parser->type_stack.len() - 2];
+                            types->reserve(cz::heap_allocator(), 1);
+                            types->insert(identifier.str, identifier.hash, union_type);
+                        }
                     }
+
+                    cleanup_last_stack = false;
+                    union_type->types = parser->type_stack.last();
+                    union_type->typedefs = parser->typedef_stack.last();
+                    union_type->declarations = parser->declaration_stack.last();
+                    union_type->flags = flags;
+
+                    base_type->set_type(union_type);
+                } else {
+                    base_type->set_type(*type);
                 }
-
-                union_type->types = parser->type_stack.last();
-                union_type->typedefs = parser->typedef_stack.last();
-                union_type->declarations = parser->declaration_stack.last();
-                union_type->flags = flags;
-
-                base_type->set_type(union_type);
                 break;
             } else {
                 parser->back = token;
@@ -667,7 +691,6 @@ static Result parse_base_type(Context* context,
                         if ((*type)->tag != Type::Enum) {
                             context->report_error(identifier_span, "Type `", identifier.str,
                                                   "` is not an enum");
-                            return {Result::ErrorInvalidInput};
                         }
                     } else {
                         Type_Enum* enum_type = parser->buffer_array.allocator().create<Type_Enum>();
@@ -686,16 +709,17 @@ static Result parse_base_type(Context* context,
                 Type** type = lookup_type(parser, identifier);
                 Type_Enum* enum_type = nullptr;
                 if (type) {
-                    if ((*type)->tag != Type::Enum) {
+                    if ((*type)->tag == Type::Enum) {
+                        enum_type = (Type_Enum*)*type;
+                        if (enum_type->flags & Type_Enum::Defined) {
+                            context->report_error(identifier_span, "Type `", identifier.str,
+                                                  "` is already defined");
+                        } else {
+                            type = nullptr;
+                        }
+                    } else {
                         context->report_error(identifier_span, "Type `", identifier.str,
                                               "` is not an enum");
-                        return {Result::ErrorInvalidInput};
-                    }
-                    enum_type = (Type_Enum*)*type;
-                    if (enum_type->flags & Type_Enum::Defined) {
-                        context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is already defined");
-                        return {Result::ErrorInvalidInput};
                     }
                 }
 
@@ -733,21 +757,25 @@ static Result parse_base_type(Context* context,
                     }
                 }
 
-                if (!enum_type) {
-                    enum_type = parser->buffer_array.allocator().create<Type_Enum>();
-                    if (identifier.str.len > 0) {
-                        cz::Str_Map<Type*>* types =
-                            &parser->type_stack[parser->type_stack.len() - 2];
-                        types->reserve(cz::heap_allocator(), 1);
-                        types->insert(identifier.str, identifier.hash, enum_type);
+                if (!type) {
+                    if (!enum_type) {
+                        enum_type = parser->buffer_array.allocator().create<Type_Enum>();
+                        if (identifier.str.len > 0) {
+                            cz::Str_Map<Type*>* types =
+                                &parser->type_stack[parser->type_stack.len() - 2];
+                            types->reserve(cz::heap_allocator(), 1);
+                            types->insert(identifier.str, identifier.hash, enum_type);
+                        }
                     }
+
+                    destroy_values = false;
+                    enum_type->values = values;
+                    enum_type->flags = flags;
+
+                    base_type->set_type(enum_type);
+                } else {
+                    base_type->set_type(*type);
                 }
-
-                destroy_values = false;
-                enum_type->values = values;
-                enum_type->flags = flags;
-
-                base_type->set_type(enum_type);
                 break;
             } else {
                 parser->back = token;
