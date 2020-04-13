@@ -401,6 +401,28 @@ TEST_CASE("cpp::next_token #if inside #if parsed correctly") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
+TEST_CASE("cpp::next_token #if ternary operator") {
+    SETUP("#if 1 ? 0 : 1\nx\n#else\ny\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "y");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #if ternary operator precedence") {
+    SETUP("#if 1 - 0 ? 2 : 1\nx\n#else\ny\n#endif");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "x");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
 TEST_CASE("cpp::next_token #define no value") {
     SETUP("#define abc\nabc");
 

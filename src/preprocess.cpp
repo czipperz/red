@@ -413,7 +413,38 @@ static Result parse_and_eval_expression(Context* context,
         Token::Type op = tokens[*index].type;
         switch (op) {
             case Token::CloseParen:
+            case Token::Colon:
                 return Result::ok();
+
+            case Token::QuestionMark: {
+                precedence = 16;
+                bool ltr = false;
+
+                if (precedence >= max_precedence) {
+                    return Result::ok();
+                }
+
+                Span question_mark_span = tokens[*index].span;
+
+                ++*index;
+                int64_t then;
+                CZ_TRY(parse_and_eval_expression(context, tokens, index, &then, precedence + !ltr));
+
+                if (*index == tokens.len || tokens[*index].type != Token::Colon) {
+                    context->report_error(
+                        question_mark_span,
+                        "Expected `:` and then otherwise expression side for ternary operator");
+                    return {Result::ErrorInvalidInput};
+                }
+                ++*index;
+
+                int64_t otherwise;
+                CZ_TRY(parse_and_eval_expression(context, tokens, index, &otherwise,
+                                                 precedence + !ltr));
+
+                *value = *value ? then : otherwise;
+                continue;
+            }
 
             case Token::LessThan:
             case Token::LessEqual:
