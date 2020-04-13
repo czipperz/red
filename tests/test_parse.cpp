@@ -40,6 +40,8 @@ TEST_CASE("parse_declaration type but no identifier") {
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 0);
     CHECK(initializers.len() == 0);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration type with identifier") {
@@ -60,6 +62,8 @@ TEST_CASE("parse_declaration type with identifier") {
     CHECK(abc->type.get_type() == parser.type_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration two variables same type") {
@@ -82,6 +86,8 @@ TEST_CASE("parse_declaration two variables same type") {
     CHECK(def->type.get_type() == parser.type_int);
     CHECK_FALSE(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration const applies to both variables") {
@@ -104,6 +110,8 @@ TEST_CASE("parse_declaration const applies to both variables") {
     CHECK(def->type.get_type() == parser.type_int);
     CHECK(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration second variable is pointer") {
@@ -132,6 +140,8 @@ TEST_CASE("parse_declaration second variable is pointer") {
     CHECK(def_type->inner.get_type() == parser.type_int);
     CHECK_FALSE(def_type->inner.is_const());
     CHECK_FALSE(def_type->inner.is_volatile());
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration const cannot be used after an identifier") {
@@ -148,6 +158,8 @@ TEST_CASE("parse_declaration const cannot be used after an identifier") {
     CHECK(abc->type.get_type() == parser.type_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
+
+    CHECK(context.errors.len() == 1);
 }
 
 TEST_CASE("parse_declaration struct unnamed empty body") {
@@ -162,6 +174,8 @@ TEST_CASE("parse_declaration struct unnamed empty body") {
     CHECK(parser.typedef_stack[0].count == 0);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 0);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration struct named empty body") {
@@ -187,6 +201,8 @@ TEST_CASE("parse_declaration struct named empty body") {
     CHECK(parser.typedef_stack[0].count == 0);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 0);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration struct named two fields") {
@@ -226,6 +242,8 @@ TEST_CASE("parse_declaration struct named two fields") {
     CHECK(parser.typedef_stack[0].count == 0);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 0);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration struct unnamed with variable") {
@@ -255,6 +273,8 @@ TEST_CASE("parse_declaration struct unnamed with variable") {
     REQUIRE(initializers.len() == 1);
     REQUIRE(initializers[0]);
     REQUIRE(initializers[0]->tag == Statement::Initializer_Default);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_expression defined variable") {
@@ -270,6 +290,8 @@ TEST_CASE("parse_expression defined variable") {
     REQUIRE(expression->tag == Expression::Variable);
     Expression_Variable* e = (Expression_Variable*)expression;
     CHECK(e->variable.str == "abc");
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_expression undefined variable") {
@@ -277,6 +299,8 @@ TEST_CASE("parse_expression undefined variable") {
 
     Expression* expression;
     REQUIRE(parse_expression(&context, &parser, &expression).type == Result::ErrorInvalidInput);
+
+    CHECK(context.errors.len() == 1);
 }
 
 TEST_CASE("parse_expression integer") {
@@ -288,6 +312,8 @@ TEST_CASE("parse_expression integer") {
     REQUIRE(expression->tag == Expression::Integer);
     Expression_Integer* e = (Expression_Integer*)expression;
     CHECK(e->value == 123);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_expression basic binary expression") {
@@ -309,6 +335,8 @@ TEST_CASE("parse_expression basic binary expression") {
     REQUIRE(e->right->tag == Expression::Integer);
     Expression_Integer* right = (Expression_Integer*)e->right;
     CHECK(right->value == 2);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_expression binary expression left to right") {
@@ -326,6 +354,8 @@ TEST_CASE("parse_expression binary expression left to right") {
 
     REQUIRE(e->right);
     CHECK(e->right->tag == Expression::Integer);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_expression binary expression right to left") {
@@ -343,6 +373,8 @@ TEST_CASE("parse_expression binary expression right to left") {
 
     REQUIRE(e->right);
     CHECK(e->right->tag == Expression::Binary);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_expression binary expression left to right parenthesis") {
@@ -360,6 +392,8 @@ TEST_CASE("parse_expression binary expression left to right parenthesis") {
 
     REQUIRE(e->right);
     CHECK(e->right->tag == Expression::Binary);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_expression binary expression right to left parenthesis") {
@@ -377,6 +411,8 @@ TEST_CASE("parse_expression binary expression right to left parenthesis") {
 
     REQUIRE(e->right);
     CHECK(e->right->tag == Expression::Integer);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_statement basic binary expression") {
@@ -402,6 +438,8 @@ TEST_CASE("parse_statement basic binary expression") {
     REQUIRE(e->right->tag == Expression::Integer);
     Expression_Integer* right = (Expression_Integer*)e->right;
     CHECK(right->value == 2);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration_or_statement basic binary expression") {
@@ -434,6 +472,8 @@ TEST_CASE("parse_declaration_or_statement basic binary expression") {
     REQUIRE(e->right->tag == Expression::Integer);
     Expression_Integer* right = (Expression_Integer*)e->right;
     CHECK(right->value == 2);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration_or_statement type with identifier") {
@@ -453,6 +493,8 @@ TEST_CASE("parse_declaration_or_statement type with identifier") {
     CHECK(abc->type.get_type() == parser.type_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_declaration two variables first has initializer") {
@@ -475,6 +517,8 @@ TEST_CASE("parse_declaration two variables first has initializer") {
     CHECK(def->type.get_type() == parser.type_int);
     CHECK_FALSE(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_statement block with defined variable and expression usage") {
@@ -503,6 +547,8 @@ TEST_CASE("parse_statement block with defined variable and expression usage") {
 
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 0);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_statement for loop") {
@@ -531,6 +577,8 @@ TEST_CASE("parse_statement for loop") {
     REQUIRE(sfor->body->tag == Statement::Block);
     Statement_Block* block = (Statement_Block*)sfor->body;
     CHECK(block->statements.len == 0);
+
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("parse_statement while loop") {
