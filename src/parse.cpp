@@ -1100,7 +1100,55 @@ static Result parse_expression_(Context* context,
         switch (token.type) {
             case Token::CloseParen:
             case Token::Semicolon:
+            case Token::Colon:
                 return Result::ok();
+
+            case Token::QuestionMark: {
+                precedence = 16;
+                ltr = false;
+
+                if (precedence >= max_precedence) {
+                    return Result::ok();
+                }
+
+                parser->back.type = Token::Parser_Null_Token;
+
+                Expression* then;
+                result = parse_expression_(context, parser, &then, precedence + !ltr);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(
+                        token.span, "Expected then expression side for ternary operator here");
+                    return Result::ok();
+                }
+
+                Span question_mark_span = token.span;
+                result = next_token(context, parser, &token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(
+                        question_mark_span,
+                        "Expected `:` and then otherwise expression side for ternary operator");
+                    return Result::ok();
+                }
+
+                Expression* otherwise;
+                result = parse_expression_(context, parser, &otherwise, precedence + !ltr);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(
+                        token.span, "Expected otherwise expression for ternary operator here");
+                    return Result::ok();
+                }
+
+                Expression_Ternary* ternary =
+                    parser->buffer_array.allocator().create<Expression_Ternary>();
+                ternary->condition = *eout;
+                ternary->then = then;
+                ternary->otherwise = otherwise;
+                *eout = ternary;
+                continue;
+            }
 
             case Token::LessThan:
             case Token::LessEqual:
@@ -1156,7 +1204,7 @@ static Result parse_expression_(Context* context,
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
             context->report_error(token.span, "Expected right side for binary operator here");
-            return {Result::ErrorInvalidInput};
+            break;
         }
 
         Expression_Binary* binary = parser->buffer_array.allocator().create<Expression_Binary>();

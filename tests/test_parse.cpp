@@ -679,6 +679,60 @@ TEST_CASE("parse_expression binary expression right to left parenthesis") {
     CHECK(context.errors.len() == 0);
 }
 
+TEST_CASE("parse_expression ternary operator") {
+    SETUP("1 ? 2 : 3;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Ternary);
+    Expression_Ternary* e = (Expression_Ternary*)expression;
+
+    REQUIRE(e->condition);
+    CHECK(e->condition->tag == Expression::Integer);
+
+    REQUIRE(e->then);
+    CHECK(e->then->tag == Expression::Integer);
+
+    REQUIRE(e->otherwise);
+    CHECK(e->otherwise->tag == Expression::Integer);
+}
+
+TEST_CASE("parse_expression ternary inside ternary") {
+    SETUP("1 ? 2 ? 3 : 4 : 5 ? 6 : 7;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Ternary);
+    Expression_Ternary* e = (Expression_Ternary*)expression;
+
+    REQUIRE(e->condition);
+    CHECK(e->condition->tag == Expression::Integer);
+
+    REQUIRE(e->then);
+    CHECK(e->then->tag == Expression::Ternary);
+    Expression_Ternary* then = (Expression_Ternary*)e->then;
+    REQUIRE(then->condition);
+    CHECK(then->condition->tag == Expression::Integer);
+    REQUIRE(then->then);
+    CHECK(then->then->tag == Expression::Integer);
+    REQUIRE(then->otherwise);
+    CHECK(then->otherwise->tag == Expression::Integer);
+
+    REQUIRE(e->otherwise);
+    CHECK(e->otherwise->tag == Expression::Ternary);
+    Expression_Ternary* otherwise = (Expression_Ternary*)e->otherwise;
+    REQUIRE(otherwise->condition);
+    CHECK(otherwise->condition->tag == Expression::Integer);
+    REQUIRE(otherwise->then);
+    CHECK(otherwise->then->tag == Expression::Integer);
+    REQUIRE(otherwise->otherwise);
+    CHECK(otherwise->otherwise->tag == Expression::Integer);
+}
+
 TEST_CASE("parse_statement basic binary expression") {
     SETUP("1 + 2;");
 

@@ -91,6 +91,7 @@ struct Expression {
         Integer,
         Variable,
         Binary,
+        Ternary,
     };
 
     Tag tag;
@@ -116,6 +117,14 @@ struct Expression_Binary : Expression {
     Token::Type op;
     Expression* left;
     Expression* right;
+};
+
+struct Expression_Ternary : Expression {
+    Expression_Ternary() : Expression(Ternary) {}
+
+    Expression* condition;
+    Expression* then;
+    Expression* otherwise;
 };
 
 struct Statement {
