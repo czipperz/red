@@ -391,7 +391,15 @@ TEST_CASE("parse_declaration struct declaration and then usage without tag is er
     CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
     REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
-    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::ErrorInvalidInput);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(initializers.len() == 1);
+    REQUIRE(parser.declaration_stack[0].count == 1);
+    Declaration* s = parser.declaration_stack[0].get_hash("s");
+    REQUIRE(s);
+    REQUIRE(parser.type_stack[0].count == 1);
+    Type** ts = parser.type_stack[0].get_hash("S");
+    REQUIRE(ts);
+    CHECK(s->type.get_type() == *ts);
 
     CHECK(context.errors.len() == 1);
 }

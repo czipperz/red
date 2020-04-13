@@ -578,7 +578,13 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
 
             if (!type) {
                 context->report_error(token.span, "Undefined type `", token.v.identifier.str, "`");
-                return {Result::ErrorInvalidInput};
+                Type** tagged_type = lookup_type(parser, token.v.identifier);
+                if (tagged_type) {
+                    base_type->set_type(*tagged_type);
+                    break;
+                } else {
+                    return {Result::ErrorInvalidInput};
+                }
             }
 
             base_type->merge_typedef(*type);
