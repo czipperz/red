@@ -246,7 +246,7 @@ TEST_CASE("parse_declaration struct named two fields") {
     CHECK(context.errors.len() == 0);
 }
 
-TEST_CASE("parse_declaration struct unnamed with variable") {
+TEST_CASE("parse_declaration struct named with variable") {
     SETUP("struct S {} s;");
     cz::Vector<Statement*> initializers = {};
     CZ_DEFER(initializers.drop(cz::heap_allocator()));
@@ -355,7 +355,7 @@ TEST_CASE("parse_declaration union named two fields") {
     CHECK(context.errors.len() == 1);
 }
 
-TEST_CASE("parse_declaration union unnamed with variable") {
+TEST_CASE("parse_declaration union named with variable") {
     SETUP("union S {} s;");
     cz::Vector<Statement*> initializers = {};
     CZ_DEFER(initializers.drop(cz::heap_allocator()));
@@ -381,6 +381,28 @@ TEST_CASE("parse_declaration union unnamed with variable") {
     REQUIRE(initializers.len() == 1);
     REQUIRE(initializers[0]);
     REQUIRE(initializers[0]->tag == Statement::Initializer_Default);
+
+    CHECK(context.errors.len() == 0);
+}
+
+TEST_CASE("parse_declaration struct declaration and then usage without tag is error") {
+    SETUP("struct S {}; S s;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::ErrorInvalidInput);
+
+    CHECK(context.errors.len() == 1);
+}
+
+TEST_CASE("parse_declaration struct declaration and then usage with tag is ok") {
+    SETUP("struct S {}; struct S s;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
 
     CHECK(context.errors.len() == 0);
 }

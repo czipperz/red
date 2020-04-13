@@ -390,6 +390,26 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
 
                 base_type->set_type(struct_type);
                 break;
+            } else {
+                Type** type = lookup_type(parser, identifier);
+                if (type) {
+                    if ((*type)->tag != Type::Struct) {
+                        context->report_error(identifier_span, "Type `", identifier.str,
+                                              "` is not a struct");
+                    }
+                    base_type->set_type(*type);
+                } else {
+                    Type_Struct* struct_type =
+                        parser->buffer_array.allocator().create<Type_Struct>();
+                    struct_type->types = {};
+                    struct_type->typedefs = {};
+                    struct_type->declarations = {};
+                    struct_type->initializers = {};
+                    struct_type->flags = 0;
+                    parser->type_stack.last().insert(identifier.str, identifier.hash, struct_type);
+                    base_type->set_type(struct_type);
+                }
+                break;
             }
         }
 
@@ -499,6 +519,24 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
 
                 base_type->set_type(union_type);
                 break;
+            } else {
+                Type** type = lookup_type(parser, identifier);
+                if (type) {
+                    if ((*type)->tag != Type::Union) {
+                        context->report_error(identifier_span, "Type `", identifier.str,
+                                              "` is not a union");
+                    }
+                    base_type->set_type(*type);
+                } else {
+                    Type_Union* union_type = parser->buffer_array.allocator().create<Type_Union>();
+                    union_type->types = {};
+                    union_type->typedefs = {};
+                    union_type->declarations = {};
+                    union_type->flags = 0;
+                    parser->type_stack.last().insert(identifier.str, identifier.hash, union_type);
+                    base_type->set_type(union_type);
+                }
+                break;
             }
         }
 
@@ -600,6 +638,7 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
     Result result = peek_token(context, parser, &token);
     CZ_TRY_VAR(result);
     if (result.is_ok() && token.type == Token::Semicolon) {
+        parser->back.type = Token::Parser_Null_Token;
         return Result::ok();
     }
 
