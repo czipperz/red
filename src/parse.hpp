@@ -65,12 +65,13 @@ struct Type_Composite : Type {
     cz::Str_Map<Type*> types;
     cz::Str_Map<TypeP> typedefs;
     cz::Str_Map<Declaration> declarations;
-    cz::Slice<struct Statement*> initializers;
     uint32_t flags;
 };
 
 struct Type_Struct : Type_Composite {
     Type_Struct() : Type_Composite(Struct) {}
+
+    cz::Slice<struct Statement*> initializers;
 };
 
 struct Type_Union : Type_Composite {

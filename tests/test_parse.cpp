@@ -277,6 +277,114 @@ TEST_CASE("parse_declaration struct unnamed with variable") {
     CHECK(context.errors.len() == 0);
 }
 
+TEST_CASE("parse_declaration union unnamed empty body") {
+    SETUP("union {};");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parser.type_stack.len() == 1);
+    CHECK(parser.type_stack[0].count == 0);
+    REQUIRE(parser.typedef_stack.len() == 1);
+    CHECK(parser.typedef_stack[0].count == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 0);
+
+    CHECK(context.errors.len() == 0);
+}
+
+TEST_CASE("parse_declaration union named empty body") {
+    SETUP("union S {};");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parser.type_stack.len() == 1);
+    REQUIRE(parser.type_stack[0].count == 1);
+    Type** type = parser.type_stack[0].get_hash("S");
+    REQUIRE(type);
+    REQUIRE(*type);
+    REQUIRE((*type)->tag == Type::Union);
+    Type_Union* ts = (Type_Union*)*type;
+    REQUIRE(ts->types.count == 0);
+    REQUIRE(ts->typedefs.count == 0);
+    REQUIRE(ts->declarations.count == 0);
+    REQUIRE(ts->flags == Composite_Flags::Defined);
+
+    REQUIRE(parser.typedef_stack.len() == 1);
+    CHECK(parser.typedef_stack[0].count == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 0);
+
+    CHECK(context.errors.len() == 0);
+}
+
+TEST_CASE("parse_declaration union named two fields") {
+    SETUP("union S { int x = 3; float y; };");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parser.type_stack.len() == 1);
+    REQUIRE(parser.type_stack[0].count == 1);
+    Type** type = parser.type_stack[0].get_hash("S");
+    REQUIRE(type);
+    REQUIRE(*type);
+    REQUIRE((*type)->tag == Type::Union);
+    Type_Union* ts = (Type_Union*)*type;
+    REQUIRE(ts->types.count == 0);
+    REQUIRE(ts->typedefs.count == 0);
+    REQUIRE(ts->declarations.count == 2);
+    Declaration* x = ts->declarations.get_hash("x");
+    REQUIRE(x);
+    CHECK(x->type.get_type() == parser.type_int);
+    CHECK_FALSE(x->type.is_const());
+    CHECK_FALSE(x->type.is_volatile());
+    Declaration* y = ts->declarations.get_hash("y");
+    REQUIRE(y);
+    CHECK(y->type.get_type() == parser.type_float);
+    CHECK_FALSE(y->type.is_const());
+    CHECK_FALSE(y->type.is_volatile());
+    REQUIRE(ts->flags == Composite_Flags::Defined);
+
+    REQUIRE(parser.typedef_stack.len() == 1);
+    CHECK(parser.typedef_stack[0].count == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 0);
+
+    CHECK(context.errors.len() == 1);
+}
+
+TEST_CASE("parse_declaration union unnamed with variable") {
+    SETUP("union S {} s;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parser.type_stack.len() == 1);
+    REQUIRE(parser.type_stack[0].count == 1);
+    Type** type = parser.type_stack[0].get_hash("S");
+    REQUIRE(type);
+    REQUIRE(*type);
+    REQUIRE((*type)->tag == Type::Union);
+    Type_Union* ts = (Type_Union*)*type;
+    REQUIRE(ts->types.count == 0);
+    REQUIRE(ts->typedefs.count == 0);
+    REQUIRE(ts->declarations.count == 0);
+    REQUIRE(ts->flags == Composite_Flags::Defined);
+
+    REQUIRE(parser.typedef_stack.len() == 1);
+    CHECK(parser.typedef_stack[0].count == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    REQUIRE(initializers.len() == 1);
+    REQUIRE(initializers[0]);
+    REQUIRE(initializers[0]->tag == Statement::Initializer_Default);
+
+    CHECK(context.errors.len() == 0);
+}
+
 TEST_CASE("parse_expression defined variable") {
     SETUP("int abc; abc;");
     cz::Vector<Statement*> initializers = {};

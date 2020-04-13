@@ -393,6 +393,115 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
             }
         }
 
+        case Token::Union: {
+            Span union_span = token.span;
+            result = next_token(context, parser, &token);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(union_span, "Expected union name, body, or `;` here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Span identifier_span;
+            Hashed_Str identifier = {};
+            if (token.type == Token::Identifier) {
+                identifier = token.v.identifier;
+                identifier_span = token.span;
+
+                result = next_token(context, parser, &token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(union_span, "Expected declaration, union body, `;` here");
+                    return {Result::ErrorInvalidInput};
+                }
+            }
+
+            if (token.type == Token::Semicolon) {
+                if (identifier.str.len > 0) {
+                    Type** type = lookup_type(parser, identifier);
+                    if (type) {
+                        if ((*type)->tag != Type::Union) {
+                            context->report_error(identifier_span, "Type `", identifier.str,
+                                                  "` is not a union");
+                            return {Result::ErrorInvalidInput};
+                        }
+                    } else {
+                        Type_Union* union_type =
+                            parser->buffer_array.allocator().create<Type_Union>();
+                        union_type->types = {};
+                        union_type->typedefs = {};
+                        union_type->declarations = {};
+                        union_type->flags = 0;
+                        parser->type_stack.last().insert(identifier.str, identifier.hash,
+                                                         union_type);
+                    }
+                }
+                parser->back = token;
+                return Result::ok();
+            }
+
+            if (token.type == Token::OpenCurly) {
+                Type** type = lookup_type(parser, identifier);
+                Type_Union* union_type = nullptr;
+                if (type) {
+                    if ((*type)->tag != Type::Union) {
+                        context->report_error(identifier_span, "Type `", identifier.str,
+                                              "` is not a union");
+                        return {Result::ErrorInvalidInput};
+                    }
+                    union_type = (Type_Union*)*type;
+                    if (union_type->flags & Composite_Flags::Defined) {
+                        context->report_error(identifier_span, "Type `", identifier.str,
+                                              "` is already defined");
+                        return {Result::ErrorInvalidInput};
+                    }
+                }
+
+                uint32_t flags = Composite_Flags::Defined;
+
+                parser->type_stack.reserve(cz::heap_allocator(), 1);
+                parser->typedef_stack.reserve(cz::heap_allocator(), 1);
+                parser->declaration_stack.reserve(cz::heap_allocator(), 1);
+                parser->type_stack.push({});
+                parser->typedef_stack.push({});
+                parser->declaration_stack.push({});
+                CZ_DEFER({
+                    parser->type_stack.pop();
+                    parser->typedef_stack.pop();
+                    parser->declaration_stack.pop();
+                });
+
+                cz::Vector<Statement*> initializers = {};
+                CZ_DEFER(initializers.drop(cz::heap_allocator()));
+                CZ_TRY(parse_composite_body(context, parser, &initializers, &flags, union_span));
+
+                for (size_t i = 0; i < initializers.len(); ++i) {
+                    if (initializers[i]->tag != Statement::Initializer_Default) {
+                        context->report_error(union_span,
+                                              "Union variants cannot have initializers");
+                    }
+                }
+
+                if (!union_type) {
+                    union_type = parser->buffer_array.allocator().create<Type_Union>();
+                    if (identifier.str.len > 0) {
+                        cz::Str_Map<Type*>* types =
+                            &parser->type_stack[parser->type_stack.len() - 2];
+                        types->reserve(cz::heap_allocator(), 1);
+                        types->insert(identifier.str, identifier.hash, union_type);
+                    }
+                }
+
+                union_type->types = parser->type_stack.last();
+                union_type->typedefs = parser->typedef_stack.last();
+                union_type->declarations = parser->declaration_stack.last();
+                union_type->flags = flags;
+
+                base_type->set_type(union_type);
+                break;
+            }
+        }
+
         case Token::Identifier: {
             Declaration* declaration = lookup_declaration(parser, token.v.identifier);
             TypeP* type = lookup_typedef(parser, token.v.identifier);
@@ -525,6 +634,7 @@ Result parse_declaration_or_statement(Context* context,
         case Token::Short:
         case Token::Void:
         case Token::Struct:
+        case Token::Union:
         case Token::Const:
         case Token::Volatile: {
             *which = Declaration_Or_Statement::Declaration;
