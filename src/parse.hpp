@@ -110,6 +110,8 @@ struct Statement {
         Block,
         For,
         While,
+        Initializer_Default,
+        Initializer_Copy,
     };
 
     Tag tag;
@@ -145,10 +147,25 @@ struct Statement_While : Statement {
     Statement* body;
 };
 
+struct Statement_Initializer : Statement {
+    Statement_Initializer(Tag tag) : Statement(tag) {}
+
+    Hashed_Str identifier;
+};
+
+struct Statement_Initializer_Default : Statement_Initializer {
+    Statement_Initializer_Default() : Statement_Initializer(Initializer_Default) {}
+};
+
+struct Statement_Initializer_Copy : Statement_Initializer {
+    Statement_Initializer_Copy() : Statement_Initializer(Initializer_Copy) {}
+
+    struct Expression* value;
+};
+
 struct Declaration {
     TypeP type;
     Type_Pointer* o_type_pointer;
-    Expression* o_value;
 };
 
 namespace Declaration_Or_Statement_ {
@@ -182,12 +199,12 @@ struct Parser {
     void drop();
 };
 
-Result parse_declaration(Context* context, Parser* parser);
+Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*>* initializers);
 Result parse_expression(Context* context, Parser* parser, Expression** expression);
 Result parse_statement(Context* context, Parser* parser, Statement** statement);
 Result parse_declaration_or_statement(Context* context,
                                       Parser* parser,
-                                      Statement** statement,
+                                      cz::Vector<Statement*>* statements,
                                       Declaration_Or_Statement* which);
 
 }

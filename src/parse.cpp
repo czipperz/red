@@ -133,7 +133,8 @@ static Result parse_declaration_after_identifier(Context* context,
                                                  Parser* parser,
                                                  Declaration* declaration,
                                                  Hashed_Str identifier,
-                                                 Token* token) {
+                                                 Token* token,
+                                                 cz::Vector<Statement*>* initializers) {
     // Todo: support arrays
     Span previous_span = token->span;
     Result result = next_token(context, parser, token);
@@ -145,12 +146,20 @@ static Result parse_declaration_after_identifier(Context* context,
 
     if (token->type == Token::Set) {
         // Eat the value.
-        result = parse_expression(context, parser, &declaration->o_value);
+        Expression* value;
+        result = parse_expression(context, parser, &value);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
             context->report_error(previous_span, "Expected ';' to end declaration here");
             return {Result::ErrorInvalidInput};
         }
+
+        Statement_Initializer_Copy* initializer =
+            parser->buffer_array.allocator().create<Statement_Initializer_Copy>();
+        initializer->identifier = identifier;
+        initializer->value = value;
+        initializers->reserve(cz::heap_allocator(), 1);
+        initializers->push(initializer);
 
         // Then eat `;` or `,` after the value.
         previous_span = token->span;
@@ -161,7 +170,11 @@ static Result parse_declaration_after_identifier(Context* context,
             return {Result::ErrorInvalidInput};
         }
     } else {
-        declaration->o_value = nullptr;
+        Statement_Initializer_Default* initializer =
+            parser->buffer_array.allocator().create<Statement_Initializer_Default>();
+        initializer->identifier = identifier;
+        initializers->reserve(cz::heap_allocator(), 1);
+        initializers->push(initializer);
     }
 
     cz::Str_Map<Declaration>* declarations = &parser->declaration_stack.last();
@@ -186,7 +199,8 @@ static Result parse_declaration_after_identifier(Context* context,
 static Result parse_declaration_after_base_type(Context* context,
                                                 Parser* parser,
                                                 TypeP base_type,
-                                                Token* token) {
+                                                Token* token,
+                                                cz::Vector<Statement*>* initializers) {
     Declaration declaration = {};
     declaration.type = base_type;
 
@@ -217,7 +231,7 @@ static Result parse_declaration_after_base_type(Context* context,
 
             case Token::Identifier:
                 return parse_declaration_after_identifier(context, parser, &declaration,
-                                                          token->v.identifier, token);
+                                                          token->v.identifier, token, initializers);
 
             default:
                 context->report_error(previous_span,
@@ -327,7 +341,7 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
     return Result::ok();
 }
 
-Result parse_declaration(Context* context, Parser* parser) {
+Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*>* initializers) {
     // Parse base type and then parse a series of declarations.
     // Example 1: int const a, b;
     //            base_type = const int
@@ -348,7 +362,8 @@ Result parse_declaration(Context* context, Parser* parser) {
     }
 
     while (1) {
-        result = parse_declaration_after_base_type(context, parser, base_type, &token);
+        result =
+            parse_declaration_after_base_type(context, parser, base_type, &token, initializers);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
             break;
@@ -360,7 +375,7 @@ Result parse_declaration(Context* context, Parser* parser) {
 
 Result parse_declaration_or_statement(Context* context,
                                       Parser* parser,
-                                      Statement** statement,
+                                      cz::Vector<Statement*>* statements,
                                       Declaration_Or_Statement* which) {
     Token token;
     Result result = peek_token(context, parser, &token);
@@ -379,7 +394,7 @@ Result parse_declaration_or_statement(Context* context,
         case Token::Const:
         case Token::Volatile: {
             *which = Declaration_Or_Statement::Declaration;
-            return parse_declaration(context, parser);
+            return parse_declaration(context, parser, statements);
         }
 
         case Token::Identifier: {
@@ -387,10 +402,17 @@ Result parse_declaration_or_statement(Context* context,
             TypeP* type = lookup_typedef(parser, token.v.identifier);
             if (declaration) {
                 *which = Declaration_Or_Statement::Statement;
-                return parse_statement(context, parser, statement);
+
+                Statement* statement;
+                result = parse_statement(context, parser, &statement);
+                if (result.is_ok()) {
+                    statements->reserve(cz::heap_allocator(), 1);
+                    statements->push(statement);
+                }
+                return result;
             } else if (type) {
                 *which = Declaration_Or_Statement::Declaration;
-                return parse_declaration(context, parser);
+                return parse_declaration(context, parser, statements);
             } else {
                 context->report_error(token.span, "Undefined identifier `", token.v.identifier.str,
                                       "`");
@@ -398,9 +420,17 @@ Result parse_declaration_or_statement(Context* context,
             }
         }
 
-        default:
+        default: {
             *which = Declaration_Or_Statement::Statement;
-            return parse_statement(context, parser, statement);
+
+            Statement* statement;
+            result = parse_statement(context, parser, &statement);
+            if (result.is_ok()) {
+                statements->reserve(cz::heap_allocator(), 1);
+                statements->push(statement);
+            }
+            return result;
+        }
     }
 }
 
@@ -587,17 +617,12 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
                     goto finish_block;
                 }
 
-                Statement* statement;
                 Declaration_Or_Statement which;
-                CZ_TRY(parse_declaration_or_statement(context, parser, &statement, &which));
+                CZ_TRY(parse_declaration_or_statement(context, parser, &statements, &which));
 
-                if (which == Declaration_Or_Statement::Declaration) {
-                    continue;
+                if (which == Declaration_Or_Statement::Statement) {
+                    break;
                 }
-
-                statements.reserve(cz::heap_allocator(), 1);
-                statements.push(statement);
-                break;
             }
 
             while (1) {

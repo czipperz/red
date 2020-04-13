@@ -1,6 +1,7 @@
 #include "test_base.hpp"
 
 #include <cz/defer.hpp>
+#include <cz/heap.hpp>
 #include "context.hpp"
 #include "file_contents.hpp"
 #include "load.hpp"
@@ -32,31 +33,41 @@ static void setup(Context* context, Parser* parser, cz::Str contents) {
 
 TEST_CASE("parse_declaration type but no identifier") {
     SETUP("int;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
-    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 0);
+    CHECK(initializers.len() == 0);
 }
 
 TEST_CASE("parse_declaration type with identifier") {
     SETUP("int abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
-    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 1);
+
+    REQUIRE(initializers.len() == 1);
+    REQUIRE(initializers[0]);
+    REQUIRE(initializers[0]->tag == Statement::Initializer_Default);
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
     CHECK(abc->type.get_type() == parser.type_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
-    CHECK(abc->o_value == nullptr);
 }
 
 TEST_CASE("parse_declaration two variables same type") {
     SETUP("int abc, def;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
-    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 2);
 
@@ -65,20 +76,20 @@ TEST_CASE("parse_declaration two variables same type") {
     CHECK(abc->type.get_type() == parser.type_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
-    CHECK(abc->o_value == nullptr);
 
     Declaration* def = parser.declaration_stack[0].get_hash("def");
     REQUIRE(def);
     CHECK(def->type.get_type() == parser.type_int);
     CHECK_FALSE(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
-    CHECK(def->o_value == nullptr);
 }
 
 TEST_CASE("parse_declaration const applies to both variables") {
     SETUP("int const abc, def;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
-    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 2);
 
@@ -87,20 +98,20 @@ TEST_CASE("parse_declaration const applies to both variables") {
     CHECK(abc->type.get_type() == parser.type_int);
     CHECK(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
-    CHECK(abc->o_value == nullptr);
 
     Declaration* def = parser.declaration_stack[0].get_hash("def");
     REQUIRE(def);
     CHECK(def->type.get_type() == parser.type_int);
     CHECK(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
-    CHECK(def->o_value == nullptr);
 }
 
 TEST_CASE("parse_declaration second variable is pointer") {
     SETUP("int abc, *def;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
-    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 2);
 
@@ -109,13 +120,11 @@ TEST_CASE("parse_declaration second variable is pointer") {
     CHECK(abc->type.get_type() == parser.type_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
-    CHECK(abc->o_value == nullptr);
 
     Declaration* def = parser.declaration_stack[0].get_hash("def");
     REQUIRE(def);
     CHECK_FALSE(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
-    CHECK(def->o_value == nullptr);
     Type* def_t = def->type.get_type();
     REQUIRE(def_t);
     REQUIRE(def_t->tag == Type::Pointer);
@@ -127,8 +136,10 @@ TEST_CASE("parse_declaration second variable is pointer") {
 
 TEST_CASE("parse_declaration const cannot be used after an identifier") {
     SETUP("int abc, const *def;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
-    REQUIRE(parse_declaration(&context, &parser).type == Result::ErrorInvalidInput);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::ErrorInvalidInput);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 1);
 
@@ -137,13 +148,14 @@ TEST_CASE("parse_declaration const cannot be used after an identifier") {
     CHECK(abc->type.get_type() == parser.type_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
-    CHECK(abc->o_value == nullptr);
 }
 
 TEST_CASE("parse_expression defined variable") {
     SETUP("int abc; abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
-    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
 
     Expression* expression;
     REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
@@ -288,11 +300,15 @@ TEST_CASE("parse_statement basic binary expression") {
 TEST_CASE("parse_declaration_or_statement basic binary expression") {
     SETUP("1 + 2;");
 
-    Statement* statement;
+    cz::Vector<Statement*> statements = {};
+    CZ_DEFER(statements.drop(cz::heap_allocator()));
     Declaration_Or_Statement which;
-    REQUIRE(parse_declaration_or_statement(&context, &parser, &statement, &which).type ==
+    REQUIRE(parse_declaration_or_statement(&context, &parser, &statements, &which).type ==
             Result::Success);
     REQUIRE(which == Declaration_Or_Statement::Statement);
+    REQUIRE(statements.len() == 1);
+
+    Statement* statement = statements[0];
     REQUIRE(statement);
     REQUIRE(statement->tag == Statement::Expression);
     Expression* expression = ((Statement_Expression*)statement)->expression;
@@ -315,10 +331,11 @@ TEST_CASE("parse_declaration_or_statement basic binary expression") {
 
 TEST_CASE("parse_declaration_or_statement type with identifier") {
     SETUP("int abc;");
+    cz::Vector<Statement*> statements = {};
+    CZ_DEFER(statements.drop(cz::heap_allocator()));
 
-    Statement* statement;
     Declaration_Or_Statement which;
-    REQUIRE(parse_declaration_or_statement(&context, &parser, &statement, &which).type ==
+    REQUIRE(parse_declaration_or_statement(&context, &parser, &statements, &which).type ==
             Result::Success);
     REQUIRE(which == Declaration_Or_Statement::Declaration);
     REQUIRE(parser.declaration_stack.len() == 1);
@@ -329,7 +346,6 @@ TEST_CASE("parse_declaration_or_statement type with identifier") {
     CHECK(abc->type.get_type() == parser.type_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
-    CHECK(abc->o_value == nullptr);
 }
 
 TEST_CASE("parse_statement block with defined variable and expression usage") {
@@ -341,9 +357,12 @@ TEST_CASE("parse_statement block with defined variable and expression usage") {
     REQUIRE(statement->tag == Statement::Block);
 
     Statement_Block* block = (Statement_Block*)statement;
-    REQUIRE(block->statements.len == 1);
+    REQUIRE(block->statements.len == 2);
 
-    Statement* se = block->statements[0];
+    REQUIRE(block->statements[0]);
+    REQUIRE(block->statements[0]->tag == Statement::Initializer_Default);
+
+    Statement* se = block->statements[1];
     REQUIRE(se);
     REQUIRE(se->tag == Statement::Expression);
 
@@ -359,8 +378,10 @@ TEST_CASE("parse_statement block with defined variable and expression usage") {
 
 TEST_CASE("parse_statement for loop") {
     SETUP("int abc; for (abc = 0; abc < 5; abc = abc + 1) {}");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
-    REQUIRE(parse_declaration(&context, &parser).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
 
     Statement* statement;
     REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
