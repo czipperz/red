@@ -328,8 +328,9 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         struct_type->declarations = {};
                         struct_type->initializers = {};
                         struct_type->flags = 0;
-                        parser->type_stack.last().insert(identifier.str, identifier.hash,
-                                                         struct_type);
+                        cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                        types->reserve(cz::heap_allocator(), 1);
+                        types->insert(identifier.str, identifier.hash, struct_type);
                     }
                 }
                 parser->back = token;
@@ -407,7 +408,9 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                     struct_type->declarations = {};
                     struct_type->initializers = {};
                     struct_type->flags = 0;
-                    parser->type_stack.last().insert(identifier.str, identifier.hash, struct_type);
+                    cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                    types->reserve(cz::heap_allocator(), 1);
+                    types->insert(identifier.str, identifier.hash, struct_type);
                     base_type->set_type(struct_type);
                 }
                 break;
@@ -453,8 +456,9 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         union_type->typedefs = {};
                         union_type->declarations = {};
                         union_type->flags = 0;
-                        parser->type_stack.last().insert(identifier.str, identifier.hash,
-                                                         union_type);
+                        cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                        types->reserve(cz::heap_allocator(), 1);
+                        types->insert(identifier.str, identifier.hash, union_type);
                     }
                 }
                 parser->back = token;
@@ -535,7 +539,9 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                     union_type->typedefs = {};
                     union_type->declarations = {};
                     union_type->flags = 0;
-                    parser->type_stack.last().insert(identifier.str, identifier.hash, union_type);
+                    cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                    types->reserve(cz::heap_allocator(), 1);
+                    types->insert(identifier.str, identifier.hash, union_type);
                     base_type->set_type(union_type);
                 }
                 break;
