@@ -352,6 +352,9 @@ TEST_CASE("parse_statement block with defined variable and expression usage") {
     REQUIRE(expression->tag == Expression::Variable);
     Expression_Variable* e = (Expression_Variable*)expression;
     CHECK(e->variable.str == "abc");
+
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 0);
 }
 
 TEST_CASE("parse_statement for loop") {

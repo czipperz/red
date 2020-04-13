@@ -559,6 +559,18 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             Span open_curly_span = token.span;
             parser->back.type = Token::Parser_Null_Token;
 
+            parser->type_stack.reserve(cz::heap_allocator(), 1);
+            parser->typedef_stack.reserve(cz::heap_allocator(), 1);
+            parser->declaration_stack.reserve(cz::heap_allocator(), 1);
+            parser->type_stack.push({});
+            parser->typedef_stack.push({});
+            parser->declaration_stack.push({});
+            CZ_DEFER({
+                parser->type_stack.pop();
+                parser->typedef_stack.pop();
+                parser->declaration_stack.pop();
+            });
+
             cz::Vector<Statement*> statements = {};
             CZ_DEFER(statements.drop(cz::heap_allocator()));
             while (1) {
