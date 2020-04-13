@@ -635,7 +635,7 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
     return Result::ok();
 }
 
-Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*>* initializers) {
+Result parse_declaration_(Context* context, Parser* parser, cz::Vector<Statement*>* initializers) {
     // Parse base type and then parse a series of declarations.
     // Example 1: int const a, b;
     //            base_type = const int
@@ -668,6 +668,49 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
     return Result::ok();
 }
 
+Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*>* initializers) {
+    Token token;
+    Result result = peek_token(context, parser, &token);
+    CZ_TRY_VAR(result);
+    if (result.is_ok() && token.type == Token::Typedef) {
+        parser->back.type = Token::Parser_Null_Token;
+
+        size_t len = initializers->len();
+        parser->declaration_stack.reserve(cz::heap_allocator(), 1);
+        parser->declaration_stack.push({});
+        CZ_DEFER({
+            parser->declaration_stack.last().drop(cz::heap_allocator());
+            parser->declaration_stack.pop();
+        });
+
+        result = parse_declaration_(context, parser, initializers);
+
+        cz::Str_Map<TypeP>* typedefs = &parser->typedef_stack.last();
+        typedefs->reserve(cz::heap_allocator(), initializers->len() - len);
+        for (size_t i = len; i < initializers->len(); ++i) {
+            Statement* init = (*initializers)[i];
+            if (init->tag != Statement::Initializer_Default) {
+                context->report_error(token.span, "Typedef cannot have initializer");
+            }
+
+            Statement_Initializer* in = (Statement_Initializer*)init;
+            Declaration* declaration =
+                parser->declaration_stack.last().get(in->identifier.str, in->identifier.hash);
+            CZ_DEBUG_ASSERT(declaration);
+            if (!typedefs->get(in->identifier.str, in->identifier.hash)) {
+                typedefs->insert(in->identifier.str, in->identifier.hash, declaration->type);
+            } else {
+                context->report_error(token.span, "Typedef `", in->identifier.str,
+                                      "` has already created");
+            }
+        }
+
+        return Result::ok();
+    } else {
+        return parse_declaration_(context, parser, initializers);
+    }
+}
+
 Result parse_declaration_or_statement(Context* context,
                                       Parser* parser,
                                       cz::Vector<Statement*>* statements,
@@ -688,6 +731,7 @@ Result parse_declaration_or_statement(Context* context,
         case Token::Void:
         case Token::Struct:
         case Token::Union:
+        case Token::Typedef:
         case Token::Const:
         case Token::Volatile: {
             *which = Declaration_Or_Statement::Declaration;

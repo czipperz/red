@@ -423,6 +423,67 @@ TEST_CASE("parse_declaration struct declaration and then usage with tag is ok") 
     CHECK(context.errors.len() == 0);
 }
 
+TEST_CASE("parse_declaration typedef unnamed struct declaration and then usage without tag is ok") {
+    SETUP("typedef struct {} S; S s;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(parser.type_stack.len() == 1);
+    REQUIRE(parser.type_stack[0].count == 0);
+    REQUIRE(parser.typedef_stack.len() == 1);
+    REQUIRE(parser.typedef_stack[0].count == 1);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    REQUIRE(parser.declaration_stack[0].count == 1);
+}
+
+TEST_CASE("parse_declaration typedef named struct declaration and then usage without tag is ok") {
+    SETUP("typedef struct S {} S; S s;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(parser.type_stack.len() == 1);
+    REQUIRE(parser.type_stack[0].count == 1);
+    REQUIRE(parser.typedef_stack.len() == 1);
+    REQUIRE(parser.typedef_stack[0].count == 1);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    REQUIRE(parser.declaration_stack[0].count == 1);
+}
+
+TEST_CASE(
+    "parse_declaration typedef unnamed struct declaration and then usage with tag is different "
+    "type") {
+    SETUP("typedef struct {} S; struct S s;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(parser.type_stack.len() == 1);
+    REQUIRE(parser.type_stack[0].count == 1);
+    REQUIRE(parser.typedef_stack.len() == 1);
+    REQUIRE(parser.typedef_stack[0].count == 1);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    REQUIRE(parser.declaration_stack[0].count == 1);
+    Declaration* s = parser.declaration_stack[0].get_hash("s");
+    Type** type_s = parser.type_stack[0].get_hash("S");
+    TypeP* typedef_s = parser.typedef_stack[0].get_hash("S");
+    REQUIRE(s);
+    REQUIRE(type_s);
+    REQUIRE(typedef_s);
+    CHECK(s->type.get_type() == *type_s);
+    CHECK(typedef_s->get_type() != *type_s);
+}
+
 TEST_CASE("parse_expression defined variable") {
     SETUP("int abc; abc;");
     cz::Vector<Statement*> initializers = {};
