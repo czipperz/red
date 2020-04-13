@@ -638,7 +638,7 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(enum_span, "Expected declaration, union body, `;` here");
+                    context->report_error(enum_span, "Expected declaration, enum body, `;` here");
                     return {Result::ErrorInvalidInput};
                 }
             }
@@ -671,7 +671,7 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                 if (type) {
                     if ((*type)->tag != Type::Enum) {
                         context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is not a union");
+                                              "` is not an enum");
                         return {Result::ErrorInvalidInput};
                     }
                     enum_type = (Type_Enum*)*type;
@@ -712,7 +712,7 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                 if (type) {
                     if ((*type)->tag != Type::Enum) {
                         context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is not a union");
+                                              "` is not an enum");
                     }
                     base_type->set_type(*type);
                 } else {
