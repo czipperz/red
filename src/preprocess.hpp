@@ -11,6 +11,7 @@ struct Lexer;
 
 struct Context;
 struct Result;
+struct Span;
 struct Token;
 
 namespace pre {
@@ -18,7 +19,7 @@ struct Definition;
 
 struct Include_Info {
     Location location;
-    size_t if_depth;
+    cz::Vector<Span> if_stack;
 };
 
 struct Definition_Info {

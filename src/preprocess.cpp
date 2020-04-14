@@ -279,8 +279,10 @@ static Result process_if_false(Context* context,
 
     check_token_exists:
         if (!at_bol) {
-            Location point = preprocessor->location();
-            context->report_lex_error({point, point}, "Unterminated #if");
+            Include_Info entry = preprocessor->include_stack.last();
+            for (size_t i = 0; i < entry.if_stack.len(); ++i) {
+                context->report_lex_error(entry.if_stack[i], "Unterminated #if");
+            }
             return {Result::ErrorInvalidInput};
         }
 
@@ -290,8 +292,10 @@ static Result process_if_false(Context* context,
             Include_Info* info = &preprocessor->include_stack.last();
             if (!lex::next_token(context, lexer, context->files.files[info->location.file].contents,
                                  &info->location, token, &at_bol)) {
-                Location point = preprocessor->location();
-                context->report_lex_error({point, point}, "Unterminated #if");
+                Include_Info entry = preprocessor->include_stack.last();
+                for (size_t i = 0; i < entry.if_stack.len(); ++i) {
+                    context->report_lex_error(entry.if_stack[i], "Unterminated #if");
+                }
                 return {Result::ErrorInvalidInput};
             }
 
@@ -309,15 +313,14 @@ static Result process_if_false(Context* context,
                     }
                 } else if (token->v.identifier.str == "elif") {
                     if (allow_else && skip_depth == 0) {
-                        preprocessor->include_stack.last().if_depth--;
+                        preprocessor->include_stack.last().if_stack.pop();
                         return process_if(context, preprocessor, lexer, token);
                     }
                 } else if (token->v.identifier.str == "endif") {
                     if (skip_depth > 0) {
                         --skip_depth;
                     } else {
-                        CZ_DEBUG_ASSERT(info->if_depth > 0);
-                        --info->if_depth;
+                        info->if_stack.pop();
                         break;
                     }
                 }
@@ -354,7 +357,8 @@ static Result process_ifdef(Context* context,
         return {Result::ErrorInvalidInput};
     }
 
-    point->if_depth++;
+    point->if_stack.reserve(cz::heap_allocator(), 1);
+    point->if_stack.push(ifdef_span);
 
     if (!!preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash) ==
         want_present) {
@@ -684,7 +688,8 @@ static Result process_if(Context* context,
             tokens.push(*token);
         }
 
-        point->if_depth++;
+        point->if_stack.reserve(cz::heap_allocator(), 1);
+        point->if_stack.push(if_span);
 
         size_t index = 0;
         if (index == tokens.len()) {
@@ -722,7 +727,7 @@ static Result process_else(Context* context,
     // #endif
 
     Include_Info* point = &preprocessor->include_stack.last();
-    if (point->if_depth == 0) {
+    if (point->if_stack.len() == 0) {
         context->report_lex_error(token->span, "#else without #if");
         return {Result::ErrorInvalidInput};
     }
@@ -745,7 +750,7 @@ static Result process_elif(Context* context,
     // #endif
 
     Include_Info* point = &preprocessor->include_stack.last();
-    if (point->if_depth == 0) {
+    if (point->if_stack.len() == 0) {
         context->report_lex_error(token->span, "#else without #if");
         return {Result::ErrorInvalidInput};
     }
@@ -759,12 +764,12 @@ static Result process_endif(Context* context,
                             Token* token) {
     ZoneScoped;
     Include_Info* point = &preprocessor->include_stack.last();
-    if (point->if_depth == 0) {
+    if (point->if_stack.len() == 0) {
         context->report_lex_error(token->span, "#endif without #if");
         return {Result::ErrorInvalidInput};
     }
 
-    --point->if_depth;
+    point->if_stack.pop();
     return SKIP_UNTIL_EOL();
 }
 
@@ -1481,8 +1486,8 @@ Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexe
     while (point->index == context->files.files[point->file].contents.len) {
         Include_Info entry = preprocessor->include_stack.pop();
 
-        if (entry.if_depth > 0) {
-            context->report_lex_error({}, "Unterminated #if");
+        for (size_t i = 0; i < entry.if_stack.len(); ++i) {
+            context->report_lex_error(entry.if_stack[i], "Unterminated #if");
         }
 
         entry.if_stack.drop(cz::heap_allocator());
