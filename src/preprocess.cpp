@@ -1242,16 +1242,7 @@ static Result process_next(Context* context,
     if (has_next) {
         return process_token(context, preprocessor, lexer, token, at_bol);
     } else {
-        Location* point = &preprocessor->include_stack.last().location;
-        if (point->index < context->files.files[point->file].contents.len) {
-            Location end = *point;
-            char ch;
-            lex::next_character(context->files.files[point->file].contents, &end, &ch);
-            context->report_lex_error({*point, end}, "Invalid input '", ch, "'");
-            return {Result::ErrorInvalidInput};
-        } else {
-            return next_token(context, preprocessor, lexer, token);
-        }
+        return next_token(context, preprocessor, lexer, token);
     }
 }
 

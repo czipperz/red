@@ -227,7 +227,8 @@ top:
                     while (1) {
                         char next;
                         if (!next_character(file_contents, &point, &next)) {
-                            context->report_lex_error({*location, point}, "Unterminated block comment");
+                            context->report_lex_error({*location, point},
+                                                      "Unterminated block comment");
                             *location = point;
                             return false;
                         }
@@ -364,7 +365,7 @@ top:
                             break;
                         default:
                             context->report_lex_error({*location, point},
-                                                  "Undefined escape sequence `\\", c, "`");
+                                                      "Undefined escape sequence `\\", c, "`");
                             goto skip_char;
                     }
                 } else if (c == '"') {
@@ -472,6 +473,7 @@ top:
                 break;
             }
 
+            context->report_lex_error({*location, point}, "Unable to process character `", c, "`");
             return false;
     }
 
