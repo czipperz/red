@@ -10,21 +10,21 @@
 
 namespace red {
 
-void include_file_reserve(Files* files, cpp::Preprocessor* preprocessor) {
+void include_file_reserve(Files* files, pre::Preprocessor* preprocessor) {
     files->files.reserve(cz::heap_allocator(), 1);
     files->file_path_hashes.reserve(cz::heap_allocator(), 1);
     preprocessor->file_pragma_once.reserve(cz::heap_allocator(), 1);
     preprocessor->include_stack.reserve(cz::heap_allocator(), 1);
 }
 
-static void push_file(cpp::Preprocessor* preprocessor, size_t index) {
-    cpp::Include_Info info = {};
+static void push_file(pre::Preprocessor* preprocessor, size_t index) {
+    pre::Include_Info info = {};
     info.location.file = index;
     preprocessor->include_stack.push(info);
 }
 
 void force_include_file(Files* files,
-                        cpp::Preprocessor* preprocessor,
+                        pre::Preprocessor* preprocessor,
                         Hashed_Str file_path,
                         File_Contents file_contents) {
     push_file(preprocessor, files->files.len());
@@ -37,7 +37,7 @@ void force_include_file(Files* files,
     preprocessor->file_pragma_once.push(false);
 }
 
-Result include_file(Files* files, cpp::Preprocessor* preprocessor, cz::String file_path) {
+Result include_file(Files* files, pre::Preprocessor* preprocessor, cz::String file_path) {
     // We don't want to reload the file if we've already loaded it.
     cz::Hash hash = Hashed_Str::hash_str(file_path);
     for (size_t index = 0; index < files->file_path_hashes.len(); ++index) {

@@ -276,103 +276,6 @@ void check_keyword(const char* str, red::Token::Type type_expected) {
     CHECK(token.span.end.index == strlen(str));
 }
 
-TEST_CASE("next_token() keyword auto") {
-    check_keyword("auto", red::Token::Auto);
-}
-TEST_CASE("next_token() keyword break") {
-    check_keyword("break", red::Token::Break);
-}
-TEST_CASE("next_token() keyword case") {
-    check_keyword("case", red::Token::Case);
-}
-TEST_CASE("next_token() keyword char") {
-    check_keyword("char", red::Token::Char);
-}
-TEST_CASE("next_token() keyword const") {
-    check_keyword("const", red::Token::Const);
-}
-TEST_CASE("next_token() keyword continue") {
-    check_keyword("continue", red::Token::Continue);
-}
-TEST_CASE("next_token() keyword default") {
-    check_keyword("default", red::Token::Default);
-}
-TEST_CASE("next_token() keyword do") {
-    check_keyword("do", red::Token::Do);
-}
-TEST_CASE("next_token() keyword double") {
-    check_keyword("double", red::Token::Double);
-}
-TEST_CASE("next_token() keyword else") {
-    check_keyword("else", red::Token::Else);
-}
-TEST_CASE("next_token() keyword enum") {
-    check_keyword("enum", red::Token::Enum);
-}
-TEST_CASE("next_token() keyword extern") {
-    check_keyword("extern", red::Token::Extern);
-}
-TEST_CASE("next_token() keyword float") {
-    check_keyword("float", red::Token::Float);
-}
-TEST_CASE("next_token() keyword for") {
-    check_keyword("for", red::Token::For);
-}
-TEST_CASE("next_token() keyword goto") {
-    check_keyword("goto", red::Token::Goto);
-}
-TEST_CASE("next_token() keyword if") {
-    check_keyword("if", red::Token::If);
-}
-TEST_CASE("next_token() keyword int") {
-    check_keyword("int", red::Token::Int);
-}
-TEST_CASE("next_token() keyword long") {
-    check_keyword("long", red::Token::Long);
-}
-TEST_CASE("next_token() keyword register") {
-    check_keyword("register", red::Token::Register);
-}
-TEST_CASE("next_token() keyword return") {
-    check_keyword("return", red::Token::Return);
-}
-TEST_CASE("next_token() keyword short") {
-    check_keyword("short", red::Token::Short);
-}
-TEST_CASE("next_token() keyword signed") {
-    check_keyword("signed", red::Token::Signed);
-}
-TEST_CASE("next_token() keyword sizeof") {
-    check_keyword("sizeof", red::Token::Sizeof);
-}
-TEST_CASE("next_token() keyword static") {
-    check_keyword("static", red::Token::Static);
-}
-TEST_CASE("next_token() keyword struct") {
-    check_keyword("struct", red::Token::Struct);
-}
-TEST_CASE("next_token() keyword switch") {
-    check_keyword("switch", red::Token::Switch);
-}
-TEST_CASE("next_token() keyword typedef") {
-    check_keyword("typedef", red::Token::Typedef);
-}
-TEST_CASE("next_token() keyword union") {
-    check_keyword("union", red::Token::Union);
-}
-TEST_CASE("next_token() keyword unsigned") {
-    check_keyword("unsigned", red::Token::Unsigned);
-}
-TEST_CASE("next_token() keyword void") {
-    check_keyword("void", red::Token::Void);
-}
-TEST_CASE("next_token() keyword volatile") {
-    check_keyword("volatile", red::Token::Volatile);
-}
-TEST_CASE("next_token() keyword while") {
-    check_keyword("while", red::Token::While);
-}
-
 TEST_CASE("next_token() pipe") {
     check_keyword("|", red::Token::Pipe);
 }
@@ -389,10 +292,6 @@ TEST_CASE("next_token() ampersand") {
 }
 TEST_CASE("next_token() and") {
     check_keyword("&&", red::Token::And);
-}
-
-TEST_CASE("next_token() __VAR_ARGS__") {
-    check_keyword("__VAR_ARGS__", red::Token::Preprocessor_Varargs_Keyword);
 }
 
 TEST_CASE("next_token() ...") {

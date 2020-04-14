@@ -408,57 +408,6 @@ top:
                     }
                 }
 
-                struct Keyword {
-                    cz::Str value;
-                    Token::Type type;
-                };
-                Keyword keywords[] = {
-                    {"__VAR_ARGS__", Token::Preprocessor_Varargs_Keyword},
-                    {"auto", Token::Auto},
-                    {"break", Token::Break},
-                    {"case", Token::Case},
-                    {"char", Token::Char},
-                    {"const", Token::Const},
-                    {"continue", Token::Continue},
-                    {"default", Token::Default},
-                    {"do", Token::Do},
-                    {"double", Token::Double},
-                    {"else", Token::Else},
-                    {"enum", Token::Enum},
-                    {"extern", Token::Extern},
-                    {"float", Token::Float},
-                    {"for", Token::For},
-                    {"goto", Token::Goto},
-                    {"if", Token::If},
-                    {"int", Token::Int},
-                    {"long", Token::Long},
-                    {"register", Token::Register},
-                    {"return", Token::Return},
-                    {"short", Token::Short},
-                    {"signed", Token::Signed},
-                    {"sizeof", Token::Sizeof},
-                    {"static", Token::Static},
-                    {"struct", Token::Struct},
-                    {"switch", Token::Switch},
-                    {"typedef", Token::Typedef},
-                    {"union", Token::Union},
-                    {"unsigned", Token::Unsigned},
-                    {"void", Token::Void},
-                    {"volatile", Token::Volatile},
-                    {"while", Token::While},
-                };
-
-                {
-                    ZoneScopedN("lex::next_token check if identifier is keyword");
-                    for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords); ++i) {
-                        if (value == keywords[i].value) {
-                            token_out->type = keywords[i].type;
-                            value.drop(lexer->identifier_buffer_array.allocator());
-                            goto end_parse_label;
-                        }
-                    }
-                }
-
                 token_out->type = Token::Identifier;
                 value.realloc(lexer->identifier_buffer_array.allocator());
                 token_out->v.identifier = Hashed_Str::from_str(value);

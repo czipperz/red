@@ -200,7 +200,7 @@ enum Declaration_Or_Statement {
 using Declaration_Or_Statement_::Declaration_Or_Statement;
 
 struct Parser {
-    cpp::Preprocessor preprocessor;
+    pre::Preprocessor preprocessor;
     lex::Lexer lexer;
 
     cz::Vector<cz::Str_Map<Type*> > type_stack;

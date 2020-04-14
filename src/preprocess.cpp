@@ -17,7 +17,7 @@
 #include "token.hpp"
 
 namespace red {
-namespace cpp {
+namespace pre {
 
 void Preprocessor::destroy() {
     file_pragma_once.drop(cz::heap_allocator());
@@ -281,21 +281,22 @@ static Result process_if_false(Context* context,
                 goto check_hash;
             }
 
-            if ((token->type == Token::Identifier &&
-                 (token->v.identifier.str == "ifdef" || token->v.identifier.str == "ifndef")) ||
-                token->type == Token::If) {
-                ++skip_depth;
-            } else if (token->type == Token::Else) {
-                if (skip_depth == 0) {
-                    break;
-                }
-            } else if (token->type == Token::Identifier && token->v.identifier.str == "endif") {
-                if (skip_depth > 0) {
-                    --skip_depth;
-                } else {
-                    CZ_DEBUG_ASSERT(info->if_depth > 0);
-                    --info->if_depth;
-                    break;
+            if (token->type == Token::Identifier) {
+                if (token->v.identifier.str == "ifdef" || token->v.identifier.str == "ifndef" ||
+                    token->v.identifier.str == "if") {
+                    ++skip_depth;
+                } else if (token->v.identifier.str == "else") {
+                    if (skip_depth == 0) {
+                        break;
+                    }
+                } else if (token->v.identifier.str == "endif") {
+                    if (skip_depth > 0) {
+                        --skip_depth;
+                    } else {
+                        CZ_DEBUG_ASSERT(info->if_depth > 0);
+                        --info->if_depth;
+                        break;
+                    }
                 }
             }
         }
@@ -879,9 +880,10 @@ static Result process_define(Context* context,
                 if (parameter) {
                     token->type = Token::Preprocessor_Parameter;
                     token->v.integer.value = *parameter;
+                } else if (token->v.identifier.str == "__VAR_ARGS__") {
+                    token->type = Token::Preprocessor_Parameter;
+                    token->v.integer.value = parameters.count;
                 }
-            } else if (token->type == Token::Preprocessor_Varargs_Keyword) {
-                token->v.integer.value = parameters.count;
             } else if (token->type == Token::HashHash) {
                 if (definition.tokens.len() == 0) {
                     // :ConcatErrors ## errors are assumed to be eliminated in
@@ -1129,6 +1131,12 @@ top:
                 if (token->v.identifier.str == "ifndef") {
                     return process_ifdef(context, preprocessor, lexer, token, false);
                 }
+                if (token->v.identifier.str == "if") {
+                    return process_if(context, preprocessor, lexer, token);
+                }
+                if (token->v.identifier.str == "else") {
+                    return process_else(context, preprocessor, lexer, token);
+                }
                 if (token->v.identifier.str == "endif") {
                     return process_endif(context, preprocessor, lexer, token);
                 }
@@ -1141,10 +1149,6 @@ top:
                 if (token->v.identifier.str == "error") {
                     return process_error(context, preprocessor, lexer, token);
                 }
-            } else if (token->type == Token::If) {
-                return process_if(context, preprocessor, lexer, token);
-            } else if (token->type == Token::Else) {
-                return process_else(context, preprocessor, lexer, token);
             }
 
             context->report_error(token->span, "Unknown preprocessor directive");
@@ -1222,8 +1226,7 @@ static Result next_token_in_definition(Context* context,
         }
 
         Token* tk = &info->definition->tokens[info->index];
-        if (tk->type == Token::Preprocessor_Parameter ||
-            tk->type == Token::Preprocessor_Varargs_Keyword) {
+        if (tk->type == Token::Preprocessor_Parameter) {
             // Run through the tokens in the argument.
             cz::Slice<Token> argument_tokens = info->arguments[tk->v.integer.value];
             if (info->argument_index == argument_tokens.len) {
@@ -1252,9 +1255,7 @@ static Result next_token_in_definition(Context* context,
             *token = *tk;
 
             if (token->type == Token::Hash && info->index < info->definition->tokens.len()) {
-                if (info->definition->tokens[info->index].type == Token::Preprocessor_Parameter ||
-                    info->definition->tokens[info->index].type ==
-                        Token::Preprocessor_Varargs_Keyword) {
+                if (info->definition->tokens[info->index].type == Token::Preprocessor_Parameter) {
                     // Todo: use lex buffer array directly since we don't lex more tokens while in
                     // the definition stack.  At some point this might change in order to implement
                     // # correctly by replacing arguments with some sort of "token soup" that are
@@ -1327,8 +1328,7 @@ static Result next_token_in_definition(Context* context,
 
             while (1) {
                 Token* tk = &info->definition->tokens[info->index];
-                if (tk->type == Token::Preprocessor_Parameter ||
-                    tk->type == Token::Preprocessor_Varargs_Keyword) {
+                if (tk->type == Token::Preprocessor_Parameter) {
                     // Get the first token in the argument and then stop chaining.
                     cz::Slice<Token> argument_tokens = info->arguments[tk->v.integer.value];
                     if (info->argument_index == argument_tokens.len) {
@@ -1425,6 +1425,52 @@ Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexe
     bool has_next = lex::next_token(context, lexer, context->files.files[point->file].contents,
                                     point, token, &at_bol);
     return process_next(context, preprocessor, lexer, token, at_bol, has_next);
+}
+
+}
+
+namespace cpp {
+
+Result next_token(Context* context,
+                  pre::Preprocessor* preprocessor,
+                  lex::Lexer* lexer,
+                  Token* token) {
+    Result result = pre::next_token(context, preprocessor, lexer, token);
+    if (result.is_ok() && token->type == Token::Identifier) {
+        ZoneScopedN("cpp::next_token keyword");
+
+        struct Keyword {
+            cz::Str value;
+            Token::Type type;
+        };
+        Keyword keywords[] = {
+            {"auto", Token::Auto},         {"break", Token::Break},
+            {"case", Token::Case},         {"char", Token::Char},
+            {"const", Token::Const},       {"continue", Token::Continue},
+            {"default", Token::Default},   {"do", Token::Do},
+            {"double", Token::Double},     {"else", Token::Else},
+            {"enum", Token::Enum},         {"extern", Token::Extern},
+            {"float", Token::Float},       {"for", Token::For},
+            {"goto", Token::Goto},         {"if", Token::If},
+            {"int", Token::Int},           {"long", Token::Long},
+            {"register", Token::Register}, {"return", Token::Return},
+            {"short", Token::Short},       {"signed", Token::Signed},
+            {"sizeof", Token::Sizeof},     {"static", Token::Static},
+            {"struct", Token::Struct},     {"switch", Token::Switch},
+            {"typedef", Token::Typedef},   {"union", Token::Union},
+            {"unsigned", Token::Unsigned}, {"void", Token::Void},
+            {"volatile", Token::Volatile}, {"while", Token::While},
+        };
+
+        cz::Str value = token->v.identifier.str;
+        for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords); ++i) {
+            if (value == keywords[i].value) {
+                token->type = keywords[i].type;
+                return Result::ok();
+            }
+        }
+    }
+    return result;
 }
 
 }

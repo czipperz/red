@@ -13,7 +13,7 @@ struct Context;
 struct Result;
 struct Token;
 
-namespace cpp {
+namespace pre {
 struct Definition;
 
 struct Include_Info {
@@ -43,6 +43,15 @@ struct Preprocessor {
 };
 
 Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer, Token* token);
+
+}
+
+namespace cpp {
+
+Result next_token(Context* context,
+                  pre::Preprocessor* preprocessor,
+                  lex::Lexer* lexer,
+                  Token* token);
 
 }
 }

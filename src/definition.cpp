@@ -6,7 +6,7 @@
 #include <cz/util.hpp>
 
 namespace red {
-namespace cpp {
+namespace pre {
 
 void Definition::drop(cz::Allocator allocator) {
     tokens.drop(allocator);

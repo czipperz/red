@@ -21,7 +21,7 @@ Result compile_file(Context* context, const char* file_name) {
     lexer.init();
     CZ_DEFER(lexer.drop());
 
-    cpp::Preprocessor preprocessor = {};
+    pre::Preprocessor preprocessor = {};
     CZ_DEFER(preprocessor.destroy());
 
     cz::String file_path = {};

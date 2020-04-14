@@ -4,7 +4,7 @@
 #include "token.hpp"
 
 namespace red {
-namespace cpp {
+namespace pre {
 
 struct Definition {
     cz::Vector<Token> tokens;
