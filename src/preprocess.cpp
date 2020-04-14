@@ -882,10 +882,26 @@ static Result process_define(Context* context,
                 }
             } else if (token->type == Token::Preprocessor_Varargs_Keyword) {
                 token->v.integer.value = parameters.count;
+            } else if (token->type == Token::HashHash) {
+                if (definition.tokens.len() == 0) {
+                    // :ConcatErrors ## errors are assumed to be eliminated in
+                    // next_token_in_definition
+                    context->report_error(token->span,
+                                          "Token concatenation (`##`) must have a token before it");
+                    continue;
+                }
             }
 
             definition.tokens.reserve(cz::heap_allocator(), 1);
             definition.tokens.push(*token);
+        }
+
+        Token* last_token = &definition.tokens.last();
+        if (last_token->type == Token::HashHash) {
+            // :ConcatErrors ## errors are assumed to be eliminated in next_token_in_definition
+            context->report_error(last_token->span,
+                                  "Token concatenation (`##`) must have a token after it");
+            definition.tokens.pop();
         }
 
         // kill parameters
@@ -1218,6 +1234,12 @@ static Result next_token_in_definition(Context* context,
             }
             *token = argument_tokens[info->argument_index++];
 
+            if (expand_macros != -1 && info->argument_index == argument_tokens.len) {
+                // We're at the end of this argument.
+                ++info->index;
+                info->argument_index = 0;
+            }
+
             if (expand_macros == 0) {
                 expand_macros = 1;
             }
@@ -1286,7 +1308,55 @@ static Result next_token_in_definition(Context* context,
             }
         }
 
-        // Todo: handle ##
+        if (info->index < info->definition->tokens.len() &&
+            info->definition->tokens[info->index].type == Token::HashHash) {
+            ++info->index;
+            // :ConcatErrors ## errors are eliminated in process_define
+            CZ_DEBUG_ASSERT(info->index < info->definition->tokens.len());
+
+            cz::AllocatedString combined_identifier = {};
+            combined_identifier.allocator = lexer->identifier_buffer_array.allocator();
+            write(string_writer(&combined_identifier), *token);
+
+            while (1) {
+                Token* tk = &info->definition->tokens[info->index];
+                if (tk->type == Token::Preprocessor_Parameter ||
+                    tk->type == Token::Preprocessor_Varargs_Keyword) {
+                    // Get the first token in the argument and then stop chaining.
+                    cz::Slice<Token> argument_tokens = info->arguments[tk->v.integer.value];
+                    if (info->argument_index == argument_tokens.len) {
+                        // We're at the end of this argument.
+                        ++info->index;
+                        info->argument_index = 0;
+                        break;
+                    }
+
+                    write(string_writer(&combined_identifier),
+                          argument_tokens[info->argument_index]);
+                    ++info->argument_index;
+                    break;
+                } else {
+                    write(string_writer(&combined_identifier), *tk);
+                    ++info->index;
+                    info->argument_index = 0;
+                }
+
+                // Deal with chain x ## y ## z
+                if (info->index + 1 >= info->definition->tokens.len()) {
+                    break;
+                } else {
+                    tk = &info->definition->tokens[info->index];
+                    if (tk->type != Token::HashHash) {
+                        break;
+                    }
+                    ++info->index;
+                }
+            }
+
+            token->type = Token::Identifier;
+            token->v.identifier = Hashed_Str::from_str(combined_identifier);
+            return Result::ok();
+        }
 
         if (token->type == Token::Identifier && expand_macros == 1) {
             Definition* definition =

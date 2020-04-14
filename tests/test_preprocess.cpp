@@ -618,3 +618,36 @@ TEST_CASE("cpp::next_token #define # inside argument") {
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
+
+TEST_CASE("cpp::next_token #define ## two non parameters") {
+    SETUP("#define abc a##b\nabc");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.string == "ab");
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #define ## two parameters") {
+    SETUP("#define abc(a, b) a##b\nabc(x, y)");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.string == "xy");
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #define ## argument is empty deletes that side") {
+    SETUP("#define abc(b) a##b\nabc()");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.string == "a");
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
