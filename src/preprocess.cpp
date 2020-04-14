@@ -625,6 +625,7 @@ static Result process_if(Context* context,
                 }
             }
 
+        retest:
             if (token->type == Token::Identifier) {
                 if (token->v.identifier.str == "defined") {
                     CZ_TRY(process_defined_macro(context, preprocessor, lexer, token));
@@ -648,6 +649,8 @@ static Result process_if(Context* context,
                     } else if (pdi_result.type == Result::Done) {
                         // Empty definition.
                         continue;
+                    } else {
+                        goto retest;
                     }
                 } else {
                 undefined_identifier:
