@@ -77,7 +77,6 @@ struct Token {
         Volatile,
         While,
 
-        // Special parameter value used in preprocessor definitions
         Preprocessor_Parameter,
         Preprocessor_Varargs_Parameter_Indicator,
         Preprocessor_Varargs_Keyword,
@@ -106,5 +105,13 @@ enum Integer_Suffix : uint32_t {
 };
 }
 using Integer_Suffix_::Integer_Suffix;
+
+}
+
+namespace cz {
+struct Result;
+struct Writer;
+
+Result write(Writer, red::Token);
 
 }
