@@ -251,24 +251,33 @@ top:
             if (next_character(file_contents, &point, &next)) {
                 if (next == '*') {
                     ZoneScopedN("lex::next_token block comment");
-                    char prev = 0;
                     while (1) {
-                        char next;
-                        if (!next_character(file_contents, &point, &next)) {
+                        char ch;
+                        if (!next_character(file_contents, &point, &ch)) {
                             context->report_lex_error({*location, point},
                                                       "Unterminated block comment");
                             *location = point;
                             return false;
                         }
 
-                        if (prev == '*' && next == '/') {
-                            break;
-                        }
-                        prev = next;
-                    }
+                        while (1) {
+                            if (ch != '*') {
+                                break;
+                            }
 
-                    *location = point;
-                    goto top;
+                            if (!next_character(file_contents, &point, &ch)) {
+                                context->report_lex_error({*location, point},
+                                                          "Unterminated block comment");
+                                *location = point;
+                                return false;
+                            }
+
+                            if (ch == '/') {
+                                *location = point;
+                                goto top;
+                            }
+                        }
+                    }
                 } else if (next == '/') {
                     ZoneScopedN("lex::next_token line comment");
                     while (1) {
