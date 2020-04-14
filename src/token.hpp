@@ -40,6 +40,7 @@ struct Token {
         ColonColon,
         Hash,
         HashHash,
+        Character,
         String,
         Integer,
         Identifier,
@@ -89,6 +90,7 @@ struct Token {
     Span span;
     union Value {
         Hashed_Str identifier;
+        char ch;
         cz::Str string;
         struct {
             uint64_t value;

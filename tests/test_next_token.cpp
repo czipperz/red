@@ -176,6 +176,28 @@ TEST_CASE("next_token() break token with whitespace") {
     CHECK(location.index == token.span.end.index);
 }
 
+TEST_CASE("next_token() character literal 'a'") {
+    SETUP("'a'");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 3);
+    CHECK(is_bol == false);
+    REQUIRE(token.type == red::Token::Character);
+    CHECK(token.v.ch == 'a');
+}
+
+TEST_CASE("next_token() character literal '\\n'") {
+    SETUP("'\\n'");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 4);
+    CHECK(is_bol == false);
+    REQUIRE(token.type == red::Token::Character);
+    CHECK(token.v.ch == '\n');
+}
+
 TEST_CASE("next_token() hash") {
     SETUP("#i");
 

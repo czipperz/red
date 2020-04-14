@@ -88,6 +88,31 @@ top:
     return true;
 }
 
+static bool process_escaped_string(char* c) {
+    switch (*c) {
+        case '\\':
+        case '"':
+            return true;
+        case 'n':
+            *c = '\n';
+            return true;
+        case 't':
+            *c = '\t';
+            return true;
+        case 'f':
+            *c = '\f';
+            return true;
+        case 'r':
+            *c = '\r';
+            return true;
+        case 'v':
+            *c = '\v';
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool next_token(Context* context,
                 Lexer* lexer,
                 const File_Contents& file_contents,
@@ -323,6 +348,45 @@ top:
             break;
         }
 
+        case '\'': {
+            ZoneScopedN("lex::next_token character");
+
+            Location start = point;
+
+            *location = point;
+
+            if (!next_character(file_contents, &point, &c)) {
+                context->report_lex_error({start, point}, "Unterminated character literal");
+                return false;
+            }
+
+            if (c == '\\') {
+                if (!next_character(file_contents, &point, &c)) {
+                    context->report_lex_error({start, point}, "Unterminated character literal");
+                    return false;
+                }
+
+                if (!process_escaped_string(&c)) {
+                    context->report_lex_error({start, point}, "Undefined escape sequence `\\", c,
+                                              "`");
+                    c = 0;
+                }
+            }
+
+            char value = c;
+
+            if (!next_character(file_contents, &point, &c) || c != '\'') {
+                context->report_lex_error({start, point}, "Unterminated character literal");
+                return false;
+            }
+
+            *location = point;
+
+            token_out->v.ch = value;
+            token_out->type = Token::Character;
+            break;
+        }
+
         case '"': {
             ZoneScopedN("lex::next_token string");
 
@@ -331,6 +395,8 @@ top:
 
             *location = point;
             while (1) {
+                Location middle = point;
+
                 if (!next_character(file_contents, &point, &c)) {
                     context->report_lex_error({start, point}, "Unterminated string");
                     value.drop(lexer->string_buffer_array.allocator());
@@ -344,29 +410,10 @@ top:
                         return false;
                     }
 
-                    switch (c) {
-                        case '\\':
-                        case '"':
-                            break;
-                        case 'n':
-                            c = '\n';
-                            break;
-                        case 't':
-                            c = '\t';
-                            break;
-                        case 'f':
-                            c = '\f';
-                            break;
-                        case 'r':
-                            c = '\r';
-                            break;
-                        case 'v':
-                            c = '\v';
-                            break;
-                        default:
-                            context->report_lex_error({*location, point},
-                                                      "Undefined escape sequence `\\", c, "`");
-                            goto skip_char;
+                    if (!process_escaped_string(&c)) {
+                        context->report_lex_error({middle, point}, "Undefined escape sequence `\\",
+                                                  c, "`");
+                        goto skip_char;
                     }
                 } else if (c == '"') {
                     break;
