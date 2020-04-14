@@ -79,6 +79,11 @@ static Result peek_token(Context* context, Parser* parser, Token* token) {
     return result;
 }
 
+static Span source_span(Parser* parser) {
+    return {parser->preprocessor.include_stack[0].location,
+            parser->preprocessor.include_stack[0].location};
+}
+
 static Declaration* lookup_declaration(Parser* parser, Hashed_Str id) {
     for (size_t i = parser->declaration_stack.len(); i-- > 0;) {
         Declaration* declaration = parser->declaration_stack[i].get(id.str, id.hash);
@@ -109,18 +114,18 @@ static Type** lookup_type(Parser* parser, Hashed_Str id) {
     return nullptr;
 }
 
-static bool parse_type_qualifier(Context* context, TypeP* type, Token token) {
+static bool parse_type_qualifier(Context* context, TypeP* type, Token token, Span source_span) {
     switch (token.type) {
         case Token::Const:
             if (type->is_const()) {
-                context->report_error(token.span, "Multiple `const` attributes");
+                context->report_error(token.span, source_span, "Multiple `const` attributes");
             }
             type->set_const();
             return true;
 
         case Token::Volatile:
             if (type->is_volatile()) {
-                context->report_error(token.span, "Multiple `volatile` attributes");
+                context->report_error(token.span, source_span, "Multiple `volatile` attributes");
             }
             type->set_volatile();
             return true;
@@ -146,7 +151,8 @@ static Result parse_declaration_after_identifier(Context* context,
     Result result = next_token(context, parser, token);
     CZ_TRY_VAR(result);
     if (result.type == Result::Done) {
-        context->report_error(previous_span, "Expected ';' to end declaration here");
+        context->report_error(previous_span, source_span(parser),
+                              "Expected ';' to end declaration here");
         return {Result::ErrorInvalidInput};
     }
 
@@ -156,7 +162,8 @@ static Result parse_declaration_after_identifier(Context* context,
         result = parse_expression_(context, parser, &value, 17);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(previous_span, "Expected ';' to end declaration here");
+            context->report_error(previous_span, source_span(parser),
+                                  "Expected ';' to end declaration here");
             return {Result::ErrorInvalidInput};
         }
 
@@ -172,7 +179,8 @@ static Result parse_declaration_after_identifier(Context* context,
         result = next_token(context, parser, token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(previous_span, "Expected ';' to end declaration here");
+            context->report_error(previous_span, source_span(parser),
+                                  "Expected ';' to end declaration here");
             return {Result::ErrorInvalidInput};
         }
     } else {
@@ -188,7 +196,8 @@ static Result parse_declaration_after_identifier(Context* context,
         declarations->reserve(cz::heap_allocator(), 1);
         declarations->insert(identifier.str, identifier.hash, *declaration);
     } else {
-        context->report_error(previous_span, "Declaration with same name also in scope");
+        context->report_error(previous_span, source_span(parser),
+                              "Declaration with same name also in scope");
     }
 
     if (token->type == Token::Comma) {
@@ -196,7 +205,8 @@ static Result parse_declaration_after_identifier(Context* context,
     } else if (token->type == Token::Semicolon) {
         return {Result::Done};
     } else {
-        context->report_error(previous_span, "Expected ';' to end declaration here");
+        context->report_error(previous_span, source_span(parser),
+                              "Expected ';' to end declaration here");
         return {Result::ErrorInvalidInput};
     }
 }
@@ -215,12 +225,14 @@ static Result parse_declaration_after_base_type(Context* context,
         Result result = next_token(context, parser, token);
         CZ_TRY_VAR(result);
         if (result.type != Result::Success) {
-            context->report_error(previous_span, "Expected ';' to end declaration here");
+            context->report_error(previous_span, source_span(parser),
+                                  "Expected ';' to end declaration here");
             return {Result::ErrorInvalidInput};
         }
         previous_span = token->span;
 
-        if (allow_qualifiers && parse_type_qualifier(context, &declaration.type, *token)) {
+        if (allow_qualifiers &&
+            parse_type_qualifier(context, &declaration.type, *token, source_span(parser))) {
             continue;
         }
 
@@ -239,7 +251,7 @@ static Result parse_declaration_after_base_type(Context* context,
                                                           token->v.identifier, token, initializers);
 
             default:
-                context->report_error(previous_span,
+                context->report_error(previous_span, source_span(parser),
                                       "Expected identifier here to complete declaration");
                 return {Result::ErrorInvalidInput};
         }
@@ -256,7 +268,8 @@ static Result parse_composite_body(Context* context,
         Result result = peek_token(context, parser, &token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(composite_span, "Expected close curly (`}`) to end body");
+            context->report_error(composite_span, source_span(parser),
+                                  "Expected close curly (`}`) to end body");
             return {Result::ErrorInvalidInput};
         }
         if (token.type == Token::CloseCurly) {
@@ -278,7 +291,8 @@ static Result parse_enum_body(Context* context,
         Result result = next_token(context, parser, &token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(enum_span, "Expected close curly (`}`) to end enum body");
+            context->report_error(enum_span, source_span(parser),
+                                  "Expected close curly (`}`) to end enum body");
             return {Result::ErrorInvalidInput};
         }
         if (token.type == Token::CloseCurly) {
@@ -286,7 +300,8 @@ static Result parse_enum_body(Context* context,
         }
 
         if (token.type != Token::Identifier) {
-            context->report_error(token.span, "Expected identifier for enum member");
+            context->report_error(token.span, source_span(parser),
+                                  "Expected identifier for enum member");
             return {Result::ErrorInvalidInput};
         }
 
@@ -296,14 +311,16 @@ static Result parse_enum_body(Context* context,
         result = next_token(context, parser, &token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(enum_span, "Expected close curly (`}`) to end enum body");
+            context->report_error(enum_span, source_span(parser),
+                                  "Expected close curly (`}`) to end enum body");
             return {Result::ErrorInvalidInput};
         }
         if (token.type == Token::Set) {
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(enum_span, "Expected close curly (`}`) to end enum body");
+                context->report_error(enum_span, source_span(parser),
+                                      "Expected close curly (`}`) to end enum body");
                 return {Result::ErrorInvalidInput};
             }
 
@@ -316,7 +333,8 @@ static Result parse_enum_body(Context* context,
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(enum_span, "Expected close curly (`}`) to end enum body");
+                context->report_error(enum_span, source_span(parser),
+                                      "Expected close curly (`}`) to end enum body");
                 return {Result::ErrorInvalidInput};
             }
         }
@@ -325,7 +343,7 @@ static Result parse_enum_body(Context* context,
         if (!values->get(name.str, name.hash)) {
             values->insert(name.str, name.hash, value);
         } else {
-            context->report_error(name_span, "Enum member is already defined");
+            context->report_error(name_span, source_span(parser), "Enum member is already defined");
         }
 
         if (token.type == Token::CloseCurly) {
@@ -333,7 +351,7 @@ static Result parse_enum_body(Context* context,
         }
         if (token.type != Token::Comma) {
             context->report_error(
-                enum_span,
+                enum_span, source_span(parser),
                 "Expected `,` to continue enum body or close curly (`}`) to end enum body");
             return {Result::ErrorInvalidInput};
         }
@@ -351,12 +369,12 @@ static Result parse_base_type(Context* context,
         result = next_token(context, parser, &token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(span, "No type to make `",
+            context->report_error(span, source_span(parser), "No type to make `",
                                   token.type == Token::Const ? "const" : "volatile", "`");
             return {Result::ErrorInvalidInput};
         }
 
-        if (!parse_type_qualifier(context, base_type, token)) {
+        if (!parse_type_qualifier(context, base_type, token, source_span(parser))) {
             break;
         }
     }
@@ -367,7 +385,8 @@ static Result parse_base_type(Context* context,
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(struct_span, "Expected struct name, body, or `;` here");
+                context->report_error(struct_span, source_span(parser),
+                                      "Expected struct name, body, or `;` here");
                 return {Result::ErrorInvalidInput};
             }
 
@@ -380,7 +399,7 @@ static Result parse_base_type(Context* context,
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(struct_span,
+                    context->report_error(struct_span, source_span(parser),
                                           "Expected declaration, struct body, `;` here");
                     return {Result::ErrorInvalidInput};
                 }
@@ -391,8 +410,8 @@ static Result parse_base_type(Context* context,
                     Type** type = lookup_type(parser, identifier);
                     if (type) {
                         if ((*type)->tag != Type::Struct) {
-                            context->report_error(identifier_span, "Type `", identifier.str,
-                                                  "` is not a struct");
+                            context->report_error(identifier_span, source_span(parser), "Type `",
+                                                  identifier.str, "` is not a struct");
                         }
                     } else {
                         Type_Struct* struct_type =
@@ -418,14 +437,14 @@ static Result parse_base_type(Context* context,
                     if ((*type)->tag == Type::Struct) {
                         struct_type = (Type_Struct*)*type;
                         if (struct_type->flags & Type_Struct::Defined) {
-                            context->report_error(identifier_span, "Type `", identifier.str,
-                                                  "` is already defined");
+                            context->report_error(identifier_span, source_span(parser), "Type `",
+                                                  identifier.str, "` is already defined");
                         } else {
                             type = nullptr;
                         }
                     } else {
-                        context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is not a struct");
+                        context->report_error(identifier_span, source_span(parser), "Type `",
+                                              identifier.str, "` is not a struct");
                     }
                 }
 
@@ -485,8 +504,8 @@ static Result parse_base_type(Context* context,
                     Type** type = lookup_type(parser, identifier);
                     if (type) {
                         if ((*type)->tag != Type::Struct) {
-                            context->report_error(identifier_span, "Type `", identifier.str,
-                                                  "` is not a struct");
+                            context->report_error(identifier_span, source_span(parser), "Type `",
+                                                  identifier.str, "` is not a struct");
                         }
                         base_type->set_type(*type);
                     } else {
@@ -503,7 +522,7 @@ static Result parse_base_type(Context* context,
                         base_type->set_type(struct_type);
                     }
                 } else {
-                    context->report_error(struct_span,
+                    context->report_error(struct_span, source_span(parser),
                                           "Structs must be either named or anonymously defined");
                     base_type->set_type(parser->type_error);
                 }
@@ -516,7 +535,8 @@ static Result parse_base_type(Context* context,
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(union_span, "Expected union name, body, or `;` here");
+                context->report_error(union_span, source_span(parser),
+                                      "Expected union name, body, or `;` here");
                 return {Result::ErrorInvalidInput};
             }
 
@@ -529,7 +549,8 @@ static Result parse_base_type(Context* context,
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(union_span, "Expected declaration, union body, `;` here");
+                    context->report_error(union_span, source_span(parser),
+                                          "Expected declaration, union body, `;` here");
                     return {Result::ErrorInvalidInput};
                 }
             }
@@ -539,8 +560,8 @@ static Result parse_base_type(Context* context,
                     Type** type = lookup_type(parser, identifier);
                     if (type) {
                         if ((*type)->tag != Type::Union) {
-                            context->report_error(identifier_span, "Type `", identifier.str,
-                                                  "` is not a union");
+                            context->report_error(identifier_span, source_span(parser), "Type `",
+                                                  identifier.str, "` is not a union");
                             return {Result::ErrorInvalidInput};
                         }
                     } else {
@@ -566,14 +587,14 @@ static Result parse_base_type(Context* context,
                     if ((*type)->tag == Type::Union) {
                         union_type = (Type_Union*)*type;
                         if (union_type->flags & Type_Union::Defined) {
-                            context->report_error(identifier_span, "Type `", identifier.str,
-                                                  "` is already defined");
+                            context->report_error(identifier_span, source_span(parser), "Type `",
+                                                  identifier.str, "` is already defined");
                         } else {
                             type = nullptr;
                         }
                     } else {
-                        context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is not a union");
+                        context->report_error(identifier_span, source_span(parser), "Type `",
+                                              identifier.str, "` is not a union");
                     }
                 }
 
@@ -603,7 +624,7 @@ static Result parse_base_type(Context* context,
 
                 for (size_t i = 0; i < initializers.len(); ++i) {
                     if (initializers[i]->tag != Statement::Initializer_Default) {
-                        context->report_error(union_span,
+                        context->report_error(union_span, source_span(parser),
                                               "Union variants cannot have initializers");
                     }
                 }
@@ -636,8 +657,8 @@ static Result parse_base_type(Context* context,
                     Type** type = lookup_type(parser, identifier);
                     if (type) {
                         if ((*type)->tag != Type::Union) {
-                            context->report_error(identifier_span, "Type `", identifier.str,
-                                                  "` is not a union");
+                            context->report_error(identifier_span, source_span(parser), "Type `",
+                                                  identifier.str, "` is not a union");
                         }
                         base_type->set_type(*type);
                     } else {
@@ -653,7 +674,7 @@ static Result parse_base_type(Context* context,
                         base_type->set_type(union_type);
                     }
                 } else {
-                    context->report_error(union_span,
+                    context->report_error(union_span, source_span(parser),
                                           "Unions must be either named or anonymously defined");
                     base_type->set_type(parser->type_error);
                 }
@@ -666,7 +687,8 @@ static Result parse_base_type(Context* context,
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(enum_span, "Expected enum name, body, or `;` here");
+                context->report_error(enum_span, source_span(parser),
+                                      "Expected enum name, body, or `;` here");
                 return {Result::ErrorInvalidInput};
             }
 
@@ -679,7 +701,8 @@ static Result parse_base_type(Context* context,
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(enum_span, "Expected declaration, enum body, `;` here");
+                    context->report_error(enum_span, source_span(parser),
+                                          "Expected declaration, enum body, `;` here");
                     return {Result::ErrorInvalidInput};
                 }
             }
@@ -689,8 +712,8 @@ static Result parse_base_type(Context* context,
                     Type** type = lookup_type(parser, identifier);
                     if (type) {
                         if ((*type)->tag != Type::Enum) {
-                            context->report_error(identifier_span, "Type `", identifier.str,
-                                                  "` is not an enum");
+                            context->report_error(identifier_span, source_span(parser), "Type `",
+                                                  identifier.str, "` is not an enum");
                         }
                     } else {
                         Type_Enum* enum_type = parser->buffer_array.allocator().create<Type_Enum>();
@@ -712,14 +735,14 @@ static Result parse_base_type(Context* context,
                     if ((*type)->tag == Type::Enum) {
                         enum_type = (Type_Enum*)*type;
                         if (enum_type->flags & Type_Enum::Defined) {
-                            context->report_error(identifier_span, "Type `", identifier.str,
-                                                  "` is already defined");
+                            context->report_error(identifier_span, source_span(parser), "Type `",
+                                                  identifier.str, "` is already defined");
                         } else {
                             type = nullptr;
                         }
                     } else {
-                        context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is not an enum");
+                        context->report_error(identifier_span, source_span(parser), "Type `",
+                                              identifier.str, "` is not an enum");
                     }
                 }
 
@@ -782,8 +805,8 @@ static Result parse_base_type(Context* context,
                 Type** type = lookup_type(parser, identifier);
                 if (type) {
                     if ((*type)->tag != Type::Enum) {
-                        context->report_error(identifier_span, "Type `", identifier.str,
-                                              "` is not an enum");
+                        context->report_error(identifier_span, source_span(parser), "Type `",
+                                              identifier.str, "` is not an enum");
                     }
                     base_type->set_type(*type);
                 } else {
@@ -807,28 +830,31 @@ static Result parse_base_type(Context* context,
                     Type* t = type->get_type();
                     if (t->tag == Type::Enum) {
                         context->report_error(
-                            token.span,
+                            token.span, source_span(parser),
                             "Variable cannot be used as a type.  Hint: add the tag `enum`");
                     } else if (t->tag == Type::Struct) {
                         context->report_error(
-                            token.span,
+                            token.span, source_span(parser),
                             "Variable cannot be used as a type.  Hint: add the tag `struct`");
                     } else if (t->tag == Type::Union) {
                         context->report_error(
-                            token.span,
+                            token.span, source_span(parser),
                             "Variable cannot be used as a type.  Hint: add the tag `union`");
                     } else {
                         // Todo: add hint about spelling out the type
-                        context->report_error(token.span, "Variable cannot be used as a type.");
+                        context->report_error(token.span, source_span(parser),
+                                              "Variable cannot be used as a type.");
                     }
                 } else {
-                    context->report_error(token.span, "Variable cannot be used as a type");
+                    context->report_error(token.span, source_span(parser),
+                                          "Variable cannot be used as a type");
                 }
                 return {Result::ErrorInvalidInput};
             }
 
             if (!type) {
-                context->report_error(token.span, "Undefined type `", token.v.identifier.str, "`");
+                context->report_error(token.span, source_span(parser), "Undefined type `",
+                                      token.v.identifier.str, "`");
                 Type** tagged_type = lookup_type(parser, token.v.identifier);
                 if (tagged_type) {
                     base_type->set_type(*tagged_type);
@@ -865,7 +891,7 @@ static Result parse_base_type(Context* context,
             break;
 
         default:
-            context->report_error(token.span, "Expected type here");
+            context->report_error(token.span, source_span(parser), "Expected type here");
             return {Result::ErrorInvalidInput};
     }
 
@@ -875,7 +901,7 @@ static Result parse_base_type(Context* context,
             return result;
         }
 
-        if (parse_type_qualifier(context, base_type, token)) {
+        if (parse_type_qualifier(context, base_type, token, source_span(parser))) {
             continue;
         }
 
@@ -941,7 +967,8 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
         for (size_t i = len; i < initializers->len(); ++i) {
             Statement* init = (*initializers)[i];
             if (init->tag != Statement::Initializer_Default) {
-                context->report_error(token.span, "Typedef cannot have initializer");
+                context->report_error(token.span, source_span(parser),
+                                      "Typedef cannot have initializer");
             }
 
             Statement_Initializer* in = (Statement_Initializer*)init;
@@ -951,8 +978,8 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
             if (!typedefs->get(in->identifier.str, in->identifier.hash)) {
                 typedefs->insert(in->identifier.str, in->identifier.hash, declaration->type);
             } else {
-                context->report_error(token.span, "Typedef `", in->identifier.str,
-                                      "` has already created");
+                context->report_error(token.span, source_span(parser), "Typedef `",
+                                      in->identifier.str, "` has already created");
             }
         }
 
@@ -1007,8 +1034,8 @@ Result parse_declaration_or_statement(Context* context,
                 *which = Declaration_Or_Statement::Declaration;
                 return parse_declaration(context, parser, statements);
             } else {
-                context->report_error(token.span, "Undefined identifier `", token.v.identifier.str,
-                                      "`");
+                context->report_error(token.span, source_span(parser), "Undefined identifier `",
+                                      token.v.identifier.str, "`");
                 return {Result::ErrorInvalidInput};
             }
         }
@@ -1055,8 +1082,8 @@ static Result parse_expression_(Context* context,
                 *eout = expression;
                 break;
             } else {
-                context->report_error(token.span, "Undefined variable `", token.v.identifier.str,
-                                      "`");
+                context->report_error(token.span, source_span(parser), "Undefined variable `",
+                                      token.v.identifier.str, "`");
                 return {Result::ErrorInvalidInput};
             }
         }
@@ -1065,7 +1092,8 @@ static Result parse_expression_(Context* context,
             result = parse_expression(context, parser, eout);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(token.span, "Unmatched parenthesis (`(`)");
+                context->report_error(token.span, source_span(parser),
+                                      "Unmatched parenthesis (`(`)");
                 return {Result::ErrorInvalidInput};
             }
 
@@ -1073,18 +1101,20 @@ static Result parse_expression_(Context* context,
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(open_paren_span, "Unmatched parenthesis (`(`)");
+                context->report_error(open_paren_span, source_span(parser),
+                                      "Unmatched parenthesis (`(`)");
                 return {Result::ErrorInvalidInput};
             }
             if (token.type != Token::CloseParen) {
-                context->report_error(token.span, "Expected close parenthesis (`(`) here");
+                context->report_error(token.span, source_span(parser),
+                                      "Expected close parenthesis (`(`) here");
                 return {Result::ErrorInvalidInput};
             }
             break;
         }
 
         default:
-            context->report_error(token.span, "Expected expression here");
+            context->report_error(token.span, source_span(parser), "Expected expression here");
             return {Result::ErrorInvalidInput};
     }
 
@@ -1118,7 +1148,8 @@ static Result parse_expression_(Context* context,
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
                     context->report_error(
-                        token.span, "Expected then expression side for ternary operator here");
+                        token.span, source_span(parser),
+                        "Expected then expression side for ternary operator here");
                     return Result::ok();
                 }
 
@@ -1127,7 +1158,7 @@ static Result parse_expression_(Context* context,
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
                     context->report_error(
-                        question_mark_span,
+                        question_mark_span, source_span(parser),
                         "Expected `:` and then otherwise expression side for ternary operator");
                     return Result::ok();
                 }
@@ -1137,7 +1168,8 @@ static Result parse_expression_(Context* context,
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
                     context->report_error(
-                        token.span, "Expected otherwise expression for ternary operator here");
+                        token.span, source_span(parser),
+                        "Expected otherwise expression for ternary operator here");
                     return Result::ok();
                 }
 
@@ -1188,7 +1220,7 @@ static Result parse_expression_(Context* context,
                 precedence = 15;
                 break;
             default:
-                context->report_error(token.span,
+                context->report_error(token.span, source_span(parser),
                                       "Expected binary operator here to connect expressions");
                 return {Result::ErrorInvalidInput};
         }
@@ -1203,7 +1235,8 @@ static Result parse_expression_(Context* context,
         result = parse_expression_(context, parser, &right, precedence + !ltr);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(token.span, "Expected right side for binary operator here");
+            context->report_error(token.span, source_span(parser),
+                                  "Expected right side for binary operator here");
             break;
         }
 
@@ -1252,7 +1285,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
                     context->report_error(
-                        open_curly_span,
+                        open_curly_span, source_span(parser),
                         "Expected end of block to match start of block (`{`) here");
                     return {Result::ErrorInvalidInput};
                 }
@@ -1274,7 +1307,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
                     context->report_error(
-                        open_curly_span,
+                        open_curly_span, source_span(parser),
                         "Expected end of block to match start of block (`{`) here");
                     return {Result::ErrorInvalidInput};
                 }
@@ -1305,29 +1338,34 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(while_span, "Expected open parenthesis here");
+                context->report_error(while_span, source_span(parser),
+                                      "Expected open parenthesis here");
                 return {Result::ErrorInvalidInput};
             }
             if (token.type != Token::OpenParen) {
-                context->report_error(token.span, "Expected open parenthesis here");
+                context->report_error(token.span, source_span(parser),
+                                      "Expected open parenthesis here");
                 return {Result::ErrorInvalidInput};
             }
 
             Expression* condition;
             result = parse_expression(context, parser, &condition);
             if (result.type == Result::Done) {
-                context->report_error(while_span, "Expected condition expression here");
+                context->report_error(while_span, source_span(parser),
+                                      "Expected condition expression here");
                 return {Result::ErrorInvalidInput};
             }
 
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(while_span, "Expected `)` to end condition expression");
+                context->report_error(while_span, source_span(parser),
+                                      "Expected `)` to end condition expression");
                 return {Result::ErrorInvalidInput};
             }
             if (token.type != Token::CloseParen) {
-                context->report_error(token.span, "Expected `)` here to end condition expression");
+                context->report_error(token.span, source_span(parser),
+                                      "Expected `)` here to end condition expression");
                 return {Result::ErrorInvalidInput};
             }
 
@@ -1335,7 +1373,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             result = parse_statement(context, parser, &body);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(while_span, "Expected body statement");
+                context->report_error(while_span, source_span(parser), "Expected body statement");
                 return {Result::ErrorInvalidInput};
             }
 
@@ -1353,18 +1391,20 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(for_span, "Expected open parenthesis here");
+                context->report_error(for_span, source_span(parser),
+                                      "Expected open parenthesis here");
                 return {Result::ErrorInvalidInput};
             }
             if (token.type != Token::OpenParen) {
-                context->report_error(token.span, "Expected open parenthesis here");
+                context->report_error(token.span, source_span(parser),
+                                      "Expected open parenthesis here");
                 return {Result::ErrorInvalidInput};
             }
 
             result = peek_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(for_span, "Expected initializer or `;`");
+                context->report_error(for_span, source_span(parser), "Expected initializer or `;`");
                 return {Result::ErrorInvalidInput};
             }
             Expression* initializer = nullptr;
@@ -1376,11 +1416,12 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(for_span, "Expected `;` to end initializer expression");
+                    context->report_error(for_span, source_span(parser),
+                                          "Expected `;` to end initializer expression");
                     return {Result::ErrorInvalidInput};
                 }
                 if (token.type != Token::Semicolon) {
-                    context->report_error(token.span,
+                    context->report_error(token.span, source_span(parser),
                                           "Expected `;` here to end initializer expression");
                     return {Result::ErrorInvalidInput};
                 }
@@ -1389,7 +1430,8 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             result = peek_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(for_span, "Expected condition expression or `;` here");
+                context->report_error(for_span, source_span(parser),
+                                      "Expected condition expression or `;` here");
                 return {Result::ErrorInvalidInput};
             }
             Expression* condition = nullptr;
@@ -1401,11 +1443,12 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(for_span, "Expected `;` to end condition expression");
+                    context->report_error(for_span, source_span(parser),
+                                          "Expected `;` to end condition expression");
                     return {Result::ErrorInvalidInput};
                 }
                 if (token.type != Token::Semicolon) {
-                    context->report_error(token.span,
+                    context->report_error(token.span, source_span(parser),
                                           "Expected `;` here to end condition expression");
                     return {Result::ErrorInvalidInput};
                 }
@@ -1414,7 +1457,8 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             result = peek_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(for_span, "Expected increment expression or `)`");
+                context->report_error(for_span, source_span(parser),
+                                      "Expected increment expression or `)`");
                 return {Result::ErrorInvalidInput};
             }
             Expression* increment = nullptr;
@@ -1426,11 +1470,12 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(for_span, "Expected `)` to end increment expression");
+                    context->report_error(for_span, source_span(parser),
+                                          "Expected `)` to end increment expression");
                     return {Result::ErrorInvalidInput};
                 }
                 if (token.type != Token::CloseParen) {
-                    context->report_error(token.span,
+                    context->report_error(token.span, source_span(parser),
                                           "Expected `)` here to end increment expression");
                     return {Result::ErrorInvalidInput};
                 }
@@ -1440,7 +1485,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             result = parse_statement(context, parser, &body);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(for_span, "Expected body statement");
+                context->report_error(for_span, source_span(parser), "Expected body statement");
                 return {Result::ErrorInvalidInput};
             }
 
@@ -1461,7 +1506,8 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             result = next_token(context, parser, &token);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(span, "Expected semicolon here to end expression statement");
+                context->report_error(span, source_span(parser),
+                                      "Expected semicolon here to end expression statement");
                 return {Result::ErrorInvalidInput};
             }
 

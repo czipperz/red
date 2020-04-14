@@ -22,6 +22,51 @@ static Result run_main(Context* context) {
     return Result::ok();
 }
 
+static void draw_error_span(const File_Contents* file_contents, Span error_span) {
+    fputs("~   ", stderr);
+    size_t line = error_span.start.line;
+    size_t line_start = error_span.start.index - error_span.start.column;
+    for (size_t i = line_start;; ++i) {
+        char ch = file_contents->get(i);
+        putc(ch, stderr);
+
+        if (ch == '\n') {
+            fputs("    ", stderr);
+
+            size_t j = 0;
+            if (line == error_span.start.line) {
+                for (; j < error_span.start.column; ++j) {
+                    putc(' ', stderr);
+                }
+            }
+
+            if (line == error_span.end.line) {
+                for (; j < error_span.end.column; ++j) {
+                    putc('^', stderr);
+                }
+            } else {
+                for (; file_contents->get(j + line_start) != '\n'; ++j) {
+                    putc('^', stderr);
+                }
+            }
+
+            putc('\n', stderr);
+            if (i < error_span.end.index) {
+                fputs("~   ", stderr);
+            }
+
+            ++line;
+            line_start = i + 1;
+
+            if (i >= error_span.end.index) {
+                break;
+            }
+        }
+    }
+
+    putc('\n', stderr);
+}
+
 static int try_run_main(Context* context) {
     ZoneScoped;
     try {
@@ -39,55 +84,26 @@ static int try_run_main(Context* context) {
             ZoneScoped;
 
             const Compiler_Error& error = context->errors[i];
-            const File& file = context->files.files[error.span.start.file];
+            const File& source_file = context->files.files[error.source_span.start.file];
 
-            fputs("Error: ", stderr);
-            fwrite(file.path.buffer, 1, file.path.len, stderr);
-            fprintf(stderr, ":%zu:%zu: ", error.span.start.line + 1, error.span.start.column + 1);
+            fwrite(source_file.path.buffer, 1, source_file.path.len, stderr);
+            fprintf(stderr, ":%zu:%zu: Error: ", error.source_span.start.line + 1,
+                    error.source_span.start.column + 1);
             fwrite(context->errors[i].message.buffer, 1, context->errors[i].message.len, stderr);
-            fputs(":\n~   ", stderr);
+            fputs(":\n", stderr);
 
-            size_t line = error.span.start.line;
-            size_t line_start = error.span.start.index - error.span.start.column;
-            for (size_t i = line_start;; ++i) {
-                char ch = file.contents.get(i);
-                putc(ch, stderr);
+            draw_error_span(&source_file.contents, error.source_span);
 
-                if (ch == '\n') {
-                    fputs("    ", stderr);
+            if (error.error_span.start.file != error.source_span.start.file ||
+                // error.error_span.start.index != error.source_span.start.index ||
+                error.error_span.end.index != error.source_span.end.index) {
+                fwrite(source_file.path.buffer, 1, source_file.path.len, stderr);
+                fprintf(stderr, ":%zu:%zu: Macro expanded from here:\n",
+                        error.source_span.start.line + 1, error.source_span.start.column + 1);
 
-                    size_t j = 0;
-                    if (line == error.span.start.line) {
-                        for (; j < error.span.start.column; ++j) {
-                            putc(' ', stderr);
-                        }
-                    }
-
-                    if (line == error.span.end.line) {
-                        for (; j < error.span.end.column; ++j) {
-                            putc('^', stderr);
-                        }
-                    } else {
-                        for (; file.contents.get(j + line_start) != '\n'; ++j) {
-                            putc('^', stderr);
-                        }
-                    }
-
-                    putc('\n', stderr);
-                    if (i < error.span.end.index) {
-                        fputs("~   ", stderr);
-                    }
-
-                    ++line;
-                    line_start = i + 1;
-
-                    if (i >= error.span.end.index) {
-                        break;
-                    }
-                }
+                const File& error_file = context->files.files[error.error_span.start.file];
+                draw_error_span(&error_file.contents, error.error_span);
             }
-
-            putc('\n', stderr);
         }
 
         if (result.is_err()) {

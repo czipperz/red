@@ -6,7 +6,8 @@
 namespace red {
 
 struct Compiler_Error {
-    Span span;
+    Span error_span;
+    Span source_span;
     cz::Str message;
 };
 

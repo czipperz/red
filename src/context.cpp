@@ -22,10 +22,14 @@ void Context::destroy() {
     files.destroy();
 }
 
-void Context::report_error_str(Span span, cz::Str message) {
+void Context::report_error_str(Span error_span, Span source_span, cz::Str message) {
     Compiler_Error error;
-    CZ_DEBUG_ASSERT(span.start.file == span.end.file);
-    error.span = span;
+    CZ_DEBUG_ASSERT(error_span.start.file == error_span.end.file);
+    error.error_span = error_span;
+
+    CZ_DEBUG_ASSERT(source_span.start.file == source_span.end.file);
+    error.source_span = source_span;
+
     error.message = message;
 
     errors.reserve(cz::heap_allocator(), 1);

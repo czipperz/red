@@ -227,7 +227,7 @@ top:
                     while (1) {
                         char next;
                         if (!next_character(file_contents, &point, &next)) {
-                            context->report_error({*location, point}, "Unterminated block comment");
+                            context->report_lex_error({*location, point}, "Unterminated block comment");
                             *location = point;
                             return false;
                         }
@@ -328,14 +328,14 @@ top:
             *location = point;
             while (1) {
                 if (!next_character(file_contents, &point, &c)) {
-                    context->report_error({start, point}, "Unterminated string");
+                    context->report_lex_error({start, point}, "Unterminated string");
                     value.drop(lexer->string_buffer_array.allocator());
                     return false;
                 }
 
                 if (c == '\\') {
                     if (!next_character(file_contents, &point, &c)) {
-                        context->report_error({start, point}, "Unterminated string");
+                        context->report_lex_error({start, point}, "Unterminated string");
                         value.drop(lexer->string_buffer_array.allocator());
                         return false;
                     }
@@ -360,7 +360,7 @@ top:
                             c = '\v';
                             break;
                         default:
-                            context->report_error({*location, point},
+                            context->report_lex_error({*location, point},
                                                   "Undefined escape sequence `\\", c, "`");
                             goto skip_char;
                     }

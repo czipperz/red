@@ -25,17 +25,22 @@ struct Context {
     void destroy();
 
     template <class... Ts>
-    void report_error(Span span, Ts... ts) {
+    void report_lex_error(Span span, Ts... ts) {
+        report_error(span, span, ts...);
+    }
+
+    template <class... Ts>
+    void report_error(Span error_span, Span source_span, Ts... ts) {
         cz::AllocatedString message = {};
         message.allocator = error_message_buffer_array.allocator();
         // ignore errors in return value
         cz::write(cz::string_writer(&message), ts...);
         message.realloc();
 
-        report_error_str(span, message);
+        report_error_str(error_span, source_span, message);
     }
 
-    void report_error_str(Span span, cz::Str message);
+    void report_error_str(Span error_span, Span source_span, cz::Str message);
 
     void report_error_unspanned(cz::Str message);
 };
