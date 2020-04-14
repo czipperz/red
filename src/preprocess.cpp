@@ -989,19 +989,6 @@ static Result process_defined_identifier(Context* context,
             }
         }
 
-        if (token->type == Token::CloseParen) {
-            if (info.arguments.len() < definition->parameter_len) {
-                context->report_error(open_paren_span, "Too few arguments to macro (expected ",
-                                      definition->parameter_len, ")");
-                return {Result::ErrorInvalidInput};
-            }
-            if (definition->has_varargs) {
-                info.arguments.reserve(cz::heap_allocator(), 1);
-                info.arguments.push({});
-            }
-            goto do_expand;
-        }
-
         // Process arguments
         cz::Vector<Token> argument_tokens = {};
         size_t paren_depth = 0;
@@ -1012,9 +999,15 @@ static Result process_defined_identifier(Context* context,
                 if (paren_depth > 0) {
                     --paren_depth;
                 } else {
-                    argument_tokens.realloc(cz::heap_allocator());
-                    info.arguments.reserve(cz::heap_allocator(), 1);
-                    info.arguments.push(argument_tokens);
+                    // If we read "()" and there are no parameters, then skip adding an argument.
+                    // However if there is a parameter and we read "()" then we add an empty
+                    // argument.
+                    if (info.arguments.len() != 0 || argument_tokens.len() != 0 ||
+                        definition->parameter_len != 0) {
+                        argument_tokens.realloc(cz::heap_allocator());
+                        info.arguments.reserve(cz::heap_allocator(), 1);
+                        info.arguments.push(argument_tokens);
+                    }
 
                     if (info.arguments.len() < definition->parameter_len) {
                         context->report_error(open_paren_span,

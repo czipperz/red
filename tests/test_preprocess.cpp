@@ -497,11 +497,13 @@ TEST_CASE("cpp::next_token #define function macro one parameter basic case") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("cpp::next_token #define function macro one parameter no arguments is error") {
+TEST_CASE("cpp::next_token #define function macro one parameter no arguments is ok") {
     SETUP("#define abc(def) def\nabc() b");
 
-    REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
-    REQUIRE(context.errors.len() == 1);
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("cpp::next_token #define function higher order") {
