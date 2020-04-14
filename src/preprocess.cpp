@@ -360,6 +360,8 @@ static Result parse_and_eval_expression(Context* context,
                                         size_t* index,
                                         int64_t* value,
                                         int max_precedence) {
+    ZoneScoped;
+
     if (*index == tokens.len) {
         CZ_DEBUG_ASSERT(*index >= 1);
         context->report_error(tokens[*index - 1].span, "Unterminated expression");
@@ -529,6 +531,8 @@ static Result process_defined_macro(Context* context,
                                     Preprocessor* preprocessor,
                                     lex::Lexer* lexer,
                                     Token* token) {
+    ZoneScoped;
+
     Location* point = &preprocessor->include_stack.last().location;
     Span defined_span = token->span;
     bool at_bol = false;
@@ -1189,6 +1193,8 @@ static Result next_token_in_definition(Context* context,
                                        Token* token,
                                        bool this_line_only,
                                        int expand_macros) {
+    ZoneScoped;
+
     /// The theoretical behavior of invoking a functional macro `#define f(x, y, z)` are as follows:
     /// `f(a, b, c)`.  "a", "b", and "c" are stored as 'token soup' as arguments.  That is, they are
     /// unparsed tokens passed to `f`.  When `f` is expanding and sees a parameter being used, it
