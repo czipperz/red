@@ -641,13 +641,35 @@ TEST_CASE("cpp::next_token #define ## two parameters") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
-TEST_CASE("cpp::next_token #define ## argument is empty deletes that side") {
+TEST_CASE("cpp::next_token #define ## argument is empty deletes that side right") {
     SETUP("#define abc(b) a##b\nabc()");
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.string == "a");
     CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #define ## argument is empty deletes that side left") {
+    SETUP("#define abc(a) a##b\nabc()");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(token.type == Token::Identifier);
+    CHECK(token.v.string == "b");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #define ## chain") {
+    SETUP("#define abc(a, b) x##a##y##b##z\nabc(h, j)");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(token.type == Token::Identifier);
+    CHECK(token.v.string == "xhyjz");
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }

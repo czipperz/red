@@ -1308,15 +1308,22 @@ static Result next_token_in_definition(Context* context,
             }
         }
 
-        if (info->index < info->definition->tokens.len() &&
-            info->definition->tokens[info->index].type == Token::HashHash) {
-            ++info->index;
+        if (token->type == Token::HashHash ||
+            (info->index < info->definition->tokens.len() &&
+             info->definition->tokens[info->index].type == Token::HashHash)) {
+            if (token->type != Token::HashHash) {
+                ++info->index;
+            }
+
             // :ConcatErrors ## errors are eliminated in process_define
             CZ_DEBUG_ASSERT(info->index < info->definition->tokens.len());
 
             cz::AllocatedString combined_identifier = {};
             combined_identifier.allocator = lexer->identifier_buffer_array.allocator();
-            write(string_writer(&combined_identifier), *token);
+
+            if (token->type != Token::HashHash) {
+                write(string_writer(&combined_identifier), *token);
+            }
 
             while (1) {
                 Token* tk = &info->definition->tokens[info->index];
@@ -1334,7 +1341,13 @@ static Result next_token_in_definition(Context* context,
                     write(string_writer(&combined_identifier),
                           argument_tokens[info->argument_index]);
                     ++info->argument_index;
-                    break;
+
+                    if (info->argument_index == argument_tokens.len) {
+                        ++info->index;
+                        info->argument_index = 0;
+                    } else {
+                        break;
+                    }
                 } else {
                     write(string_writer(&combined_identifier), *tk);
                     ++info->index;
