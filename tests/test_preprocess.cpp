@@ -545,3 +545,47 @@ TEST_CASE("cpp::next_token #define varargs only param and no args") {
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
+
+TEST_CASE("cpp::next_token #define # make undefined identifier string") {
+    SETUP("#define abc #def\nabc");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::String);
+    CHECK(token.v.string == "def");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #define # parameter") {
+    SETUP("#define abc(def) #def\nabc(x)");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::String);
+    CHECK(token.v.string == "x");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #define # argument isn't expanded") {
+    SETUP("#define abc(def) #def\n#define x y\nabc(x)");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::String);
+    CHECK(token.v.string == "x");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #define # after function call argument is expanded") {
+    SETUP("#define abc2(def) #def\n#define abc(def) abc2(def)\n#define x y\nabc(x)");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::String);
+    CHECK(token.v.string == "y");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}

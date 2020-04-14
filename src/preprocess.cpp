@@ -352,7 +352,7 @@ static Result next_token_in_definition(Context* context,
                                        lex::Lexer* lexer,
                                        Token* token,
                                        bool this_line_only,
-                                       bool expand_macros);
+                                       int expand_macros);
 
 static Result parse_and_eval_expression(Context* context,
                                         cz::Slice<Token> tokens,
@@ -596,7 +596,7 @@ static Result process_if(Context* context,
         Include_Info* point;
         while (1) {
             Result ntid_result =
-                next_token_in_definition(context, preprocessor, lexer, token, true, true);
+                next_token_in_definition(context, preprocessor, lexer, token, true, 1);
             if (ntid_result.type == Result::Done) {
                 bool at_bol = false;
                 point = &preprocessor->include_stack.last();
@@ -956,7 +956,7 @@ static Result process_defined_identifier(Context* context,
         // We expect an open parenthesis here.  If there isn't one, just don't expand the macro.
         bool at_bol = false;
         Result ntid_result =
-            next_token_in_definition(context, preprocessor, lexer, token, this_line_only, false);
+            next_token_in_definition(context, preprocessor, lexer, token, this_line_only, 0);
         if (ntid_result.type == Result::Done) {
             if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                                  token, &at_bol)) {
@@ -976,7 +976,7 @@ static Result process_defined_identifier(Context* context,
         // Get the first token of the body.  After this point no more tokens form errors.
         at_bol = false;
         ntid_result =
-            next_token_in_definition(context, preprocessor, lexer, token, this_line_only, false);
+            next_token_in_definition(context, preprocessor, lexer, token, this_line_only, 0);
         if (ntid_result.type == Result::Done) {
             if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                                  token, &at_bol)) {
@@ -1055,8 +1055,8 @@ static Result process_defined_identifier(Context* context,
             argument_tokens.push(*token);
 
         next_argument_token:
-            ntid_result = next_token_in_definition(context, preprocessor, lexer, token,
-                                                   this_line_only, false);
+            ntid_result =
+                next_token_in_definition(context, preprocessor, lexer, token, this_line_only, 0);
             if (ntid_result.type == Result::Done) {
                 if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
                                      point, token, &at_bol)) {
@@ -1175,7 +1175,7 @@ static Result next_token_in_definition(Context* context,
                                        lex::Lexer* lexer,
                                        Token* token,
                                        bool this_line_only,
-                                       bool expand_macros) {
+                                       int expand_macros) {
     while (preprocessor->definition_stack.len() > 0) {
         Definition_Info* info = &preprocessor->definition_stack.last();
         if (info->index == info->definition->tokens.len()) {
@@ -1196,6 +1196,10 @@ static Result next_token_in_definition(Context* context,
                 continue;
             }
             *token = argument_tokens[info->argument_index++];
+
+            if (expand_macros == 0) {
+                expand_macros = 1;
+            }
         } else {
             ++info->index;
             // Since we postincrement index, we need to set `argument_index` to 0 if the next token
@@ -1203,11 +1207,65 @@ static Result next_token_in_definition(Context* context,
             // is expensive, we just always set it to 0.
             info->argument_index = 0;
             *token = *tk;
+
+            if (token->type == Token::Hash && info->index < info->definition->tokens.len() &&
+                info->definition->tokens[info->index].type == Token::Identifier) {
+                // Todo: do we need to expand here?
+                token->type = Token::String;
+                token->v.string = info->definition->tokens[info->index].v.identifier.str;
+                ++info->index;
+                return Result::ok();
+            }
+
+            if (token->type == Token::Hash && info->index < info->definition->tokens.len() &&
+                (info->definition->tokens[info->index].type == Token::Preprocessor_Parameter ||
+                 info->definition->tokens[info->index].type ==
+                     Token::Preprocessor_Varargs_Keyword)) {
+                // Todo: use lex buffer array directly since we don't lex more tokens while in the
+                // definition stack.  At some point this might change in order to implement #
+                // correctly by replacing arguments with some sort of "token soup" that are then
+                // reparsed each time they are used.  Who knows.
+                cz::AllocatedString string = {};
+                string.allocator = cz::heap_allocator();
+                CZ_DEFER(string.drop());
+
+                tk = &info->definition->tokens[info->index];
+                size_t pdsl = preprocessor->definition_stack.len();
+                while (1) {
+                    Definition_Info* info = &preprocessor->definition_stack.last();
+                    if (info->index == info->definition->tokens.len()) {
+                        // This definition has ran through all its tokens.
+                        preprocessor->definition_stack.pop();
+                        continue;
+                    }
+
+                    if (preprocessor->definition_stack.len() == pdsl) {
+                        if (info->argument_index == info->arguments[tk->v.integer.value].len()) {
+                            ++info->index;
+                            info->argument_index = 0;
+                            break;
+                        }
+                    }
+
+                    CZ_TRY(next_token_in_definition(context, preprocessor, lexer, token,
+                                                    this_line_only, -1));
+
+                    if (string.len() > 0) {
+                        // Todo make this not happen all the time
+                        write(string_writer(&string), ' ');
+                    }
+                    write(string_writer(&string), *token);
+                }
+
+                token->type = Token::String;
+                token->v.string = string.clone(lexer->string_buffer_array.allocator());
+                return Result::ok();
+            }
         }
 
-        // Todo: handle # and ##
+        // Todo: handle ##
 
-        if (token->type == Token::Identifier && expand_macros) {
+        if (token->type == Token::Identifier && expand_macros == 1) {
             Definition* definition =
                 preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
             if (!definition) {
