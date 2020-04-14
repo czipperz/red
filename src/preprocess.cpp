@@ -409,8 +409,8 @@ static Result parse_and_eval_expression(Context* context,
         }
 
         default:
-            context->report_error(tokens[*index].span, if_span,
-                                  "#if expects a constant expression");
+            context->report_error(tokens[*index].span, if_span, "Unexpected token `",
+                                  tokens[*index], "` in #if expression");
             return {Result::ErrorInvalidInput};
     }
 
