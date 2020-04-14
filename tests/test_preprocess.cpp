@@ -749,6 +749,35 @@ TEST_CASE("cpp::next_token #define no body") {
     CHECK(definition->tokens.len() == 0);
 }
 
+TEST_CASE("cpp::next_token #define usage with comma inside parenthesis is still one argument") {
+    SETUP("#define abc(x) x\nabc((a, b))");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    CHECK(token.type == Token::OpenParen);
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    CHECK(token.type == Token::Comma);
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    CHECK(token.type == Token::CloseParen);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+    CHECK(context.errors.len() == 0);
+}
+
 static void check_keyword(const char* str, red::Token::Type type_expected) {
     SETUP(str);
 

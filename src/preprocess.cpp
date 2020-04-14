@@ -1102,7 +1102,7 @@ static Result process_defined_identifier(Context* context,
 
                     goto do_expand;
                 }
-            } else if (token->type == Token::Comma) {
+            } else if (paren_depth == 0 && token->type == Token::Comma) {
                 if (definition->has_varargs && info.arguments.len() == definition->parameter_len) {
                     goto append_argument_token;
                 }
