@@ -1176,6 +1176,34 @@ static Result next_token_in_definition(Context* context,
                                        Token* token,
                                        bool this_line_only,
                                        int expand_macros) {
+    /// The theoretical behavior of invoking a functional macro `#define f(x, y, z)` are as follows:
+    /// `f(a, b, c)`.  "a", "b", and "c" are stored as 'token soup' as arguments.  That is, they are
+    /// unparsed tokens passed to `f`.  When `f` is expanding and sees a parameter being used, it
+    /// parses the parameter and expands it fully, bypassing token soupization.  If it sees `#x` it
+    /// will only parse `x` and not expand it.
+    ///
+    /// `expand_macros` allows us to implement this:
+    /// * `1` means the token is expanded.  This is the default value.
+    /// * `0` is used when expanding function macros and means the arguments are unparsed and
+    ///   unexpanded, except for parameters, which are fully parsed and expanded.
+    /// * `-1` is used when expanding `#x` where `x` is a parameter.  It means the parameter is
+    ///   expanded but macros are not.
+    ///
+    /// Example:
+    /// ```
+    /// #define stringify1(x) stringify2(x)
+    /// #define stringify2(x) #x
+    /// #define a 13
+    /// stringify1(a);
+    /// stringify2(a);
+    /// ```
+    ///
+    /// In `stringify2(a)`, `#x` would expand the parameter but not expand macros, creating `"a"`.
+    ///
+    /// In `stringify1(a)`, the call to `stringify2(x)` allows `x` to be fully expanded as `x` is a
+    /// parameter and `0` is used in parsing function macro invocations.  Then `stringify2(13)` is
+    /// invoked, which trivially evaluates to `"13"`.
+
     while (preprocessor->definition_stack.len() > 0) {
         Definition_Info* info = &preprocessor->definition_stack.last();
         if (info->index == info->definition->tokens.len()) {
