@@ -3,6 +3,7 @@
 #include <cz/defer.hpp>
 #include <cz/heap.hpp>
 #include "context.hpp"
+#include "definition.hpp"
 #include "file_contents.hpp"
 #include "hashed_str.hpp"
 #include "lex.hpp"
@@ -689,6 +690,19 @@ TEST_CASE("cpp::next_token #define function no body") {
 
     REQUIRE(EAT_NEXT().type == Result::Done);
     CHECK(context.errors.len() == 0);
+}
+
+TEST_CASE("cpp::next_token #define no body") {
+    SETUP("#define abc\na");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
+
+    pre::Definition* definition = preprocessor.definitions.get_hash("abc");
+    REQUIRE(definition);
+    CHECK(definition->tokens.len() == 0);
 }
 
 static void check_keyword(const char* str, red::Token::Type type_expected) {
