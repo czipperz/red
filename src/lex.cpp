@@ -108,6 +108,9 @@ static bool process_escaped_string(char* c) {
         case 'v':
             *c = '\v';
             return true;
+        case '0':
+            *c = '\0';
+            return true;
         default:
             return false;
     }
