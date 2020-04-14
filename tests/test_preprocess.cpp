@@ -435,6 +435,39 @@ TEST_CASE("cpp::next_token #if ternary operator precedence") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
+TEST_CASE("cpp::next_token #if taken #elif ignored") {
+    SETUP("#if 1\na\n#elif 2\nb\n#else\nc\n#endif\n");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "a");
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #elif taken") {
+    SETUP("#if 0\na\n#elif 2\nb\n#else\nc\n#endif\n");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "b");
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
+TEST_CASE("cpp::next_token #elif not taken") {
+    SETUP("#if 0\na\n#elif 0\nb\n#else\nc\n#endif\n");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "c");
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
 TEST_CASE("cpp::next_token #define no value") {
     SETUP("#define abc\nabc");
 

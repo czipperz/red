@@ -244,11 +244,17 @@ static Result process_if_true(Context* context,
     return process_token(context, preprocessor, lexer, token, at_bol);
 }
 
+static Result process_if(Context* context,
+                         Preprocessor* preprocessor,
+                         lex::Lexer* lexer,
+                         Token* token);
+
 static Result process_if_false(Context* context,
                                Preprocessor* preprocessor,
                                lex::Lexer* lexer,
                                Token* token,
-                               bool start_at_bol) {
+                               bool start_at_bol,
+                               bool allow_else) {
     ZoneScoped;
     size_t skip_depth = 0;
 
@@ -291,8 +297,12 @@ static Result process_if_false(Context* context,
                     token->v.identifier.str == "if") {
                     ++skip_depth;
                 } else if (token->v.identifier.str == "else") {
-                    if (skip_depth == 0) {
+                    if (allow_else && skip_depth == 0) {
                         break;
+                    }
+                } else if (token->v.identifier.str == "elif") {
+                    if (allow_else && skip_depth == 0) {
+                        return process_if(context, preprocessor, lexer, token);
                     }
                 } else if (token->v.identifier.str == "endif") {
                     if (skip_depth > 0) {
@@ -342,7 +352,7 @@ static Result process_ifdef(Context* context,
         want_present) {
         return process_if_true(context, preprocessor, lexer, token);
     } else {
-        return process_if_false(context, preprocessor, lexer, token, false);
+        return process_if_false(context, preprocessor, lexer, token, false, true);
     }
 }
 
@@ -687,7 +697,7 @@ static Result process_if(Context* context,
     if (value) {
         return process_if_true(context, preprocessor, lexer, token);
     } else {
-        return process_if_false(context, preprocessor, lexer, token, true);
+        return process_if_false(context, preprocessor, lexer, token, true, true);
     }
 }
 
@@ -709,7 +719,30 @@ static Result process_else(Context* context,
         return {Result::ErrorInvalidInput};
     }
 
-    return process_if_false(context, preprocessor, lexer, token, false);
+    return process_if_false(context, preprocessor, lexer, token, false, true);
+}
+
+static Result process_elif(Context* context,
+                           Preprocessor* preprocessor,
+                           lex::Lexer* lexer,
+                           Token* token) {
+    ZoneScoped;
+    // We just produced x and are skipping over y and z
+    // #if 1
+    // x
+    // |#elif 2
+    // y
+    // #else
+    // z
+    // #endif
+
+    Include_Info* point = &preprocessor->include_stack.last();
+    if (point->if_depth == 0) {
+        context->report_lex_error(token->span, "#else without #if");
+        return {Result::ErrorInvalidInput};
+    }
+
+    return process_if_false(context, preprocessor, lexer, token, false, false);
 }
 
 static Result process_endif(Context* context,
@@ -1158,6 +1191,9 @@ top:
                 }
                 if (token->v.identifier.str == "else") {
                     return process_else(context, preprocessor, lexer, token);
+                }
+                if (token->v.identifier.str == "elif") {
+                    return process_elif(context, preprocessor, lexer, token);
                 }
                 if (token->v.identifier.str == "endif") {
                     return process_endif(context, preprocessor, lexer, token);
