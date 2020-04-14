@@ -42,6 +42,13 @@ static Span source_span(Preprocessor* preprocessor) {
     return {end, end};
 }
 
+static void drop(Definition_Info* info) {
+    for (size_t i = 0; i < info->arguments.len(); ++i) {
+        info->arguments[i].drop(cz::heap_allocator());
+    }
+    info->arguments.drop(cz::heap_allocator());
+}
+
 static void advance_over_whitespace(const File_Contents& contents, Location* location) {
     ZoneScoped;
     Location point = *location;
@@ -1101,6 +1108,7 @@ static Result process_defined_identifier(Context* context,
                         info.arguments.push({});
                     }
 
+                    info.arguments.realloc(cz::heap_allocator());
                     goto do_expand;
                 }
             } else if (paren_depth == 0 && token->type == Token::Comma) {
@@ -1282,7 +1290,8 @@ static Result next_token_in_definition(Context* context,
         Definition_Info* info = &preprocessor->definition_stack.last();
         if (info->index == info->definition->tokens.len()) {
             // This definition has ran through all its tokens.
-            preprocessor->definition_stack.pop();
+            Definition_Info info = preprocessor->definition_stack.pop();
+            drop(&info);
             continue;
         }
 
@@ -1331,7 +1340,8 @@ static Result next_token_in_definition(Context* context,
                         Definition_Info* info = &preprocessor->definition_stack.last();
                         if (info->index == info->definition->tokens.len()) {
                             // This definition has ran through all its tokens.
-                            preprocessor->definition_stack.pop();
+                            Definition_Info info = preprocessor->definition_stack.pop();
+                            drop(&info);
                             continue;
                         }
 
@@ -1474,6 +1484,8 @@ Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexe
         if (entry.if_depth > 0) {
             context->report_lex_error({}, "Unterminated #if");
         }
+
+        entry.if_stack.drop(cz::heap_allocator());
 
         if (preprocessor->include_stack.len() == 0) {
             return Result::done();
