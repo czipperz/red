@@ -172,7 +172,7 @@ TEST_CASE(
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE(
@@ -186,7 +186,7 @@ TEST_CASE(
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("cpp::next_token random #endif is error") {
@@ -253,7 +253,7 @@ TEST_CASE("cpp::next_token #random inside #if false is ignored") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "abc");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -275,7 +275,7 @@ TEST_CASE("cpp::next_token #if x undefined is false") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "b");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -286,7 +286,7 @@ TEST_CASE("cpp::next_token #if x defined 0 is false") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "b");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -297,7 +297,7 @@ TEST_CASE("cpp::next_token #if x defined 1 is true") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -308,7 +308,7 @@ TEST_CASE("cpp::next_token #if defined(x) defined 0 is true") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -319,7 +319,7 @@ TEST_CASE("cpp::next_token #if defined(x) undefined is false") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "b");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -330,7 +330,7 @@ TEST_CASE("cpp::next_token #if !defined(x) undefined is true (not operator works
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -341,7 +341,7 @@ TEST_CASE("cpp::next_token #if 1 + 1 > 1 || 1 is true") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -352,7 +352,7 @@ TEST_CASE("cpp::next_token #if 1 + 1 > 1 is true") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -363,7 +363,7 @@ TEST_CASE("cpp::next_token #if 1 + 1 > 2 is false") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "b");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -374,7 +374,7 @@ TEST_CASE("cpp::next_token order of operations #if 0 - 1 - 2 == -3 is true") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -385,7 +385,7 @@ TEST_CASE("cpp::next_token #if parenthesis and order of operations") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -396,7 +396,7 @@ TEST_CASE("cpp::next_token #if inside #if parsed correctly") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -407,7 +407,7 @@ TEST_CASE("cpp::next_token #if ternary operator") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "y");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -418,7 +418,7 @@ TEST_CASE("cpp::next_token #if ternary operator precedence") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "x");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -435,7 +435,7 @@ TEST_CASE("cpp::next_token #define one value") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "def");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -445,16 +445,16 @@ TEST_CASE("cpp::next_token #define value with parenthesis") {
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::OpenParen);
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "def");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::CloseParen);
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -465,7 +465,7 @@ TEST_CASE("cpp::next_token #define function macro no parameters isn't replaced w
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "abc");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -476,7 +476,7 @@ TEST_CASE("cpp::next_token #define function macro no parameters is replaced when
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "def");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -487,12 +487,12 @@ TEST_CASE("cpp::next_token #define function macro one parameter basic case") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "a");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "b");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -510,12 +510,12 @@ TEST_CASE("cpp::next_token #define function higher order") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Integer);
     CHECK(token.v.integer.value == 2);
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Identifier);
     CHECK(token.v.identifier.str == "b");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -526,22 +526,22 @@ TEST_CASE("cpp::next_token #define varargs only param and no args") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Integer);
     CHECK(token.v.integer.value == 1);
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Integer);
     CHECK(token.v.integer.value == 2);
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Integer);
     CHECK(token.v.integer.value == 3);
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::Integer);
     CHECK(token.v.integer.value == 4);
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -552,7 +552,7 @@ TEST_CASE("cpp::next_token #define # make undefined identifier string") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::String);
     CHECK(token.v.string == "def");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -563,7 +563,7 @@ TEST_CASE("cpp::next_token #define # parameter") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::String);
     CHECK(token.v.string == "x");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -574,7 +574,7 @@ TEST_CASE("cpp::next_token #define # argument isn't expanded") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::String);
     CHECK(token.v.string == "x");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -585,7 +585,7 @@ TEST_CASE("cpp::next_token #define # after function call argument is expanded") 
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::String);
     CHECK(token.v.string == "y");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
@@ -598,7 +598,7 @@ TEST_CASE("cpp::next_token #define # parameter string double escapes it") {
     REQUIRE(EAT_NEXT().type == Result::Success);
     CHECK(token.type == Token::String);
     CHECK(token.v.string == "\"\\\"\\\\abc\\\"\"");
-    REQUIRE(context.errors.len() == 0);
+    CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
