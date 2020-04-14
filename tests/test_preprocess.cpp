@@ -684,6 +684,13 @@ TEST_CASE("cpp::next_token #define ## combine to make keyword") {
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
+TEST_CASE("cpp::next_token #define function no body") {
+    SETUP("#define abc()");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+    CHECK(context.errors.len() == 0);
+}
+
 static void check_keyword(const char* str, red::Token::Type type_expected) {
     SETUP(str);
 

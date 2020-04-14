@@ -902,12 +902,14 @@ static Result process_define(Context* context,
             definition.tokens.push(*token);
         }
 
-        Token* last_token = &definition.tokens.last();
-        if (last_token->type == Token::HashHash) {
-            // :ConcatErrors ## errors are assumed to be eliminated in next_token_in_definition
-            context->report_error(last_token->span,
-                                  "Token concatenation (`##`) must have a token after it");
-            definition.tokens.pop();
+        if (definition.tokens.len() > 0) {
+            Token* last_token = &definition.tokens.last();
+            if (last_token->type == Token::HashHash) {
+                // :ConcatErrors ## errors are assumed to be eliminated in next_token_in_definition
+                context->report_error(last_token->span,
+                                      "Token concatenation (`##`) must have a token after it");
+                definition.tokens.pop();
+            }
         }
 
         // kill parameters
