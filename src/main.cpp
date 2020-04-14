@@ -97,11 +97,12 @@ static int try_run_main(Context* context) {
             if (error.error_span.start.file != error.source_span.start.file ||
                 // error.error_span.start.index != error.source_span.start.index ||
                 error.error_span.end.index != error.source_span.end.index) {
-                fwrite(source_file.path.buffer, 1, source_file.path.len, stderr);
-                fprintf(stderr, ":%zu:%zu: Macro expanded from here:\n",
-                        error.source_span.start.line + 1, error.source_span.start.column + 1);
-
                 const File& error_file = context->files.files[error.error_span.start.file];
+
+                fwrite(error_file.path.buffer, 1, error_file.path.len, stderr);
+                fprintf(stderr, ":%zu:%zu: Macro expanded from here:\n",
+                        error.error_span.start.line + 1, error.error_span.start.column + 1);
+
                 draw_error_span(&error_file.contents, error.error_span);
             }
         }
