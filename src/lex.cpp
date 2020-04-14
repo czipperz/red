@@ -19,73 +19,79 @@ top:
 
     *out = file_contents.get(location->index);
 
-    if (location->index + 1 < file_contents.len) {
-        char next = file_contents.get(location->index + 1);
-        if (*out == '?' && location->index + 2 < file_contents.len) {
-            if (next == '?') {
-                switch (file_contents.get(location->index + 2)) {
-                    case '=':
-                        *out = '#';
-                        break;
-                    case '/':
-                        *out = '\\';
-                        break;
-                    case '\'':
-                        *out = '^';
-                        break;
-                    case '(':
-                        *out = '[';
-                        break;
-                    case ')':
-                        *out = ']';
-                        break;
-                    case '!':
-                        *out = '|';
-                        break;
-                    case '<':
-                        *out = '{';
-                        break;
-                    case '>':
-                        *out = '}';
-                        break;
-                    case '-':
-                        *out = '~';
-                        break;
-                    default:
-                        ++location->index;
-                        ++location->column;
-                        *out = '?';
-                        return true;
-                }
+switch_:
+    switch (*out) {
+        case '\\': {
+            if (file_contents.get(location->index + 1) == '\n') {
                 location->index += 2;
-                location->column += 2;
+                ++location->line;
+                location->column = 0;
+                goto top;
+            }
+            goto default_;
+        }
 
-                if (location->index + 1 == file_contents.len) {
-                    ++location->index;
-                    ++location->column;
+        case '?': {
+            if (location->index + 2 < file_contents.len) {
+                if (file_contents.get(location->index + 1) == '?') {
+                    switch (file_contents.get(location->index + 2)) {
+                        case '=':
+                            *out = '#';
+                            break;
+                        case '/':
+                            *out = '\\';
+                            location->index += 2;
+                            location->column += 2;
+                            goto switch_;
+                        case '\'':
+                            *out = '^';
+                            break;
+                        case '(':
+                            *out = '[';
+                            break;
+                        case ')':
+                            *out = ']';
+                            break;
+                        case '!':
+                            *out = '|';
+                            break;
+                        case '<':
+                            *out = '{';
+                            break;
+                        case '>':
+                            *out = '}';
+                            break;
+                        case '-':
+                            *out = '~';
+                            break;
+                        default:
+                            ++location->index;
+                            ++location->column;
+                            *out = '?';
+                            return true;
+                    }
+
+                    location->index += 3;
+                    location->column += 3;
+
                     return true;
                 }
-
-                next = file_contents.get(location->index + 1);
             }
+            goto default_;
         }
 
-        if (*out == '\\' && next == '\n') {
-            location->index += 2;
+        case '\n':
+            ++location->index;
             ++location->line;
             location->column = 0;
-            goto top;
-        }
-    }
+            return true;
 
-    ++location->index;
-    if (*out == '\n') {
-        ++location->line;
-        location->column = 0;
-    } else {
-        ++location->column;
+        default:
+        default_:
+            ++location->index;
+            ++location->column;
+            return true;
     }
-    return true;
 }
 
 static bool process_escaped_string(char* c) {
