@@ -333,13 +333,45 @@ top:
                     return false;
                 }
 
-                if (c == '"') {
+                if (c == '\\') {
+                    if (!next_character(file_contents, &point, &c)) {
+                        context->report_error({start, point}, "Unterminated string");
+                        value.drop(lexer->string_buffer_array.allocator());
+                        return false;
+                    }
+
+                    switch (c) {
+                        case '\\':
+                        case '"':
+                            break;
+                        case 'n':
+                            c = '\n';
+                            break;
+                        case 't':
+                            c = '\t';
+                            break;
+                        case 'f':
+                            c = '\f';
+                            break;
+                        case 'r':
+                            c = '\r';
+                            break;
+                        case 'v':
+                            c = '\v';
+                            break;
+                        default:
+                            context->report_error({*location, point},
+                                                  "Undefined escape sequence `\\", c, "`");
+                            goto skip_char;
+                    }
+                } else if (c == '"') {
                     break;
                 }
 
                 value.reserve(lexer->string_buffer_array.allocator(), 1);
                 value.push(c);
 
+            skip_char:
                 *location = point;
             }
 

@@ -398,3 +398,12 @@ TEST_CASE("next_token() __VAR_ARGS__") {
 TEST_CASE("next_token() ...") {
     check_keyword("...", red::Token::Preprocessor_Varargs_Parameter_Indicator);
 }
+
+TEST_CASE("next_token() string with escape characters") {
+    SETUP("\"\\\"\\\\abc\\\"\"");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.type == red::Token::String);
+    CHECK(token.v.string == "\"\\abc\"");
+    REQUIRE(context.errors.len() == 0);
+}

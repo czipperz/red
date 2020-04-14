@@ -589,3 +589,16 @@ TEST_CASE("cpp::next_token #define # after function call argument is expanded") 
 
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
+
+TEST_CASE("cpp::next_token #define # parameter string double escapes it") {
+    SETUP("#define abc(def) #def\nabc(\"\\\"\\\\abc\\\"\")");
+    // string syntax = "\"\\abc\""
+    // string value = "\abc"
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::String);
+    CHECK(token.v.string == "\"\\\"\\\\abc\\\"\"");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}

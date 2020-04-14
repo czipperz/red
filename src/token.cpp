@@ -68,8 +68,33 @@ Result write(Writer writer, red::Token token) {
             return write(writer, '#');
         case Token::HashHash:
             return write(writer, "##");
-        case Token::String:
-            return write(writer, token.v.string);
+        case Token::String: {
+            CZ_TRY(write(writer, '"'));
+            for (size_t i = 0; i < token.v.string.len; ++i) {
+                char c = token.v.string[i];
+                if (c == '\\' || c == '"') {
+                    CZ_TRY(write(writer, '\\'));
+                } else if (c == '\n') {
+                    CZ_TRY(write(writer, '\\'));
+                    c = 'n';
+                } else if (c == '\t') {
+                    CZ_TRY(write(writer, '\\'));
+                    c = 't';
+                } else if (c == '\f') {
+                    CZ_TRY(write(writer, '\\'));
+                    c = 'f';
+                } else if (c == '\r') {
+                    CZ_TRY(write(writer, '\\'));
+                    c = 'r';
+                } else if (c == '\v') {
+                    CZ_TRY(write(writer, '\\'));
+                    c = 'v';
+                }
+                CZ_TRY(write(writer, c));
+            }
+            CZ_TRY(write(writer, '"'));
+            return Result::ok();
+        }
         case Token::Integer:
             CZ_TRY(write(writer, token.v.integer.value));
             if (token.v.integer.suffix & Integer_Suffix::Unsigned) {
