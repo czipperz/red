@@ -302,6 +302,7 @@ static Result process_if_false(Context* context,
                     }
                 } else if (token->v.identifier.str == "elif") {
                     if (allow_else && skip_depth == 0) {
+                        preprocessor->include_stack.last().if_depth--;
                         return process_if(context, preprocessor, lexer, token);
                     }
                 } else if (token->v.identifier.str == "endif") {

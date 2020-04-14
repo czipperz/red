@@ -444,6 +444,7 @@ TEST_CASE("cpp::next_token #if taken #elif ignored") {
     CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("cpp::next_token #elif taken") {
@@ -455,6 +456,7 @@ TEST_CASE("cpp::next_token #elif taken") {
     CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("cpp::next_token #elif not taken") {
@@ -466,6 +468,7 @@ TEST_CASE("cpp::next_token #elif not taken") {
     CHECK(context.errors.len() == 0);
 
     REQUIRE(EAT_NEXT().type == Result::Done);
+    CHECK(context.errors.len() == 0);
 }
 
 TEST_CASE("cpp::next_token #define no value") {
