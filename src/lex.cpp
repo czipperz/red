@@ -296,6 +296,9 @@ top:
         case '?':
             token_out->type = Token::QuestionMark;
             break;
+        case '~':
+            token_out->type = Token::Tilde;
+            break;
         case '!': {
             *location = point;
             char next;

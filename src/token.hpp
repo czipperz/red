@@ -35,6 +35,7 @@ struct Token {
         Semicolon,
         Not,
         QuestionMark,
+        Tilde,
         Colon,
         ColonColon,
         Hash,

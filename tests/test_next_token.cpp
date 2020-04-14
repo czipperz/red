@@ -294,6 +294,10 @@ TEST_CASE("next_token() and") {
     check_keyword("&&", red::Token::And);
 }
 
+TEST_CASE("next_token() tilde") {
+    check_keyword("~", red::Token::Tilde);
+}
+
 TEST_CASE("next_token() ...") {
     check_keyword("...", red::Token::Preprocessor_Varargs_Parameter_Indicator);
 }
