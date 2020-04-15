@@ -15,13 +15,25 @@ struct Type_Pointer;
 struct alignas(4) Type {
     enum Tag {
         Builtin_Char,
-        Builtin_Double,
+        Builtin_Signed_Char,
+        Builtin_Unsigned_Char,
+
         Builtin_Float,
-        Builtin_Int,
-        Builtin_Long,
-        Builtin_Short,
+        Builtin_Double,
+        Builtin_Long_Double,
+
+        Builtin_Signed_Short,
+        Builtin_Signed_Int,
+        Builtin_Signed_Long,
+        Builtin_Signed_Long_Long,
+        Builtin_Unsigned_Short,
+        Builtin_Unsigned_Int,
+        Builtin_Unsigned_Long,
+        Builtin_Unsigned_Long_Long,
+
         Builtin_Void,
         Builtin_Error,
+
         Enum,
         Struct,
         Union,
@@ -208,12 +220,24 @@ struct Parser {
     cz::Vector<cz::Str_Map<Declaration> > declaration_stack;
 
     cz::Buffer_Array buffer_array;
+
     Type* type_char;
-    Type* type_double;
+    Type* type_signed_char;
+    Type* type_unsigned_char;
+
     Type* type_float;
-    Type* type_int;
-    Type* type_long;
-    Type* type_short;
+    Type* type_double;
+    Type* type_long_double;
+
+    Type* type_signed_short;
+    Type* type_signed_int;
+    Type* type_signed_long;
+    Type* type_signed_long_long;
+    Type* type_unsigned_short;
+    Type* type_unsigned_int;
+    Type* type_unsigned_long;
+    Type* type_unsigned_long_long;
+
     Type* type_void;
     Type* type_error;
 

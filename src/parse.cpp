@@ -19,12 +19,26 @@ static Type* make_primitive(cz::Allocator allocator, Type::Tag tag) {
 void Parser::init() {
     lexer.init();
     buffer_array.create();
+
     type_char = make_primitive(buffer_array.allocator(), Type::Builtin_Char);
-    type_double = make_primitive(buffer_array.allocator(), Type::Builtin_Double);
+    type_signed_char = make_primitive(buffer_array.allocator(), Type::Builtin_Signed_Char);
+    type_unsigned_char = make_primitive(buffer_array.allocator(), Type::Builtin_Unsigned_Char);
+
     type_float = make_primitive(buffer_array.allocator(), Type::Builtin_Float);
-    type_int = make_primitive(buffer_array.allocator(), Type::Builtin_Int);
-    type_long = make_primitive(buffer_array.allocator(), Type::Builtin_Long);
-    type_short = make_primitive(buffer_array.allocator(), Type::Builtin_Short);
+    type_double = make_primitive(buffer_array.allocator(), Type::Builtin_Double);
+    type_long_double = make_primitive(buffer_array.allocator(), Type::Builtin_Long_Double);
+
+    type_signed_short = make_primitive(buffer_array.allocator(), Type::Builtin_Signed_Short);
+    type_signed_int = make_primitive(buffer_array.allocator(), Type::Builtin_Signed_Int);
+    type_signed_long = make_primitive(buffer_array.allocator(), Type::Builtin_Signed_Long);
+    type_signed_long_long =
+        make_primitive(buffer_array.allocator(), Type::Builtin_Signed_Long_Long);
+    type_unsigned_short = make_primitive(buffer_array.allocator(), Type::Builtin_Unsigned_Short);
+    type_unsigned_int = make_primitive(buffer_array.allocator(), Type::Builtin_Unsigned_Int);
+    type_unsigned_long = make_primitive(buffer_array.allocator(), Type::Builtin_Unsigned_Long);
+    type_unsigned_long_long =
+        make_primitive(buffer_array.allocator(), Type::Builtin_Unsigned_Long_Long);
+
     type_void = make_primitive(buffer_array.allocator(), Type::Builtin_Void);
     type_error = make_primitive(buffer_array.allocator(), Type::Builtin_Error);
     back.type = Token::Parser_Null_Token;
@@ -798,7 +812,7 @@ static Result parse_base_type(Context* context,
                         if (!declarations->get(key.str, key.hash)) {
                             Declaration declaration = {};
                             // Todo: expand to long / long long when values are too big
-                            declaration.type.set_type(parser->type_int);
+                            declaration.type.set_type(parser->type_signed_int);
                             declaration.type.set_const();
                             declarations->insert(key.str, key.hash, declaration);
 
@@ -913,13 +927,13 @@ static Result parse_base_type(Context* context,
             base_type->set_type(parser->type_float);
             break;
         case Token::Int:
-            base_type->set_type(parser->type_int);
+            base_type->set_type(parser->type_signed_int);
             break;
         case Token::Long:
-            base_type->set_type(parser->type_long);
+            base_type->set_type(parser->type_signed_long);
             break;
         case Token::Short:
-            base_type->set_type(parser->type_short);
+            base_type->set_type(parser->type_signed_short);
             break;
         case Token::Void:
             base_type->set_type(parser->type_void);

@@ -59,7 +59,7 @@ TEST_CASE("parse_declaration type with identifier") {
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
-    CHECK(abc->type.get_type() == parser.type_int);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
@@ -77,13 +77,13 @@ TEST_CASE("parse_declaration two variables same type") {
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
-    CHECK(abc->type.get_type() == parser.type_int);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
     Declaration* def = parser.declaration_stack[0].get_hash("def");
     REQUIRE(def);
-    CHECK(def->type.get_type() == parser.type_int);
+    CHECK(def->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
 
@@ -101,13 +101,13 @@ TEST_CASE("parse_declaration const applies to both variables") {
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
-    CHECK(abc->type.get_type() == parser.type_int);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
     Declaration* def = parser.declaration_stack[0].get_hash("def");
     REQUIRE(def);
-    CHECK(def->type.get_type() == parser.type_int);
+    CHECK(def->type.get_type() == parser.type_signed_int);
     CHECK(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
 
@@ -125,7 +125,7 @@ TEST_CASE("parse_declaration second variable is pointer") {
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
-    CHECK(abc->type.get_type() == parser.type_int);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
@@ -137,7 +137,7 @@ TEST_CASE("parse_declaration second variable is pointer") {
     REQUIRE(def_t);
     REQUIRE(def_t->tag == Type::Pointer);
     Type_Pointer* def_type = (Type_Pointer*)def_t;
-    CHECK(def_type->inner.get_type() == parser.type_int);
+    CHECK(def_type->inner.get_type() == parser.type_signed_int);
     CHECK_FALSE(def_type->inner.is_const());
     CHECK_FALSE(def_type->inner.is_volatile());
 
@@ -155,7 +155,7 @@ TEST_CASE("parse_declaration const cannot be used after an identifier") {
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
-    CHECK(abc->type.get_type() == parser.type_int);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
@@ -223,7 +223,7 @@ TEST_CASE("parse_declaration struct named two fields") {
     REQUIRE(ts->declarations.count == 2);
     Declaration* x = ts->declarations.get_hash("x");
     REQUIRE(x);
-    CHECK(x->type.get_type() == parser.type_int);
+    CHECK(x->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(x->type.is_const());
     CHECK_FALSE(x->type.is_volatile());
     Declaration* y = ts->declarations.get_hash("y");
@@ -337,7 +337,7 @@ TEST_CASE("parse_declaration union named two fields") {
     REQUIRE(ts->declarations.count == 2);
     Declaration* x = ts->declarations.get_hash("x");
     REQUIRE(x);
-    CHECK(x->type.get_type() == parser.type_int);
+    CHECK(x->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(x->type.is_const());
     CHECK_FALSE(x->type.is_volatile());
     Declaration* y = ts->declarations.get_hash("y");
@@ -808,7 +808,7 @@ TEST_CASE("parse_declaration_or_statement type with identifier") {
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
-    CHECK(abc->type.get_type() == parser.type_int);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
@@ -826,13 +826,13 @@ TEST_CASE("parse_declaration two variables first has initializer") {
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
-    CHECK(abc->type.get_type() == parser.type_int);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
     Declaration* def = parser.declaration_stack[0].get_hash("def");
     REQUIRE(def);
-    CHECK(def->type.get_type() == parser.type_int);
+    CHECK(def->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
 
