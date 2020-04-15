@@ -332,3 +332,25 @@ TEST_CASE("next_token() string with escape characters") {
     CHECK(token.v.string == "\"\\abc\"");
     REQUIRE(context.errors.len() == 0);
 }
+
+TEST_CASE("next_token() identifier trigraph backslash and then newline") {
+    SETUP("ab?""?/\nc");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.type == red::Token::Identifier);
+    CHECK(token.v.string == "abc");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(!next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+}
+
+TEST_CASE("next_token() identifier backslash and then newline") {
+    SETUP("ab\\\nc");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.type == red::Token::Identifier);
+    CHECK(token.v.string == "abc");
+    REQUIRE(context.errors.len() == 0);
+
+    REQUIRE(!next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+}
