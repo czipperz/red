@@ -1,17 +1,23 @@
 #include "test_base.hpp"
 
+#include <cz/defer.hpp>
+#include <cz/heap.hpp>
 #include "file_contents.hpp"
 #include "lex.hpp"
 #include "location.hpp"
 
 using red::lex::next_character;
 
-TEST_CASE("next_character() empty file") {
-    red::File_Contents file_contents = {};
-
-    red::Location location = {};
+#define SETUP(CONTENTS)                                       \
+    red::File_Contents file_contents = {};                    \
+    file_contents.load_str(CONTENTS, cz::heap_allocator());   \
+    CZ_DEFER(file_contents.drop_array(cz::heap_allocator())); \
+                                                              \
+    red::Location location = {};                              \
     char ch;
 
+TEST_CASE("next_character() empty file") {
+    SETUP("");
     REQUIRE_FALSE(next_character(file_contents, &location, &ch));
     CHECK(location.index == 0);
     CHECK(location.line == 0);
@@ -19,14 +25,8 @@ TEST_CASE("next_character() empty file") {
 }
 
 TEST_CASE("next_character() normal chars") {
-    red::File_Contents file_contents = {};
-    char* buffer = (char*)"abc";
-    file_contents.buffers = &buffer;
-    file_contents.buffers_len = 1;
-    file_contents.len = strlen(buffer);
+    SETUP("abc");
 
-    red::Location location = {};
-    char ch;
     REQUIRE(next_character(file_contents, &location, &ch));
     CHECK(ch == 'a');
     CHECK(location.index == 1);
@@ -46,14 +46,9 @@ TEST_CASE("next_character() normal chars") {
 }
 
 TEST_CASE("next_character() trigraph") {
-    red::File_Contents file_contents = {};
-    char* buffer = (char*)"??""<";
-    file_contents.buffers = &buffer;
-    file_contents.buffers_len = 1;
-    file_contents.len = strlen(buffer);
-
-    red::Location location = {};
-    char ch;
+    SETUP(
+        "??"
+        "<");
 
     REQUIRE(next_character(file_contents, &location, &ch));
     CHECK(ch == '{');
@@ -63,14 +58,8 @@ TEST_CASE("next_character() trigraph") {
 }
 
 TEST_CASE("next_character() question mark chain no trigraphs") {
-    red::File_Contents file_contents = {};
-    char* buffer = (char*)"??????";
-    file_contents.buffers = &buffer;
-    file_contents.buffers_len = 1;
-    file_contents.len = strlen(buffer);
+    SETUP("??????");
 
-    red::Location location = {};
-    char ch;
     REQUIRE(next_character(file_contents, &location, &ch));
     REQUIRE(ch == '?');
     CHECK(location.index == 1);
@@ -100,14 +89,7 @@ TEST_CASE("next_character() question mark chain no trigraphs") {
 }
 
 TEST_CASE("next_character() backslash newline") {
-    red::File_Contents file_contents = {};
-    char* buffer = (char*)"\\\na";
-    file_contents.buffers = &buffer;
-    file_contents.buffers_len = 1;
-    file_contents.len = strlen(buffer);
-
-    red::Location location = {};
-    char ch;
+    SETUP("\\\na");
 
     REQUIRE(next_character(file_contents, &location, &ch));
     REQUIRE(ch == 'a');
@@ -117,14 +99,9 @@ TEST_CASE("next_character() backslash newline") {
 }
 
 TEST_CASE("next_character() backslash trigraph newline") {
-    red::File_Contents file_contents = {};
-    char* buffer = (char*)"??""/\na";
-    file_contents.buffers = &buffer;
-    file_contents.buffers_len = 1;
-    file_contents.len = strlen(buffer);
-
-    red::Location location = {};
-    char ch;
+    SETUP(
+        "??"
+        "/\na");
 
     REQUIRE(next_character(file_contents, &location, &ch));
     CHECK(ch == 'a');
@@ -134,14 +111,8 @@ TEST_CASE("next_character() backslash trigraph newline") {
 }
 
 TEST_CASE("next_character() newline") {
-    red::File_Contents file_contents = {};
-    char* buffer = (char*)"a\nb";
-    file_contents.buffers = &buffer;
-    file_contents.buffers_len = 1;
-    file_contents.len = strlen(buffer);
+    SETUP("a\nb");
 
-    red::Location location = {};
-    char ch;
     REQUIRE(next_character(file_contents, &location, &ch));
     CHECK(ch == 'a');
     CHECK(location.index == 1);
@@ -162,14 +133,10 @@ TEST_CASE("next_character() newline") {
 }
 
 TEST_CASE("next_character() trigraph interrupted by backslash newline isn't a trigraph") {
-    red::File_Contents file_contents = {};
-    char* buffer = (char*)"??""\\\n>a";
-    file_contents.buffers = &buffer;
-    file_contents.buffers_len = 1;
-    file_contents.len = strlen(buffer);
+    SETUP(
+        "??"
+        "\\\n>a");
 
-    red::Location location = {};
-    char ch;
     REQUIRE(next_character(file_contents, &location, &ch));
     CHECK(ch == '?');
     CHECK(location.index == 1);
@@ -190,14 +157,7 @@ TEST_CASE("next_character() trigraph interrupted by backslash newline isn't a tr
 }
 
 TEST_CASE("next_character() backslash newline repeatedly handled") {
-    red::File_Contents file_contents = {};
-    char* buffer = (char*)"\\\n\\\n\\\n0";
-    file_contents.buffers = &buffer;
-    file_contents.buffers_len = 1;
-    file_contents.len = strlen(buffer);
-
-    red::Location location = {};
-    char ch;
+    SETUP("\\\n\\\n\\\n0");
 
     REQUIRE(next_character(file_contents, &location, &ch));
     CHECK(location.index == 7);

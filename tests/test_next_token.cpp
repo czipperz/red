@@ -13,8 +13,9 @@ using red::lex::Lexer;
 using red::lex::next_token;
 
 #define SETUP(CONTENTS)                                     \
-    char* buffer = (char*)(CONTENTS);                       \
-    red::File_Contents file_contents = mem_buffer(&buffer); \
+    red::File_Contents file_contents = {};                  \
+    file_contents.load_str(CONTENTS, cz::heap_allocator()); \
+                                                            \
     red::Location location = {};                            \
     red::Token token = {};                                  \
     bool is_bol = false;                                    \
@@ -26,17 +27,10 @@ using red::lex::next_token;
     context.init();                                         \
                                                             \
     CZ_DEFER({                                              \
+        file_contents.drop_array(cz::heap_allocator());     \
         lexer.drop();                                       \
         context.destroy();                                  \
     });
-
-red::File_Contents mem_buffer(char** buffers) {
-    red::File_Contents file_contents;
-    file_contents.buffers = buffers;
-    file_contents.buffers_len = 1;
-    file_contents.len = strlen(buffers[0]);
-    return file_contents;
-}
 
 TEST_CASE("next_token() basic symbol") {
     SETUP("<");
@@ -334,7 +328,9 @@ TEST_CASE("next_token() string with escape characters") {
 }
 
 TEST_CASE("next_token() identifier trigraph backslash and then newline") {
-    SETUP("ab?""?/\nc");
+    SETUP(
+        "ab?"
+        "?/\nc");
 
     REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
     CHECK(token.type == red::Token::Identifier);
