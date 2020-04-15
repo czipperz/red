@@ -120,7 +120,7 @@ static Result peek_token(Context* context, Parser* parser, Token* token) {
         return Result::ok();
     }
     Result result = cpp::next_token(context, &parser->preprocessor, &parser->lexer, token);
-    if (result.is_ok()) {
+    if (result.type == Result::Success) {
         parser->back = *token;
     }
     return result;
@@ -1311,7 +1311,7 @@ Result parse_declaration_(Context* context, Parser* parser, cz::Vector<Statement
     Token token;
     Result result = peek_token(context, parser, &token);
     CZ_TRY_VAR(result);
-    if (result.is_ok() && token.type == Token::Semicolon) {
+    if (result.type == Result::Success && token.type == Token::Semicolon) {
         parser->back.type = Token::Parser_Null_Token;
         return Result::ok();
     }
@@ -1332,7 +1332,7 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
     Token token;
     Result result = peek_token(context, parser, &token);
     CZ_TRY_VAR(result);
-    if (result.is_ok() && token.type == Token::Typedef) {
+    if (result.type == Result::Success && token.type == Token::Typedef) {
         parser->back.type = Token::Parser_Null_Token;
 
         size_t len = initializers->len();
@@ -1408,7 +1408,7 @@ Result parse_declaration_or_statement(Context* context,
 
                 Statement* statement;
                 result = parse_statement(context, parser, &statement);
-                if (result.is_ok()) {
+                if (result.type == Result::Success) {
                     statements->reserve(cz::heap_allocator(), 1);
                     statements->push(statement);
                 }
@@ -1428,7 +1428,7 @@ Result parse_declaration_or_statement(Context* context,
 
             Statement* statement;
             result = parse_statement(context, parser, &statement);
-            if (result.is_ok()) {
+            if (result.type == Result::Success) {
                 statements->reserve(cz::heap_allocator(), 1);
                 statements->push(statement);
             }

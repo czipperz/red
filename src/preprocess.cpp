@@ -1521,7 +1521,7 @@ Result next_token(Context* context,
                   lex::Lexer* lexer,
                   Token* token) {
     Result result = pre::next_token(context, preprocessor, lexer, token);
-    if (result.is_ok() && token->type == Token::Identifier) {
+    if (result.type == Result::Success && token->type == Token::Identifier) {
         ZoneScopedN("cpp::next_token keyword");
 
         struct Keyword {
