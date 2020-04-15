@@ -516,6 +516,15 @@ static Result parse_and_eval_expression(Context* context,
             case Token::Or:
                 precedence = 15;
                 break;
+            case Token::Xor:
+                precedence = 12;
+                break;
+            case Token::LeftShift:
+                precedence = 7;
+                break;
+            case Token::RightShift:
+                precedence = 7;
+                break;
             default:
                 context->report_error(tokens[*index].span, if_span,
                                       "Expected binary operator here to connect expressions");
@@ -554,6 +563,9 @@ static Result parse_and_eval_expression(Context* context,
             CASE(Token::And, &&);
             CASE(Token::Pipe, |);
             CASE(Token::Or, ||);
+            CASE(Token::Xor, ^);
+            CASE(Token::LeftShift, <<);
+            CASE(Token::RightShift, >>);
 #undef CASE
             default:
                 CZ_PANIC("Unimplemented eval_expression operator");
