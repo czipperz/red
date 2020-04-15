@@ -1,5 +1,6 @@
 #include "load.hpp"
 
+#include <Tracy.hpp>
 #include <cz/heap.hpp>
 #include <cz/try.hpp>
 #include "file.hpp"
@@ -38,6 +39,8 @@ void force_include_file(Files* files,
 }
 
 Result include_file(Files* files, pre::Preprocessor* preprocessor, cz::String file_path) {
+    ZoneScoped;
+
     // We don't want to reload the file if we've already loaded it.
     cz::Hash hash = Hashed_Str::hash_str(file_path);
     for (size_t index = 0; index < files->file_path_hashes.len(); ++index) {
@@ -53,16 +56,25 @@ Result include_file(Files* files, pre::Preprocessor* preprocessor, cz::String fi
         }
     }
 
-    // Load the file from disk.
-    include_file_reserve(files, preprocessor);
+    {
+        ZoneScopedN("include_file loading file");
+#ifdef TRACY_ENABLE
+        char buffer[1024];
+        size_t len = snprintf(buffer, 1024, "include_file loading file %s", file_path.buffer());
+        ZoneName(buffer, len);
+#endif
 
-    File_Contents file_contents;
-    CZ_TRY(file_contents.read(file_path.buffer(), files->file_array_buffer_array.allocator()));
+        // Load the file from disk.
+        include_file_reserve(files, preprocessor);
 
-    file_path.realloc(files->file_path_buffer_array.allocator());
-    force_include_file(files, preprocessor, {file_path, hash}, file_contents);
+        File_Contents file_contents;
+        CZ_TRY(file_contents.read(file_path.buffer(), files->file_array_buffer_array.allocator()));
 
-    return Result::ok();
+        file_path.realloc(files->file_path_buffer_array.allocator());
+        force_include_file(files, preprocessor, {file_path, hash}, file_contents);
+
+        return Result::ok();
+    }
 }
 
 }
