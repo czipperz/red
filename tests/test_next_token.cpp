@@ -84,7 +84,11 @@ TEST_CASE("next_token() basic identifier") {
     REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
     CHECK(token.type == red::Token::Identifier);
     CHECK(token.span.start.index == 0);
+    CHECK(token.span.start.line == 0);
+    CHECK(token.span.start.column == 0);
     CHECK(token.span.end.index == 3);
+    CHECK(token.span.end.line == 0);
+    CHECK(token.span.end.column == 3);
     CHECK(is_bol == false);
     CHECK(token.v.identifier.str == "abc");
 }
@@ -284,9 +288,27 @@ TEST_CASE("next_token() Block comment is not recursive") {
 }
 
 TEST_CASE("next_token() Block comment star in middle") {
-    SETUP("/* *abc */");
+    SETUP("/* *abc */ xyz");
 
-    REQUIRE_FALSE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 11);
+    CHECK(token.span.start.line == 0);
+    CHECK(token.span.start.column == 11);
+    CHECK(token.span.end.index == 14);
+    CHECK(token.span.end.line == 0);
+    CHECK(token.span.end.column == 14);
+}
+
+TEST_CASE("next_token() Block comment multiline star in middle") {
+    SETUP("/* \n*abc \n*/ xyz");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 13);
+    CHECK(token.span.start.line == 2);
+    CHECK(token.span.start.column == 3);
+    CHECK(token.span.end.index == 16);
+    CHECK(token.span.end.line == 2);
+    CHECK(token.span.end.column == 6);
 }
 
 void check_keyword(const char* str, red::Token::Type type_expected) {

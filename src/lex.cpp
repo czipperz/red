@@ -265,7 +265,7 @@ static void next_token_identifier(Lexer* lexer,
 
 commit_cheap_identifier : {
     token_out->type = Token::Identifier;
-    point.column += point.index - location->index;
+    point.column += point.index - location->index - 1;
     size_t start_base = file_contents.get_base(location->index);
     size_t end_base = file_contents.get_base(point.index);
     size_t start_offset = file_contents.get_offset(location->index);
@@ -483,41 +483,38 @@ top:
             if (next_character(file_contents, &point, &next)) {
                 if (next == '*') {
                     ZoneScopedN("lex::next_token block comment");
+                    size_t start_index = point.index - point.column;
                     while (1) {
                     block_comment_switch:
                         switch (file_contents.get(point.index)) {
-                            case '*': {
-                                size_t start_index = point.index;
+                            case '*':
                                 ++point.index;
                                 while (1) {
                                     switch (file_contents.get(point.index)) {
                                         case '*':
                                             ++point.index;
-                                            ++point.column;
                                             continue;
 
                                         case File_Contents::eof:
+                                            point.column = point.index - start_index;
                                             context->report_lex_error({*location, point},
                                                                       "Unterminated block comment");
-                                            point.column += point.index - start_index;
                                             *location = point;
                                             return false;
 
                                         case '/':
                                             ++point.index;
-                                            point.column += point.index - start_index;
+                                            point.column = point.index - start_index;
                                             *location = point;
                                             goto top;
 
                                         default:
-                                            point.column += point.index - start_index;
                                             goto block_comment_switch;
                                     }
                                 }
-                                break;
-                            }
 
                             case File_Contents::eof:
+                                point.column = point.index - start_index;
                                 context->report_lex_error({*location, point},
                                                           "Unterminated block comment");
                                 *location = point;
@@ -526,12 +523,11 @@ top:
                             case '\n':
                                 ++point.index;
                                 ++point.line;
-                                point.column = 0;
+                                start_index = point.index;
                                 break;
 
                             default:
                                 ++point.index;
-                                ++point.column;
                                 break;
                         }
                     }
