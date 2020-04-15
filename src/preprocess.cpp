@@ -975,7 +975,14 @@ static Result process_define(Context* context,
 
 end_definition:
     preprocessor->definitions.reserve(cz::heap_allocator(), 1);
-    preprocessor->definitions.insert(identifier.str, identifier.hash, definition);
+
+    Definition* dd = preprocessor->definitions.get(identifier.str, identifier.hash);
+    if (dd) {
+        dd->drop(cz::heap_allocator());
+        *dd = definition;
+    } else {
+        preprocessor->definitions.insert(identifier.str, identifier.hash, definition);
+    }
 
     return process_next(context, preprocessor, lexer, token, at_bol, at_bol);
 }
@@ -1003,7 +1010,12 @@ static Result process_undef(Context* context,
         return SKIP_UNTIL_EOL();
     }
 
-    preprocessor->definitions.remove(token->v.identifier.str, token->v.identifier.hash);
+    size_t index;
+    if (preprocessor->definitions.index_of(token->v.identifier.str, token->v.identifier.hash,
+                                           &index)) {
+        preprocessor->definitions.values[index].drop(cz::heap_allocator());
+        preprocessor->definitions.set_tombstone(index);
+    }
 
     return SKIP_UNTIL_EOL();
 }
