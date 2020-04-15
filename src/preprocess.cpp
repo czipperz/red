@@ -29,7 +29,11 @@ void Preprocessor::destroy() {
     }
     definitions.drop(cz::heap_allocator());
 
+    for (size_t i = 0; i < include_stack.len(); ++i) {
+        include_stack[i].if_stack.drop(cz::heap_allocator());
+    }
     include_stack.drop(cz::heap_allocator());
+
     definition_stack.drop(cz::heap_allocator());
 }
 
