@@ -24,14 +24,13 @@ struct File_Contents {
     void drop_buffers();
     void drop_array(cz::Allocator buffers_array_allocator);
 
+    size_t get_base(size_t index) const { return (index & outer_mask) >> buffer_size_bits; }
+
+    size_t get_offset(size_t index) const { return index & inner_mask; }
+
     char get(size_t index) const {
         CZ_DEBUG_ASSERT(index < len);
-
-        size_t outer = (index & outer_mask) >> buffer_size_bits;
-        CZ_DEBUG_ASSERT(outer < buffers_len);
-
-        size_t inner = index & inner_mask;
-        return buffers[outer][inner];
+        return buffers[get_base(index)][get_offset(index)];
     }
 };
 
