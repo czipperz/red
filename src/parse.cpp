@@ -41,6 +41,7 @@ void Parser::init() {
 
     type_void = make_primitive(buffer_array.allocator(), Type::Builtin_Void);
     type_error = make_primitive(buffer_array.allocator(), Type::Builtin_Error);
+
     back.type = Token::Parser_Null_Token;
 
     type_stack.reserve(cz::heap_allocator(), 4);
@@ -160,20 +161,28 @@ static Type** lookup_type(Parser* parser, Hashed_Str id) {
     return nullptr;
 }
 
+static void parse_const(Context* context, TypeP* type, Token token, Span source_span) {
+    if (type->is_const()) {
+        context->report_error(token.span, source_span, "Multiple `const` attributes");
+    }
+    type->set_const();
+}
+
+static void parse_volatile(Context* context, TypeP* type, Token token, Span source_span) {
+    if (type->is_volatile()) {
+        context->report_error(token.span, source_span, "Multiple `volatile` attributes");
+    }
+    type->set_volatile();
+}
+
 static bool parse_type_qualifier(Context* context, TypeP* type, Token token, Span source_span) {
     switch (token.type) {
         case Token::Const:
-            if (type->is_const()) {
-                context->report_error(token.span, source_span, "Multiple `const` attributes");
-            }
-            type->set_const();
+            parse_const(context, type, token, source_span);
             return true;
 
         case Token::Volatile:
-            if (type->is_volatile()) {
-                context->report_error(token.span, source_span, "Multiple `volatile` attributes");
-            }
-            type->set_volatile();
+            parse_volatile(context, type, token, source_span);
             return true;
 
         default:
@@ -404,366 +413,491 @@ static Result parse_enum_body(Context* context,
     }
 }
 
+struct Numeric_Base {
+    uint32_t flags;
+
+    enum : uint32_t {
+        Char_Index = 1 - 1,
+        Double_Index = 2 - 1,
+        Float_Index = 3 - 1,
+        Int_Index = 4 - 1,
+        Short_Index = 5 - 1,
+        Long_Index = 6 - 1,
+        Long_Long_Index = 7 - 1,
+        Signed_Index = 8 - 1,
+        Unsigned_Index = 9 - 1,
+
+        Char = 1 << Char_Index + 1,
+        Double = 1 << Double_Index + 1,
+        Float = 1 << Float_Index + 1,
+        Int = 1 << Int_Index + 1,
+        Short = 1 << Short_Index + 1,
+        Long = 1 << Long_Index + 1,
+        Long_Long = 1 << Long_Long_Index + 1,
+        Signed = 1 << Signed_Index + 1,
+        Unsigned = 1 << Unsigned_Index + 1,
+    };
+};
+
 static Result parse_base_type(Context* context,
                               Parser* parser,
                               cz::Vector<Statement*>* initializers,
                               TypeP* base_type) {
-    // Todo: cleanup anonymous structures.  This will probably work by copying the type information
+    // Todo: dealloc anonymous structures.  This will probably work by copying the type information
     // into the buffer array.
 
     Token token;
     Result result;
+
+    Numeric_Base numeric_base = {};
+    Span numeric_base_spans[9];
+
     while (1) {
-        Span span = token.span;
         result = next_token(context, parser, &token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(span, source_span(parser), "No type to make `",
-                                  token.type == Token::Const ? "const" : "volatile", "`");
-            return {Result::ErrorInvalidInput};
-        }
-
-        if (!parse_type_qualifier(context, base_type, token, source_span(parser))) {
             break;
         }
-    }
 
-    switch (token.type) {
-        case Token::Struct: {
-            Span struct_span = token.span;
-            result = next_token(context, parser, &token);
-            CZ_TRY_VAR(result);
-            if (result.type == Result::Done) {
-                context->report_error(struct_span, source_span(parser),
-                                      "Expected struct name, body, or `;` here");
-                return {Result::ErrorInvalidInput};
-            }
-
-            Span identifier_span;
-            Hashed_Str identifier = {};
-            if (token.type == Token::Identifier) {
-                identifier = token.v.identifier;
-                identifier_span = token.span;
-
+        switch (token.type) {
+            case Token::Struct: {
+                Span struct_span = token.span;
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
                     context->report_error(struct_span, source_span(parser),
-                                          "Expected declaration, struct body, `;` here");
+                                          "Expected struct name, body, or `;` here");
                     return {Result::ErrorInvalidInput};
                 }
-            }
 
-            if (token.type == Token::Semicolon) {
-                if (identifier.str.len > 0) {
-                    Type** type = lookup_type(parser, identifier);
-                    if (type) {
-                        if ((*type)->tag != Type::Struct) {
-                            context->report_error(identifier_span, source_span(parser), "Type `",
-                                                  identifier.str, "` is not a struct");
-                        }
-                    } else {
-                        Type_Struct* struct_type =
-                            parser->buffer_array.allocator().create<Type_Struct>();
-                        struct_type->types = {};
-                        struct_type->typedefs = {};
-                        struct_type->declarations = {};
-                        struct_type->initializers = {};
-                        struct_type->flags = 0;
-                        cz::Str_Map<Type*>* types = &parser->type_stack.last();
-                        types->reserve(cz::heap_allocator(), 1);
-                        types->insert(identifier.str, identifier.hash, struct_type);
+                Span identifier_span;
+                Hashed_Str identifier = {};
+                if (token.type == Token::Identifier) {
+                    identifier = token.v.identifier;
+                    identifier_span = token.span;
+
+                    result = next_token(context, parser, &token);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        context->report_error(struct_span, source_span(parser),
+                                              "Expected declaration, struct body, `;` here");
+                        return {Result::ErrorInvalidInput};
                     }
                 }
-                parser->back = token;
-                return Result::ok();
-            }
 
-            if (token.type == Token::OpenCurly) {
-                Type** type = lookup_type(parser, identifier);
-                Type_Struct* struct_type = nullptr;
-                if (type) {
-                    if ((*type)->tag == Type::Struct) {
-                        struct_type = (Type_Struct*)*type;
-                        if (struct_type->flags & Type_Struct::Defined) {
-                            context->report_error(identifier_span, source_span(parser), "Type `",
-                                                  identifier.str, "` is already defined");
+                if (token.type == Token::Semicolon) {
+                    if (identifier.str.len > 0) {
+                        Type** type = lookup_type(parser, identifier);
+                        if (type) {
+                            if ((*type)->tag != Type::Struct) {
+                                context->report_error(identifier_span, source_span(parser),
+                                                      "Type `", identifier.str,
+                                                      "` is not a struct");
+                            }
                         } else {
-                            type = nullptr;
-                        }
-                    } else {
-                        context->report_error(identifier_span, source_span(parser), "Type `",
-                                              identifier.str, "` is not a struct");
-                    }
-                }
-
-                uint32_t flags = Type_Struct::Defined;
-
-                parser->type_stack.reserve(cz::heap_allocator(), 1);
-                parser->typedef_stack.reserve(cz::heap_allocator(), 1);
-                parser->declaration_stack.reserve(cz::heap_allocator(), 1);
-                parser->type_stack.push({});
-                parser->typedef_stack.push({});
-                parser->declaration_stack.push({});
-                bool cleanup_last_stack = true;
-                CZ_DEFER({
-                    if (cleanup_last_stack) {
-                        drop_types(&parser->type_stack.last());
-                        parser->typedef_stack.last().drop(cz::heap_allocator());
-                        parser->declaration_stack.last().drop(cz::heap_allocator());
-                    }
-                    parser->type_stack.pop();
-                    parser->typedef_stack.pop();
-                    parser->declaration_stack.pop();
-                });
-
-                cz::Vector<Statement*> initializers = {};
-                CZ_DEFER(initializers.drop(cz::heap_allocator()));
-                CZ_TRY(parse_composite_body(context, parser, &initializers, &flags, struct_span));
-
-                // If type is already defined, just don't define it again.  This allows us to
-                // continue parsing which is good.
-                if (!type) {
-                    if (!struct_type) {
-                        struct_type = parser->buffer_array.allocator().create<Type_Struct>();
-                        if (identifier.str.len > 0) {
-                            cz::Str_Map<Type*>* types =
-                                &parser->type_stack[parser->type_stack.len() - 2];
+                            Type_Struct* struct_type =
+                                parser->buffer_array.allocator().create<Type_Struct>();
+                            struct_type->types = {};
+                            struct_type->typedefs = {};
+                            struct_type->declarations = {};
+                            struct_type->initializers = {};
+                            struct_type->flags = 0;
+                            cz::Str_Map<Type*>* types = &parser->type_stack.last();
                             types->reserve(cz::heap_allocator(), 1);
                             types->insert(identifier.str, identifier.hash, struct_type);
                         }
                     }
-
-                    cleanup_last_stack = false;
-                    struct_type->types = parser->type_stack.last();
-                    struct_type->typedefs = parser->typedef_stack.last();
-                    struct_type->declarations = parser->declaration_stack.last();
-                    struct_type->initializers =
-                        parser->buffer_array.allocator().duplicate(initializers.as_slice());
-                    struct_type->flags = flags;
-
-                    base_type->set_type(struct_type);
-                } else {
-                    base_type->set_type(*type);
+                    parser->back = token;
+                    return Result::ok();
                 }
-                break;
-            } else {
-                parser->back = token;
-                if (identifier.str.len > 0) {
+
+                if (token.type == Token::OpenCurly) {
                     Type** type = lookup_type(parser, identifier);
+                    Type_Struct* struct_type = nullptr;
                     if (type) {
-                        if ((*type)->tag != Type::Struct) {
+                        if ((*type)->tag == Type::Struct) {
+                            struct_type = (Type_Struct*)*type;
+                            if (struct_type->flags & Type_Struct::Defined) {
+                                context->report_error(identifier_span, source_span(parser),
+                                                      "Type `", identifier.str,
+                                                      "` is already defined");
+                            } else {
+                                type = nullptr;
+                            }
+                        } else {
                             context->report_error(identifier_span, source_span(parser), "Type `",
                                                   identifier.str, "` is not a struct");
                         }
-                        base_type->set_type(*type);
-                    } else {
-                        Type_Struct* struct_type =
-                            parser->buffer_array.allocator().create<Type_Struct>();
-                        struct_type->types = {};
-                        struct_type->typedefs = {};
-                        struct_type->declarations = {};
-                        struct_type->initializers = {};
-                        struct_type->flags = 0;
-                        cz::Str_Map<Type*>* types = &parser->type_stack.last();
-                        types->reserve(cz::heap_allocator(), 1);
-                        types->insert(identifier.str, identifier.hash, struct_type);
-                        base_type->set_type(struct_type);
                     }
+
+                    uint32_t flags = Type_Struct::Defined;
+
+                    parser->type_stack.reserve(cz::heap_allocator(), 1);
+                    parser->typedef_stack.reserve(cz::heap_allocator(), 1);
+                    parser->declaration_stack.reserve(cz::heap_allocator(), 1);
+                    parser->type_stack.push({});
+                    parser->typedef_stack.push({});
+                    parser->declaration_stack.push({});
+                    bool cleanup_last_stack = true;
+                    CZ_DEFER({
+                        if (cleanup_last_stack) {
+                            drop_types(&parser->type_stack.last());
+                            parser->typedef_stack.last().drop(cz::heap_allocator());
+                            parser->declaration_stack.last().drop(cz::heap_allocator());
+                        }
+                        parser->type_stack.pop();
+                        parser->typedef_stack.pop();
+                        parser->declaration_stack.pop();
+                    });
+
+                    cz::Vector<Statement*> initializers = {};
+                    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+                    CZ_TRY(
+                        parse_composite_body(context, parser, &initializers, &flags, struct_span));
+
+                    // If type is already defined, just don't define it again.  This allows us to
+                    // continue parsing which is good.
+                    if (!type) {
+                        if (!struct_type) {
+                            struct_type = parser->buffer_array.allocator().create<Type_Struct>();
+                            if (identifier.str.len > 0) {
+                                cz::Str_Map<Type*>* types =
+                                    &parser->type_stack[parser->type_stack.len() - 2];
+                                types->reserve(cz::heap_allocator(), 1);
+                                types->insert(identifier.str, identifier.hash, struct_type);
+                            }
+                        }
+
+                        cleanup_last_stack = false;
+                        struct_type->types = parser->type_stack.last();
+                        struct_type->typedefs = parser->typedef_stack.last();
+                        struct_type->declarations = parser->declaration_stack.last();
+                        struct_type->initializers =
+                            parser->buffer_array.allocator().duplicate(initializers.as_slice());
+                        struct_type->flags = flags;
+
+                        base_type->set_type(struct_type);
+                    } else {
+                        base_type->set_type(*type);
+                    }
+                    break;
                 } else {
-                    context->report_error(struct_span, source_span(parser),
-                                          "Structs must be either named or anonymously defined");
-                    base_type->set_type(parser->type_error);
+                    parser->back = token;
+                    if (identifier.str.len > 0) {
+                        Type** type = lookup_type(parser, identifier);
+                        if (type) {
+                            if ((*type)->tag != Type::Struct) {
+                                context->report_error(identifier_span, source_span(parser),
+                                                      "Type `", identifier.str,
+                                                      "` is not a struct");
+                            }
+                            base_type->set_type(*type);
+                        } else {
+                            Type_Struct* struct_type =
+                                parser->buffer_array.allocator().create<Type_Struct>();
+                            struct_type->types = {};
+                            struct_type->typedefs = {};
+                            struct_type->declarations = {};
+                            struct_type->initializers = {};
+                            struct_type->flags = 0;
+                            cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                            types->reserve(cz::heap_allocator(), 1);
+                            types->insert(identifier.str, identifier.hash, struct_type);
+                            base_type->set_type(struct_type);
+                        }
+                    } else {
+                        context->report_error(
+                            struct_span, source_span(parser),
+                            "Structs must be either named or anonymously defined");
+                        base_type->set_type(parser->type_error);
+                    }
+                    break;
                 }
-                break;
-            }
-        }
-
-        case Token::Union: {
-            Span union_span = token.span;
-            result = next_token(context, parser, &token);
-            CZ_TRY_VAR(result);
-            if (result.type == Result::Done) {
-                context->report_error(union_span, source_span(parser),
-                                      "Expected union name, body, or `;` here");
-                return {Result::ErrorInvalidInput};
             }
 
-            Span identifier_span;
-            Hashed_Str identifier = {};
-            if (token.type == Token::Identifier) {
-                identifier = token.v.identifier;
-                identifier_span = token.span;
-
+            case Token::Union: {
+                Span union_span = token.span;
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
                     context->report_error(union_span, source_span(parser),
-                                          "Expected declaration, union body, `;` here");
+                                          "Expected union name, body, or `;` here");
                     return {Result::ErrorInvalidInput};
                 }
-            }
 
-            if (token.type == Token::Semicolon) {
-                if (identifier.str.len > 0) {
-                    Type** type = lookup_type(parser, identifier);
-                    if (type) {
-                        if ((*type)->tag != Type::Union) {
-                            context->report_error(identifier_span, source_span(parser), "Type `",
-                                                  identifier.str, "` is not a union");
-                            return {Result::ErrorInvalidInput};
-                        }
-                    } else {
-                        Type_Union* union_type =
-                            parser->buffer_array.allocator().create<Type_Union>();
-                        union_type->types = {};
-                        union_type->typedefs = {};
-                        union_type->declarations = {};
-                        union_type->flags = 0;
-                        cz::Str_Map<Type*>* types = &parser->type_stack.last();
-                        types->reserve(cz::heap_allocator(), 1);
-                        types->insert(identifier.str, identifier.hash, union_type);
-                    }
-                }
-                parser->back = token;
-                return Result::ok();
-            }
+                Span identifier_span;
+                Hashed_Str identifier = {};
+                if (token.type == Token::Identifier) {
+                    identifier = token.v.identifier;
+                    identifier_span = token.span;
 
-            if (token.type == Token::OpenCurly) {
-                Type** type = lookup_type(parser, identifier);
-                Type_Union* union_type = nullptr;
-                if (type) {
-                    if ((*type)->tag == Type::Union) {
-                        union_type = (Type_Union*)*type;
-                        if (union_type->flags & Type_Union::Defined) {
-                            context->report_error(identifier_span, source_span(parser), "Type `",
-                                                  identifier.str, "` is already defined");
-                        } else {
-                            type = nullptr;
-                        }
-                    } else {
-                        context->report_error(identifier_span, source_span(parser), "Type `",
-                                              identifier.str, "` is not a union");
-                    }
-                }
-
-                uint32_t flags = Type_Union::Defined;
-
-                parser->type_stack.reserve(cz::heap_allocator(), 1);
-                parser->typedef_stack.reserve(cz::heap_allocator(), 1);
-                parser->declaration_stack.reserve(cz::heap_allocator(), 1);
-                parser->type_stack.push({});
-                parser->typedef_stack.push({});
-                parser->declaration_stack.push({});
-                bool cleanup_last_stack = true;
-                CZ_DEFER({
-                    if (cleanup_last_stack) {
-                        drop_types(&parser->type_stack.last());
-                        parser->typedef_stack.last().drop(cz::heap_allocator());
-                        parser->declaration_stack.last().drop(cz::heap_allocator());
-                    }
-                    parser->type_stack.pop();
-                    parser->typedef_stack.pop();
-                    parser->declaration_stack.pop();
-                });
-
-                cz::Vector<Statement*> initializers = {};
-                CZ_DEFER(initializers.drop(cz::heap_allocator()));
-                CZ_TRY(parse_composite_body(context, parser, &initializers, &flags, union_span));
-
-                for (size_t i = 0; i < initializers.len(); ++i) {
-                    if (initializers[i]->tag != Statement::Initializer_Default) {
+                    result = next_token(context, parser, &token);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
                         context->report_error(union_span, source_span(parser),
-                                              "Union variants cannot have initializers");
+                                              "Expected declaration, union body, `;` here");
+                        return {Result::ErrorInvalidInput};
                     }
                 }
 
-                if (!type) {
-                    if (!union_type) {
-                        union_type = parser->buffer_array.allocator().create<Type_Union>();
-                        if (identifier.str.len > 0) {
-                            cz::Str_Map<Type*>* types =
-                                &parser->type_stack[parser->type_stack.len() - 2];
+                if (token.type == Token::Semicolon) {
+                    if (identifier.str.len > 0) {
+                        Type** type = lookup_type(parser, identifier);
+                        if (type) {
+                            if ((*type)->tag != Type::Union) {
+                                context->report_error(identifier_span, source_span(parser),
+                                                      "Type `", identifier.str, "` is not a union");
+                                return {Result::ErrorInvalidInput};
+                            }
+                        } else {
+                            Type_Union* union_type =
+                                parser->buffer_array.allocator().create<Type_Union>();
+                            union_type->types = {};
+                            union_type->typedefs = {};
+                            union_type->declarations = {};
+                            union_type->flags = 0;
+                            cz::Str_Map<Type*>* types = &parser->type_stack.last();
                             types->reserve(cz::heap_allocator(), 1);
                             types->insert(identifier.str, identifier.hash, union_type);
                         }
                     }
-
-                    cleanup_last_stack = false;
-                    union_type->types = parser->type_stack.last();
-                    union_type->typedefs = parser->typedef_stack.last();
-                    union_type->declarations = parser->declaration_stack.last();
-                    union_type->flags = flags;
-
-                    base_type->set_type(union_type);
-                } else {
-                    base_type->set_type(*type);
+                    parser->back = token;
+                    return Result::ok();
                 }
-                break;
-            } else {
-                parser->back = token;
-                if (identifier.str.len > 0) {
+
+                if (token.type == Token::OpenCurly) {
                     Type** type = lookup_type(parser, identifier);
+                    Type_Union* union_type = nullptr;
                     if (type) {
-                        if ((*type)->tag != Type::Union) {
+                        if ((*type)->tag == Type::Union) {
+                            union_type = (Type_Union*)*type;
+                            if (union_type->flags & Type_Union::Defined) {
+                                context->report_error(identifier_span, source_span(parser),
+                                                      "Type `", identifier.str,
+                                                      "` is already defined");
+                            } else {
+                                type = nullptr;
+                            }
+                        } else {
                             context->report_error(identifier_span, source_span(parser), "Type `",
                                                   identifier.str, "` is not a union");
                         }
-                        base_type->set_type(*type);
-                    } else {
-                        Type_Union* union_type =
-                            parser->buffer_array.allocator().create<Type_Union>();
-                        union_type->types = {};
-                        union_type->typedefs = {};
-                        union_type->declarations = {};
-                        union_type->flags = 0;
-                        cz::Str_Map<Type*>* types = &parser->type_stack.last();
-                        types->reserve(cz::heap_allocator(), 1);
-                        types->insert(identifier.str, identifier.hash, union_type);
-                        base_type->set_type(union_type);
                     }
+
+                    uint32_t flags = Type_Union::Defined;
+
+                    parser->type_stack.reserve(cz::heap_allocator(), 1);
+                    parser->typedef_stack.reserve(cz::heap_allocator(), 1);
+                    parser->declaration_stack.reserve(cz::heap_allocator(), 1);
+                    parser->type_stack.push({});
+                    parser->typedef_stack.push({});
+                    parser->declaration_stack.push({});
+                    bool cleanup_last_stack = true;
+                    CZ_DEFER({
+                        if (cleanup_last_stack) {
+                            drop_types(&parser->type_stack.last());
+                            parser->typedef_stack.last().drop(cz::heap_allocator());
+                            parser->declaration_stack.last().drop(cz::heap_allocator());
+                        }
+                        parser->type_stack.pop();
+                        parser->typedef_stack.pop();
+                        parser->declaration_stack.pop();
+                    });
+
+                    cz::Vector<Statement*> initializers = {};
+                    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+                    CZ_TRY(
+                        parse_composite_body(context, parser, &initializers, &flags, union_span));
+
+                    for (size_t i = 0; i < initializers.len(); ++i) {
+                        if (initializers[i]->tag != Statement::Initializer_Default) {
+                            context->report_error(union_span, source_span(parser),
+                                                  "Union variants cannot have initializers");
+                        }
+                    }
+
+                    if (!type) {
+                        if (!union_type) {
+                            union_type = parser->buffer_array.allocator().create<Type_Union>();
+                            if (identifier.str.len > 0) {
+                                cz::Str_Map<Type*>* types =
+                                    &parser->type_stack[parser->type_stack.len() - 2];
+                                types->reserve(cz::heap_allocator(), 1);
+                                types->insert(identifier.str, identifier.hash, union_type);
+                            }
+                        }
+
+                        cleanup_last_stack = false;
+                        union_type->types = parser->type_stack.last();
+                        union_type->typedefs = parser->typedef_stack.last();
+                        union_type->declarations = parser->declaration_stack.last();
+                        union_type->flags = flags;
+
+                        base_type->set_type(union_type);
+                    } else {
+                        base_type->set_type(*type);
+                    }
+                    break;
                 } else {
-                    context->report_error(union_span, source_span(parser),
-                                          "Unions must be either named or anonymously defined");
-                    base_type->set_type(parser->type_error);
+                    parser->back = token;
+                    if (identifier.str.len > 0) {
+                        Type** type = lookup_type(parser, identifier);
+                        if (type) {
+                            if ((*type)->tag != Type::Union) {
+                                context->report_error(identifier_span, source_span(parser),
+                                                      "Type `", identifier.str, "` is not a union");
+                            }
+                            base_type->set_type(*type);
+                        } else {
+                            Type_Union* union_type =
+                                parser->buffer_array.allocator().create<Type_Union>();
+                            union_type->types = {};
+                            union_type->typedefs = {};
+                            union_type->declarations = {};
+                            union_type->flags = 0;
+                            cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                            types->reserve(cz::heap_allocator(), 1);
+                            types->insert(identifier.str, identifier.hash, union_type);
+                            base_type->set_type(union_type);
+                        }
+                    } else {
+                        context->report_error(union_span, source_span(parser),
+                                              "Unions must be either named or anonymously defined");
+                        base_type->set_type(parser->type_error);
+                    }
+                    break;
                 }
-                break;
-            }
-        }
-
-        case Token::Enum: {
-            Span enum_span = token.span;
-            result = next_token(context, parser, &token);
-            CZ_TRY_VAR(result);
-            if (result.type == Result::Done) {
-                context->report_error(enum_span, source_span(parser),
-                                      "Expected enum name, body, or `;` here");
-                return {Result::ErrorInvalidInput};
             }
 
-            Span identifier_span;
-            Hashed_Str identifier = {};
-            if (token.type == Token::Identifier) {
-                identifier = token.v.identifier;
-                identifier_span = token.span;
-
+            case Token::Enum: {
+                Span enum_span = token.span;
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
                     context->report_error(enum_span, source_span(parser),
-                                          "Expected declaration, enum body, `;` here");
+                                          "Expected enum name, body, or `;` here");
                     return {Result::ErrorInvalidInput};
                 }
-            }
 
-            if (token.type == Token::Semicolon) {
-                if (identifier.str.len > 0) {
+                Span identifier_span;
+                Hashed_Str identifier = {};
+                if (token.type == Token::Identifier) {
+                    identifier = token.v.identifier;
+                    identifier_span = token.span;
+
+                    result = next_token(context, parser, &token);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        context->report_error(enum_span, source_span(parser),
+                                              "Expected declaration, enum body, `;` here");
+                        return {Result::ErrorInvalidInput};
+                    }
+                }
+
+                if (token.type == Token::Semicolon) {
+                    if (identifier.str.len > 0) {
+                        Type** type = lookup_type(parser, identifier);
+                        if (type) {
+                            if ((*type)->tag != Type::Enum) {
+                                context->report_error(identifier_span, source_span(parser),
+                                                      "Type `", identifier.str, "` is not an enum");
+                            }
+                        } else {
+                            Type_Enum* enum_type =
+                                parser->buffer_array.allocator().create<Type_Enum>();
+                            enum_type->values = {};
+                            enum_type->flags = 0;
+                            cz::Str_Map<Type*>* types = &parser->type_stack.last();
+                            types->reserve(cz::heap_allocator(), 1);
+                            types->insert(identifier.str, identifier.hash, enum_type);
+                        }
+                    }
+                    parser->back = token;
+                    return Result::ok();
+                }
+
+                if (token.type == Token::OpenCurly) {
+                    Type** type = lookup_type(parser, identifier);
+                    Type_Enum* enum_type = nullptr;
+                    if (type) {
+                        if ((*type)->tag == Type::Enum) {
+                            enum_type = (Type_Enum*)*type;
+                            if (enum_type->flags & Type_Enum::Defined) {
+                                context->report_error(identifier_span, source_span(parser),
+                                                      "Type `", identifier.str,
+                                                      "` is already defined");
+                            } else {
+                                type = nullptr;
+                            }
+                        } else {
+                            context->report_error(identifier_span, source_span(parser), "Type `",
+                                                  identifier.str, "` is not an enum");
+                        }
+                    }
+
+                    uint32_t flags = Type_Enum::Defined;
+
+                    cz::Str_Map<int64_t> values = {};
+                    bool destroy_values = true;
+                    CZ_DEFER(if (destroy_values) { values.drop(cz::heap_allocator()); });
+
+                    CZ_TRY(parse_enum_body(context, parser, &values, &flags, enum_span));
+
+                    cz::Str_Map<Declaration>* declarations = &parser->declaration_stack.last();
+                    declarations->reserve(cz::heap_allocator(), values.cap);
+                    initializers->reserve(cz::heap_allocator(), values.cap);
+                    for (size_t i = 0; i < values.cap; ++i) {
+                        if (values.is_present(i)) {
+                            Hashed_Str key = Hashed_Str::from_str(values.keys[i]);
+                            if (!declarations->get(key.str, key.hash)) {
+                                Declaration declaration = {};
+                                // Todo: expand to long / long long when values are too big
+                                declaration.type.set_type(parser->type_signed_int);
+                                declaration.type.set_const();
+                                declarations->insert(key.str, key.hash, declaration);
+
+                                Statement_Initializer_Copy* initializer =
+                                    parser->buffer_array.allocator()
+                                        .create<Statement_Initializer_Copy>();
+                                initializer->identifier = key;
+                                Expression_Integer* value =
+                                    parser->buffer_array.allocator().create<Expression_Integer>();
+                                value->value = values.values[i];
+                                initializer->value = value;
+                                initializers->push(initializer);
+                            }
+                        }
+                    }
+
+                    if (!type) {
+                        if (!enum_type) {
+                            enum_type = parser->buffer_array.allocator().create<Type_Enum>();
+                            if (identifier.str.len > 0) {
+                                cz::Str_Map<Type*>* types =
+                                    &parser->type_stack[parser->type_stack.len() - 2];
+                                types->reserve(cz::heap_allocator(), 1);
+                                types->insert(identifier.str, identifier.hash, enum_type);
+                            }
+                        }
+
+                        destroy_values = false;
+                        enum_type->values = values;
+                        enum_type->flags = flags;
+
+                        base_type->set_type(enum_type);
+                    } else {
+                        base_type->set_type(*type);
+                    }
+                    break;
+                } else {
+                    parser->back = token;
                     Type** type = lookup_type(parser, identifier);
                     if (type) {
                         if ((*type)->tag != Type::Enum) {
                             context->report_error(identifier_span, source_span(parser), "Type `",
                                                   identifier.str, "` is not an enum");
                         }
+                        base_type->set_type(*type);
                     } else {
                         Type_Enum* enum_type = parser->buffer_array.allocator().create<Type_Enum>();
                         enum_type->values = {};
@@ -771,191 +905,335 @@ static Result parse_base_type(Context* context,
                         cz::Str_Map<Type*>* types = &parser->type_stack.last();
                         types->reserve(cz::heap_allocator(), 1);
                         types->insert(identifier.str, identifier.hash, enum_type);
+                        base_type->set_type(enum_type);
                     }
+                    break;
                 }
-                parser->back = token;
-                return Result::ok();
             }
 
-            if (token.type == Token::OpenCurly) {
-                Type** type = lookup_type(parser, identifier);
-                Type_Enum* enum_type = nullptr;
-                if (type) {
-                    if ((*type)->tag == Type::Enum) {
-                        enum_type = (Type_Enum*)*type;
-                        if (enum_type->flags & Type_Enum::Defined) {
-                            context->report_error(identifier_span, source_span(parser), "Type `",
-                                                  identifier.str, "` is already defined");
-                        } else {
-                            type = nullptr;
-                        }
-                    } else {
-                        context->report_error(identifier_span, source_span(parser), "Type `",
-                                              identifier.str, "` is not an enum");
-                    }
+            case Token::Identifier: {
+                if (base_type->get_type() || numeric_base.flags) {
+                    parser->back = token;
+                    goto stop_processing_tokens;
                 }
 
-                uint32_t flags = Type_Enum::Defined;
-
-                cz::Str_Map<int64_t> values = {};
-                bool destroy_values = true;
-                CZ_DEFER(if (destroy_values) { values.drop(cz::heap_allocator()); });
-
-                CZ_TRY(parse_enum_body(context, parser, &values, &flags, enum_span));
-
-                cz::Str_Map<Declaration>* declarations = &parser->declaration_stack.last();
-                declarations->reserve(cz::heap_allocator(), values.cap);
-                initializers->reserve(cz::heap_allocator(), values.cap);
-                for (size_t i = 0; i < values.cap; ++i) {
-                    if (values.is_present(i)) {
-                        Hashed_Str key = Hashed_Str::from_str(values.keys[i]);
-                        if (!declarations->get(key.str, key.hash)) {
-                            Declaration declaration = {};
-                            // Todo: expand to long / long long when values are too big
-                            declaration.type.set_type(parser->type_signed_int);
-                            declaration.type.set_const();
-                            declarations->insert(key.str, key.hash, declaration);
-
-                            Statement_Initializer_Copy* initializer =
-                                parser->buffer_array.allocator()
-                                    .create<Statement_Initializer_Copy>();
-                            initializer->identifier = key;
-                            Expression_Integer* value =
-                                parser->buffer_array.allocator().create<Expression_Integer>();
-                            value->value = values.values[i];
-                            initializer->value = value;
-                            initializers->push(initializer);
+                Declaration* declaration = lookup_declaration(parser, token.v.identifier);
+                TypeP* type = lookup_typedef(parser, token.v.identifier);
+                if (declaration) {
+                    if (type) {
+                        Type* t = type->get_type();
+                        if (t->tag == Type::Enum) {
+                            context->report_error(
+                                token.span, source_span(parser),
+                                "Variable cannot be used as a type.  Hint: add the tag `enum`");
+                        } else if (t->tag == Type::Struct) {
+                            context->report_error(
+                                token.span, source_span(parser),
+                                "Variable cannot be used as a type.  Hint: add the tag `struct`");
+                        } else if (t->tag == Type::Union) {
+                            context->report_error(
+                                token.span, source_span(parser),
+                                "Variable cannot be used as a type.  Hint: add the tag `union`");
+                        } else {
+                            // Todo: add hint about spelling out the type
+                            context->report_error(token.span, source_span(parser),
+                                                  "Variable cannot be used as a type.");
                         }
+                    } else {
+                        context->report_error(token.span, source_span(parser),
+                                              "Variable cannot be used as a type");
                     }
+                    return {Result::ErrorInvalidInput};
                 }
 
                 if (!type) {
-                    if (!enum_type) {
-                        enum_type = parser->buffer_array.allocator().create<Type_Enum>();
-                        if (identifier.str.len > 0) {
-                            cz::Str_Map<Type*>* types =
-                                &parser->type_stack[parser->type_stack.len() - 2];
-                            types->reserve(cz::heap_allocator(), 1);
-                            types->insert(identifier.str, identifier.hash, enum_type);
-                        }
-                    }
-
-                    destroy_values = false;
-                    enum_type->values = values;
-                    enum_type->flags = flags;
-
-                    base_type->set_type(enum_type);
-                } else {
-                    base_type->set_type(*type);
-                }
-                break;
-            } else {
-                parser->back = token;
-                Type** type = lookup_type(parser, identifier);
-                if (type) {
-                    if ((*type)->tag != Type::Enum) {
-                        context->report_error(identifier_span, source_span(parser), "Type `",
-                                              identifier.str, "` is not an enum");
-                    }
-                    base_type->set_type(*type);
-                } else {
-                    Type_Enum* enum_type = parser->buffer_array.allocator().create<Type_Enum>();
-                    enum_type->values = {};
-                    enum_type->flags = 0;
-                    cz::Str_Map<Type*>* types = &parser->type_stack.last();
-                    types->reserve(cz::heap_allocator(), 1);
-                    types->insert(identifier.str, identifier.hash, enum_type);
-                    base_type->set_type(enum_type);
-                }
-                break;
-            }
-        }
-
-        case Token::Identifier: {
-            Declaration* declaration = lookup_declaration(parser, token.v.identifier);
-            TypeP* type = lookup_typedef(parser, token.v.identifier);
-            if (declaration) {
-                if (type) {
-                    Type* t = type->get_type();
-                    if (t->tag == Type::Enum) {
-                        context->report_error(
-                            token.span, source_span(parser),
-                            "Variable cannot be used as a type.  Hint: add the tag `enum`");
-                    } else if (t->tag == Type::Struct) {
-                        context->report_error(
-                            token.span, source_span(parser),
-                            "Variable cannot be used as a type.  Hint: add the tag `struct`");
-                    } else if (t->tag == Type::Union) {
-                        context->report_error(
-                            token.span, source_span(parser),
-                            "Variable cannot be used as a type.  Hint: add the tag `union`");
+                    context->report_error(token.span, source_span(parser), "Undefined type `",
+                                          token.v.identifier.str, "`");
+                    Type** tagged_type = lookup_type(parser, token.v.identifier);
+                    if (tagged_type) {
+                        base_type->set_type(*tagged_type);
+                        break;
                     } else {
-                        // Todo: add hint about spelling out the type
-                        context->report_error(token.span, source_span(parser),
-                                              "Variable cannot be used as a type.");
+                        return {Result::ErrorInvalidInput};
                     }
-                } else {
+                }
+
+                base_type->merge_typedef(*type);
+                break;
+            }
+
+#define CASE_NUMERIC_KEYWORD(CASE)                                             \
+    case Token::CASE:                                                          \
+        if (numeric_base.flags & Numeric_Base::CASE) {                         \
+            context->report_error(token.span, source_span(parser), "`", token, \
+                                  "` has already been applied to the type");   \
+        } else {                                                               \
+            numeric_base.flags |= Numeric_Base::CASE;                          \
+            numeric_base_spans[Numeric_Base::CASE##_Index] = token.span;       \
+        }                                                                      \
+        break
+
+                CASE_NUMERIC_KEYWORD(Char);
+                CASE_NUMERIC_KEYWORD(Float);
+                CASE_NUMERIC_KEYWORD(Double);
+                CASE_NUMERIC_KEYWORD(Int);
+                CASE_NUMERIC_KEYWORD(Short);
+                CASE_NUMERIC_KEYWORD(Signed);
+                CASE_NUMERIC_KEYWORD(Unsigned);
+
+            case Token::Long: {
+                if (numeric_base.flags & Numeric_Base::Long_Long) {
                     context->report_error(token.span, source_span(parser),
-                                          "Variable cannot be used as a type");
-                }
-                return {Result::ErrorInvalidInput};
-            }
-
-            if (!type) {
-                context->report_error(token.span, source_span(parser), "Undefined type `",
-                                      token.v.identifier.str, "`");
-                Type** tagged_type = lookup_type(parser, token.v.identifier);
-                if (tagged_type) {
-                    base_type->set_type(*tagged_type);
-                    break;
+                                          "Type cannot be made `long long long`");
+                } else if (numeric_base.flags & Numeric_Base::Long) {
+                    numeric_base.flags |= Numeric_Base::Long_Long;
                 } else {
-                    return {Result::ErrorInvalidInput};
+                    numeric_base.flags |= Numeric_Base::Long;
                 }
+                break;
             }
 
-            base_type->merge_typedef(*type);
-            break;
+            case Token::Void:
+                base_type->set_type(parser->type_void);
+                break;
+
+            case Token::Const:
+                parse_const(context, base_type, token, source_span(parser));
+                break;
+
+            case Token::Volatile:
+                parse_volatile(context, base_type, token, source_span(parser));
+                break;
+
+            default:
+                parser->back = token;
+                goto stop_processing_tokens;
         }
-
-        case Token::Char:
-            base_type->set_type(parser->type_char);
-            break;
-        case Token::Double:
-            base_type->set_type(parser->type_double);
-            break;
-        case Token::Float:
-            base_type->set_type(parser->type_float);
-            break;
-        case Token::Int:
-            base_type->set_type(parser->type_signed_int);
-            break;
-        case Token::Long:
-            base_type->set_type(parser->type_signed_long);
-            break;
-        case Token::Short:
-            base_type->set_type(parser->type_signed_short);
-            break;
-        case Token::Void:
-            base_type->set_type(parser->type_void);
-            break;
-
-        default:
-            context->report_error(token.span, source_span(parser), "Expected type here");
-            return {Result::ErrorInvalidInput};
     }
 
-    while (1) {
-        result = next_token(context, parser, &token);
-        if (result.type != Result::Success) {
-            return result;
+stop_processing_tokens:
+    if (numeric_base.flags) {
+        if ((numeric_base.flags & Numeric_Base::Signed) &&
+            (numeric_base.flags & Numeric_Base::Unsigned)) {
+            context->report_error(numeric_base_spans[Numeric_Base::Unsigned_Index],
+                                  source_span(parser), "Cannot be both signed and unsigned");
+            context->report_error(numeric_base_spans[Numeric_Base::Signed_Index],
+                                  source_span(parser), "Cannot be both signed and unsigned");
+            base_type->set_type(parser->type_error);
+            return Result::ok();
         }
 
-        if (parse_type_qualifier(context, base_type, token, source_span(parser))) {
-            continue;
+        if (numeric_base.flags & Numeric_Base::Char) {
+            if (numeric_base.flags & Numeric_Base::Unsigned) {
+                base_type->set_type(parser->type_unsigned_char);
+            } else if (numeric_base.flags & Numeric_Base::Signed) {
+                base_type->set_type(parser->type_signed_char);
+            } else {
+                base_type->set_type(parser->type_char);
+            }
+
+            if (numeric_base.flags & Numeric_Base::Double) {
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
+                                      source_span(parser), "Cannot be both `char` and `double`");
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
+                                      source_span(parser), "Cannot be both `char` and `double`");
+                base_type->set_type(parser->type_error);
+            }
+            if (numeric_base.flags & Numeric_Base::Float) {
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
+                                      source_span(parser), "Cannot be both `char` and `float`");
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
+                                      source_span(parser), "Cannot be both `char` and `float`");
+                base_type->set_type(parser->type_error);
+            }
+            if (numeric_base.flags & Numeric_Base::Int) {
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
+                                      source_span(parser), "Cannot be both `char` and `int`");
+                context->report_error(numeric_base_spans[Numeric_Base::Int_Index],
+                                      source_span(parser), "Cannot be both `char` and `int`");
+                base_type->set_type(parser->type_error);
+            }
+            if (numeric_base.flags & Numeric_Base::Short) {
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
+                                      source_span(parser), "Cannot be both `char` and `short`");
+                context->report_error(numeric_base_spans[Numeric_Base::Short_Index],
+                                      source_span(parser), "Cannot be both `char` and `short`");
+                base_type->set_type(parser->type_error);
+            }
+            if (numeric_base.flags & Numeric_Base::Long) {
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
+                                      source_span(parser), "Cannot be both `char` and `long`");
+                context->report_error(numeric_base_spans[Numeric_Base::Long_Index],
+                                      source_span(parser), "Cannot be both `char` and `long`");
+                base_type->set_type(parser->type_error);
+            }
+            if (numeric_base.flags & Numeric_Base::Long_Long) {
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
+                                      source_span(parser), "Cannot be both `char` and `long long`");
+                context->report_error(numeric_base_spans[Numeric_Base::Long_Long_Index],
+                                      source_span(parser), "Cannot be both `char` and `long long`");
+                base_type->set_type(parser->type_error);
+            }
+            return Result::ok();
         }
 
-        parser->back = token;
-        break;
+        if (numeric_base.flags & Numeric_Base::Double) {
+            if (numeric_base.flags & Numeric_Base::Long) {
+                base_type->set_type(parser->type_long_double);
+            } else {
+                base_type->set_type(parser->type_double);
+            }
+
+            if (numeric_base.flags & Numeric_Base::Signed) {
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Float_Index], source_span(parser),
+                    "Cannot be both `double` and `signed`.  Hint: removed the keyword `signed`.");
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Double_Index], source_span(parser),
+                    "Cannot be both `double` and `signed`.  Hint: remove the keyword `signed`.");
+            }
+            if (numeric_base.flags & Numeric_Base::Unsigned) {
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
+                                      source_span(parser),
+                                      "Cannot be both `double` and `unsigned`");
+                context->report_error(numeric_base_spans[Numeric_Base::Unsigned_Index],
+                                      source_span(parser),
+                                      "Cannot be both `double` and `unsigned`");
+            }
+            if (numeric_base.flags & Numeric_Base::Float) {
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
+                                      source_span(parser), "Cannot be both `double` and `float`");
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
+                                      source_span(parser), "Cannot be both `double` and `float`");
+                base_type->set_type(parser->type_double);
+            }
+            if (numeric_base.flags & Numeric_Base::Int) {
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
+                                      source_span(parser), "Cannot be both `double` and `int`");
+                context->report_error(numeric_base_spans[Numeric_Base::Int_Index],
+                                      source_span(parser), "Cannot be both `double` and `int`");
+                base_type->set_type(parser->type_error);
+            }
+            if (numeric_base.flags & Numeric_Base::Short) {
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Double_Index], source_span(parser),
+                    "Cannot be both `double` and `short`.  Perhaps you meant `float`?");
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Short_Index], source_span(parser),
+                    "Cannot be both `double` and `short`.  Perhaps you meant `float`?");
+                base_type->set_type(parser->type_float);
+            }
+            if (numeric_base.flags & Numeric_Base::Long_Long) {
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Double_Index], source_span(parser),
+                    "Cannot be both `double` and `long long`.  Perhaps you meant `long double`?");
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Long_Long_Index], source_span(parser),
+                    "Cannot be both `double` and `long long`.  Perhaps you meant `long double`?");
+                base_type->set_type(parser->type_long_double);
+            }
+            return Result::ok();
+        }
+
+        if (numeric_base.flags & Numeric_Base::Float) {
+            base_type->set_type(parser->type_float);
+
+            if (numeric_base.flags & Numeric_Base::Signed) {
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Float_Index], source_span(parser),
+                    "Cannot be both `float` and `signed`.  Hint: removed the keyword `signed`.");
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Double_Index], source_span(parser),
+                    "Cannot be both `float` and `signed`.  Hint: remove the keyword `signed`.");
+            }
+            if (numeric_base.flags & Numeric_Base::Unsigned) {
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
+                                      source_span(parser), "Cannot be both `float` and `unsigned`");
+                context->report_error(numeric_base_spans[Numeric_Base::Unsigned_Index],
+                                      source_span(parser), "Cannot be both `float` and `unsigned`");
+            }
+            if (numeric_base.flags & Numeric_Base::Double) {
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
+                                      source_span(parser), "Cannot be both `float` and `double`");
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
+                                      source_span(parser), "Cannot be both `float` and `double`");
+                base_type->set_type(parser->type_double);
+            }
+            if (numeric_base.flags & Numeric_Base::Int) {
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
+                                      source_span(parser), "Cannot be both `float` and `int`");
+                context->report_error(numeric_base_spans[Numeric_Base::Int_Index],
+                                      source_span(parser), "Cannot be both `float` and `int`");
+                base_type->set_type(parser->type_error);
+            }
+            if (numeric_base.flags & Numeric_Base::Short) {
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
+                                      source_span(parser), "Cannot be both `float` and `short`");
+                context->report_error(numeric_base_spans[Numeric_Base::Short_Index],
+                                      source_span(parser), "Cannot be both `float` and `short`");
+            }
+            if (numeric_base.flags & Numeric_Base::Long) {
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Float_Index], source_span(parser),
+                    "Cannot be both `float` and `long`.  Perhaps you meant `double`?");
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Long_Index], source_span(parser),
+                    "Cannot be both `float` and `long`.  Perhaps you meant `double`?");
+                base_type->set_type(parser->type_double);
+            }
+            if (numeric_base.flags & Numeric_Base::Long_Long) {
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Float_Index], source_span(parser),
+                    "Cannot be both `float` and `long long`.  Perhaps you meant `long double`?");
+                context->report_error(
+                    numeric_base_spans[Numeric_Base::Long_Long_Index], source_span(parser),
+                    "Cannot be both `float` and `long long`.  Perhaps you meant `long double`?");
+                base_type->set_type(parser->type_long_double);
+            }
+            return Result::ok();
+        }
+
+        if ((numeric_base.flags & Numeric_Base::Short) &&
+            (numeric_base.flags & Numeric_Base::Long)) {
+            context->report_error(numeric_base_spans[Numeric_Base::Short_Index],
+                                  source_span(parser), "Cannot be both `short` and `long`");
+            context->report_error(numeric_base_spans[Numeric_Base::Long_Index], source_span(parser),
+                                  "Cannot be both `short` and `long`");
+            base_type->set_type(parser->type_error);
+            return Result::ok();
+        }
+
+        if (numeric_base.flags & Numeric_Base::Long_Long) {
+            if (numeric_base.flags & Numeric_Base::Unsigned) {
+                base_type->set_type(parser->type_unsigned_long_long);
+            } else {
+                base_type->set_type(parser->type_signed_long_long);
+            }
+        } else if (numeric_base.flags & Numeric_Base::Long) {
+            if (numeric_base.flags & Numeric_Base::Unsigned) {
+                base_type->set_type(parser->type_unsigned_long);
+            } else {
+                base_type->set_type(parser->type_signed_long);
+            }
+        } else if (numeric_base.flags & Numeric_Base::Short) {
+            if (numeric_base.flags & Numeric_Base::Unsigned) {
+                base_type->set_type(parser->type_unsigned_short);
+            } else {
+                base_type->set_type(parser->type_signed_short);
+            }
+        } else {
+            if (numeric_base.flags & Numeric_Base::Unsigned) {
+                base_type->set_type(parser->type_unsigned_int);
+            } else {
+                base_type->set_type(parser->type_signed_int);
+            }
+        }
+        return Result::ok();
+    }
+
+    if (!base_type->get_type()) {
+        context->report_error(token.span, source_span(parser), "Expected type here");
+        return {Result::ErrorInvalidInput};
     }
 
     return Result::ok();

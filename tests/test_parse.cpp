@@ -162,6 +162,159 @@ TEST_CASE("parse_declaration const cannot be used after an identifier") {
     CHECK(context.errors.len() == 1);
 }
 
+TEST_CASE("parse_declaration long int = signed long") {
+    SETUP("long int abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_signed_long);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+}
+
+TEST_CASE("parse_declaration long unsigned int = unsigned long") {
+    SETUP("long unsigned int abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_unsigned_long);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+}
+
+TEST_CASE("parse_declaration volatile signed const = CV (signed)") {
+    SETUP("volatile signed const abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
+    CHECK(abc->type.is_const());
+    CHECK(abc->type.is_volatile());
+}
+
+TEST_CASE("parse_declaration long double = long double") {
+    SETUP("long double abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_long_double);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+}
+
+TEST_CASE("parse_declaration signed = signed int") {
+    SETUP("signed abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+}
+
+TEST_CASE("parse_declaration signed = unsigned int") {
+    SETUP("unsigned abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_unsigned_int);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+}
+
+TEST_CASE("parse_declaration char = char") {
+    SETUP("char abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_char);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+}
+
+TEST_CASE("parse_declaration char signed = char") {
+    SETUP("char signed abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_signed_char);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+}
+
+TEST_CASE("parse_declaration unsigned char = char") {
+    SETUP("unsigned char abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_unsigned_char);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+}
+
 TEST_CASE("parse_declaration struct unnamed empty body") {
     SETUP("struct {};");
     cz::Vector<Statement*> initializers = {};
