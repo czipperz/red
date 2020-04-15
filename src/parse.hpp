@@ -231,5 +231,8 @@ Result parse_declaration_or_statement(Context* context,
                                       cz::Vector<Statement*>* statements,
                                       Declaration_Or_Statement* which);
 
+void drop_type(Type* type);
+void drop_types(cz::Str_Map<Type*>* types);
+
 }
 }

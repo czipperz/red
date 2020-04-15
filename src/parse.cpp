@@ -39,7 +39,7 @@ void Parser::init() {
 
 void Parser::drop() {
     for (size_t i = 0; i < type_stack.len(); ++i) {
-        type_stack[i].drop(cz::heap_allocator());
+        drop_types(&type_stack[i]);
     }
     type_stack.drop(cz::heap_allocator());
 
@@ -56,6 +56,38 @@ void Parser::drop() {
     buffer_array.drop();
     preprocessor.destroy();
     lexer.drop();
+}
+
+void drop_type(Type* type) {
+    switch (type->tag) {
+        case Type::Enum: {
+            Type_Enum* t = (Type_Enum*)type;
+            t->values.drop(cz::heap_allocator());
+            break;
+        }
+
+        case Type::Struct:
+        case Type::Union: {
+            Type_Composite* t = (Type_Composite*)type;
+            drop_types(&t->types);
+            t->typedefs.drop(cz::heap_allocator());
+            t->declarations.drop(cz::heap_allocator());
+            break;
+        }
+
+        default:
+            break;
+    }
+}
+
+void drop_types(cz::Str_Map<Type*>* types) {
+    for (size_t i = 0; i < types->count; ++i) {
+        if (types->is_present(i)) {
+            drop_type(types->values[i]);
+        }
+    }
+
+    types->drop(cz::heap_allocator());
 }
 
 static Result next_token(Context* context, Parser* parser, Token* token) {
@@ -459,7 +491,7 @@ static Result parse_base_type(Context* context,
                 bool cleanup_last_stack = true;
                 CZ_DEFER({
                     if (cleanup_last_stack) {
-                        parser->type_stack.last().drop(cz::heap_allocator());
+                        drop_types(&parser->type_stack.last());
                         parser->typedef_stack.last().drop(cz::heap_allocator());
                         parser->declaration_stack.last().drop(cz::heap_allocator());
                     }
@@ -609,7 +641,7 @@ static Result parse_base_type(Context* context,
                 bool cleanup_last_stack = true;
                 CZ_DEFER({
                     if (cleanup_last_stack) {
-                        parser->type_stack.last().drop(cz::heap_allocator());
+                        drop_types(&parser->type_stack.last());
                         parser->typedef_stack.last().drop(cz::heap_allocator());
                         parser->declaration_stack.last().drop(cz::heap_allocator());
                     }
@@ -1273,6 +1305,9 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             parser->typedef_stack.push({});
             parser->declaration_stack.push({});
             CZ_DEFER({
+                drop_types(&parser->type_stack.last());
+                parser->typedef_stack.last().drop(cz::heap_allocator());
+                parser->declaration_stack.last().drop(cz::heap_allocator());
                 parser->type_stack.pop();
                 parser->typedef_stack.pop();
                 parser->declaration_stack.pop();
