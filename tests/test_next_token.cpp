@@ -311,6 +311,32 @@ TEST_CASE("next_token() Block comment multiline star in middle") {
     CHECK(token.span.end.column == 6);
 }
 
+TEST_CASE("next_token() block comment terminator has backslash newline in middle") {
+    SETUP("/* *abc *\\\n/ xyz");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 13);
+    CHECK(token.span.start.line == 1);
+    CHECK(token.span.start.column == 2);
+    CHECK(token.span.end.index == 16);
+    CHECK(token.span.end.line == 1);
+    CHECK(token.span.end.column == 5);
+}
+
+TEST_CASE("next_token() block comment terminator has trigraph backslash newline in middle") {
+    SETUP(
+        "/* *abc *?"
+        "?/\n/ xyz");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 15);
+    CHECK(token.span.start.line == 1);
+    CHECK(token.span.start.column == 2);
+    CHECK(token.span.end.index == 18);
+    CHECK(token.span.end.line == 1);
+    CHECK(token.span.end.column == 5);
+}
+
 void check_keyword(const char* str, red::Token::Type type_expected) {
     SETUP(str);
 

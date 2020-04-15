@@ -508,6 +508,26 @@ top:
                                             *location = point;
                                             goto top;
 
+                                        case '\\':
+                                            if (file_contents.get(point.index + 1) == '\n') {
+                                                point.index += 2;
+                                                ++point.line;
+                                                start_index = point.index;
+                                                continue;
+                                            }
+                                            goto block_comment_switch;
+
+                                        case '?':
+                                            if (file_contents.get(point.index + 1) == '?' &&
+                                                file_contents.get(point.index + 2) == '/' &&
+                                                file_contents.get(point.index + 3) == '\n') {
+                                                point.index += 4;
+                                                ++point.line;
+                                                start_index = point.index;
+                                                continue;
+                                            }
+                                            goto block_comment_switch;
+
                                         default:
                                             goto block_comment_switch;
                                     }
