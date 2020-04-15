@@ -127,8 +127,8 @@ static Result peek_token(Context* context, Parser* parser, Token* token) {
 }
 
 static Span source_span(Parser* parser) {
-    return {parser->preprocessor.include_stack[0].location,
-            parser->preprocessor.include_stack[0].location};
+    Location location = parser->preprocessor.location();
+    return {location, location};
 }
 
 static Declaration* lookup_declaration(Parser* parser, Hashed_Str id) {
