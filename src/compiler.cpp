@@ -8,6 +8,7 @@
 #include "hashed_str.hpp"
 #include "lex.hpp"
 #include "load.hpp"
+#include "parse.hpp"
 #include "preprocess.hpp"
 #include "result.hpp"
 #include "token.hpp"
@@ -17,12 +18,9 @@ namespace red {
 Result compile_file(Context* context, const char* file_name) {
     ZoneScoped;
 
-    lex::Lexer lexer = {};
-    lexer.init();
-    CZ_DEFER(lexer.drop());
-
-    pre::Preprocessor preprocessor = {};
-    CZ_DEFER(preprocessor.destroy());
+    parse::Parser parser = {};
+    parser.init();
+    CZ_DEFER(parser.drop());
 
     cz::String file_path = {};
     cz::Result abs_result = cz::path::make_absolute(
@@ -33,11 +31,11 @@ Result compile_file(Context* context, const char* file_name) {
     }
     file_path.realloc_null_terminate(context->files.file_path_buffer_array.allocator());
 
-    CZ_TRY(include_file(&context->files, &preprocessor, file_path));
+    CZ_TRY(include_file(&context->files, &parser.preprocessor, file_path));
 
-    Token token;
+    cz::Vector<parse::Statement*> initializers = {};
     while (1) {
-        Result result = cpp::next_token(context, &preprocessor, &lexer, &token);
+        Result result = parse_declaration(context, &parser, &initializers);
         if (result.is_err()) {
             return result;
         }
