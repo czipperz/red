@@ -372,6 +372,48 @@ TEST_CASE("next_token() ...") {
     check_keyword("...", red::Token::Preprocessor_Varargs_Parameter_Indicator);
 }
 
+TEST_CASE("next_token() >>") {
+    check_keyword(">>", red::Token::RightShift);
+}
+TEST_CASE("next_token() <<") {
+    check_keyword("<<", red::Token::LeftShift);
+}
+TEST_CASE("next_token() >>=") {
+    check_keyword(">>=", red::Token::RightShiftSet);
+}
+TEST_CASE("next_token() <<=") {
+    check_keyword("<<=", red::Token::LeftShiftSet);
+}
+
+TEST_CASE("next_token() ^") {
+    check_keyword("^", red::Token::Xor);
+}
+
+TEST_CASE("next_token() +=") {
+    check_keyword("+=", red::Token::PlusSet);
+}
+TEST_CASE("next_token() -=") {
+    check_keyword("-=", red::Token::MinusSet);
+}
+TEST_CASE("next_token() *=") {
+    check_keyword("*=", red::Token::MultiplySet);
+}
+TEST_CASE("next_token() /=") {
+    check_keyword("/=", red::Token::DivideSet);
+}
+TEST_CASE("next_token() %=") {
+    check_keyword("%=", red::Token::ModulusSet);
+}
+TEST_CASE("next_token() &=") {
+    check_keyword("&=", red::Token::BitAndSet);
+}
+TEST_CASE("next_token() ^=") {
+    check_keyword("^=", red::Token::BitXorSet);
+}
+TEST_CASE("next_token() |=") {
+    check_keyword("|=", red::Token::BitOrSet);
+}
+
 TEST_CASE("next_token() string with escape characters") {
     SETUP("\"\\\"\\\\abc\\\"\"");
 

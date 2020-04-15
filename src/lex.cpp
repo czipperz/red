@@ -391,6 +391,14 @@ top:
                     token_out->type = Token::OpenSquare;
                 } else if (next == '%') {
                     token_out->type = Token::OpenCurly;
+                } else if (next == '<') {
+                    *location = point;
+                    if (next_character(file_contents, &point, &next) && next == '=') {
+                        token_out->type = Token::LeftShiftSet;
+                    } else {
+                        token_out->type = Token::LeftShift;
+                        point = *location;
+                    }
                 } else {
                     token_out->type = Token::LessThan;
                     point = *location;
@@ -404,8 +412,21 @@ top:
         case '>': {
             *location = point;
             char next;
-            if (next_character(file_contents, &point, &next) && next == '=') {
-                token_out->type = Token::GreaterEqual;
+            if (next_character(file_contents, &point, &next)) {
+                if (next == '=') {
+                    token_out->type = Token::GreaterEqual;
+                } else if (next == '>') {
+                    *location = point;
+                    if (next_character(file_contents, &point, &next) && next == '=') {
+                        token_out->type = Token::RightShiftSet;
+                    } else {
+                        token_out->type = Token::RightShift;
+                        point = *location;
+                    }
+                } else {
+                    token_out->type = Token::GreaterThan;
+                    point = *location;
+                }
             } else {
                 token_out->type = Token::GreaterThan;
                 point = *location;
@@ -433,8 +454,15 @@ top:
         case '%': {
             *location = point;
             char next;
-            if (next_character(file_contents, &point, &next) && next == '>') {
-                token_out->type = Token::CloseCurly;
+            if (next_character(file_contents, &point, &next)) {
+                if (next == '>') {
+                    token_out->type = Token::CloseCurly;
+                } else if (next == '=') {
+                    token_out->type = Token::ModulusSet;
+                } else {
+                    token_out->type = Token::Ampersand;
+                    point = *location;
+                }
             } else {
                 token_out->type = Token::Ampersand;
                 point = *location;
@@ -471,12 +499,28 @@ top:
         case ',':
             token_out->type = Token::Comma;
             break;
-        case '+':
-            token_out->type = Token::Plus;
+        case '+': {
+            *location = point;
+            char next;
+            if (next_character(file_contents, &point, &next) && next == '=') {
+                token_out->type = Token::PlusSet;
+            } else {
+                token_out->type = Token::Plus;
+                point = *location;
+            }
             break;
-        case '-':
-            token_out->type = Token::Minus;
+        }
+        case '-': {
+            *location = point;
+            char next;
+            if (next_character(file_contents, &point, &next) && next == '=') {
+                token_out->type = Token::MinusSet;
+            } else {
+                token_out->type = Token::Minus;
+                point = *location;
+            }
             break;
+        }
         case '/': {
             *location = point;
             char next;
@@ -567,6 +611,8 @@ top:
 
                     *location = point;
                     goto top;
+                } else if (next == '=') {
+                    token_out->type = Token::DivideSet;
                 } else {
                     token_out->type = Token::Divide;
                     point = *location;
@@ -577,26 +623,60 @@ top:
             }
             break;
         }
-        case '*':
-            token_out->type = Token::Star;
+        case '*': {
+            *location = point;
+            char next;
+            if (next_character(file_contents, &point, &next) && next == '=') {
+                token_out->type = Token::MultiplySet;
+            } else {
+                token_out->type = Token::Star;
+                point = *location;
+            }
             break;
+        }
         case '&': {
             *location = point;
             char next;
-            if (next_character(file_contents, &point, &next) && next == '&') {
-                token_out->type = Token::And;
+            if (next_character(file_contents, &point, &next)) {
+                if (next == '&') {
+                    token_out->type = Token::And;
+                } else if (next == '=') {
+                    token_out->type = Token::BitAndSet;
+                } else {
+                    token_out->type = Token::Ampersand;
+                    point = *location;
+                }
             } else {
                 token_out->type = Token::Ampersand;
+                point = *location;
             }
             break;
         }
         case '|': {
             *location = point;
             char next;
-            if (next_character(file_contents, &point, &next) && next == '|') {
-                token_out->type = Token::Or;
+            if (next_character(file_contents, &point, &next)) {
+                if (next == '|') {
+                    token_out->type = Token::Or;
+                } else if (next == '=') {
+                    token_out->type = Token::BitOrSet;
+                } else {
+                    token_out->type = Token::Pipe;
+                    point = *location;
+                }
             } else {
                 token_out->type = Token::Pipe;
+                point = *location;
+            }
+            break;
+        }
+        case '^': {
+            *location = point;
+            char next;
+            if (next_character(file_contents, &point, &next) && next == '=') {
+                token_out->type = Token::BitXorSet;
+            } else {
+                token_out->type = Token::Xor;
                 point = *location;
             }
             break;
