@@ -455,6 +455,11 @@ static Result parse_base_type(Context* context,
     Token token;
     Result result;
 
+    result = peek_token(context, parser, &token);
+    if (result.type != Result::Success) {
+        return result;
+    }
+
     Numeric_Base numeric_base = {};
     Span numeric_base_spans[9 * 2];
 
@@ -1306,10 +1311,13 @@ Result parse_declaration_(Context* context, Parser* parser, cz::Vector<Statement
     //            declaration 1 = *a
     //            declaration 2 = b
     TypeP base_type = {};
-    CZ_TRY(parse_base_type(context, parser, initializers, &base_type));
+    Result result = parse_base_type(context, parser, initializers, &base_type);
+    if (result.type != Result::Success) {
+        return result;
+    }
 
     Token token;
-    Result result = peek_token(context, parser, &token);
+    result = peek_token(context, parser, &token);
     CZ_TRY_VAR(result);
     if (result.type == Result::Success && token.type == Token::Semicolon) {
         parser->back.type = Token::Parser_Null_Token;

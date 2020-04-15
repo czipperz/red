@@ -50,6 +50,7 @@ TEST_CASE("parse_declaration type with identifier") {
     CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
     REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 1);
 
@@ -63,6 +64,7 @@ TEST_CASE("parse_declaration type with identifier") {
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Done);
     CHECK(context.errors.len() == 0);
 }
 
