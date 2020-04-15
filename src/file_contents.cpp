@@ -28,7 +28,6 @@ Result File_Contents::read(const char* cstr_file_name, cz::Allocator buffers_arr
         // we reached the end of the file (eof) but still have some final characters to consume
         if (len < buffer_size) {
             buffer[len] = eof;
-            ++len;
         }
 
         // reserve a spot
@@ -50,7 +49,7 @@ Result File_Contents::read(const char* cstr_file_name, cz::Allocator buffers_arr
         } else {
             // shrink the last string to size
             this->len = buffers_len * buffer_size + len;
-            char* shrunk_buffer = static_cast<char*>(realloc(buffer, len));
+            char* shrunk_buffer = static_cast<char*>(realloc(buffer, len + 1));
             CZ_ASSERT(shrunk_buffer);
             buffer = shrunk_buffer;
 
