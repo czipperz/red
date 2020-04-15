@@ -394,6 +394,9 @@ static Result parse_base_type(Context* context,
                               Parser* parser,
                               cz::Vector<Statement*>* initializers,
                               TypeP* base_type) {
+    // Todo: cleanup anonymous structures.  This will probably work by copying the type information
+    // into the buffer array.
+
     Token token;
     Result result;
     while (1) {
