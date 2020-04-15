@@ -203,10 +203,11 @@ static Result parse_declaration_after_identifier(Context* context,
                                                  cz::Vector<Statement*>* initializers) {
     // Todo: support arrays
     Span previous_span = token->span;
+    Span previous_source_span = source_span(parser);
     Result result = next_token(context, parser, token);
     CZ_TRY_VAR(result);
     if (result.type == Result::Done) {
-        context->report_error(previous_span, source_span(parser),
+        context->report_error(previous_span, previous_source_span,
                               "Expected ';' to end declaration here");
         return {Result::ErrorInvalidInput};
     }
@@ -217,7 +218,7 @@ static Result parse_declaration_after_identifier(Context* context,
         result = parse_expression_(context, parser, &value, 17);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(previous_span, source_span(parser),
+            context->report_error(previous_span, previous_source_span,
                                   "Expected ';' to end declaration here");
             return {Result::ErrorInvalidInput};
         }
@@ -231,10 +232,11 @@ static Result parse_declaration_after_identifier(Context* context,
 
         // Then eat `;` or `,` after the value.
         previous_span = token->span;
+        previous_source_span = source_span(parser);
         result = next_token(context, parser, token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(previous_span, source_span(parser),
+            context->report_error(previous_span, previous_source_span,
                                   "Expected ';' to end declaration here");
             return {Result::ErrorInvalidInput};
         }
@@ -251,7 +253,7 @@ static Result parse_declaration_after_identifier(Context* context,
         declarations->reserve(cz::heap_allocator(), 1);
         declarations->insert(identifier.str, identifier.hash, *declaration);
     } else {
-        context->report_error(previous_span, source_span(parser),
+        context->report_error(previous_span, previous_source_span,
                               "Declaration with same name also in scope");
     }
 
@@ -260,7 +262,7 @@ static Result parse_declaration_after_identifier(Context* context,
     } else if (token->type == Token::Semicolon) {
         return {Result::Done};
     } else {
-        context->report_error(previous_span, source_span(parser),
+        context->report_error(previous_span, previous_source_span,
                               "Expected ';' to end declaration here");
         return {Result::ErrorInvalidInput};
     }
@@ -277,17 +279,20 @@ static Result parse_declaration_after_base_type(Context* context,
     bool allow_qualifiers = false;
     while (1) {
         Span previous_span = token->span;
+        Span previous_source_span = source_span(parser);
         Result result = next_token(context, parser, token);
         CZ_TRY_VAR(result);
         if (result.type != Result::Success) {
-            context->report_error(previous_span, source_span(parser),
+            context->report_error(previous_span, previous_source_span,
                                   "Expected ';' to end declaration here");
             return {Result::ErrorInvalidInput};
         }
+
         previous_span = token->span;
+        previous_source_span = source_span(parser);
 
         if (allow_qualifiers &&
-            parse_type_qualifier(context, &declaration.type, *token, source_span(parser))) {
+            parse_type_qualifier(context, &declaration.type, *token, previous_source_span)) {
             continue;
         }
 
@@ -306,7 +311,7 @@ static Result parse_declaration_after_base_type(Context* context,
                                                           token->v.identifier, token, initializers);
 
             default:
-                context->report_error(previous_span, source_span(parser),
+                context->report_error(previous_span, previous_source_span,
                                       "Expected identifier here to complete declaration");
                 return {Result::ErrorInvalidInput};
         }
@@ -317,13 +322,14 @@ static Result parse_composite_body(Context* context,
                                    Parser* parser,
                                    cz::Vector<Statement*>* initializers,
                                    uint32_t* flags,
-                                   Span composite_span) {
+                                   Span composite_span,
+                                   Span composite_source_span) {
     while (1) {
         Token token;
         Result result = peek_token(context, parser, &token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(composite_span, source_span(parser),
+            context->report_error(composite_span, composite_source_span,
                                   "Expected close curly (`}`) to end body");
             return {Result::ErrorInvalidInput};
         }
@@ -450,7 +456,7 @@ static Result parse_base_type(Context* context,
     Result result;
 
     Numeric_Base numeric_base = {};
-    Span numeric_base_spans[9];
+    Span numeric_base_spans[9 * 2];
 
     while (1) {
         result = next_token(context, parser, &token);
@@ -462,24 +468,27 @@ static Result parse_base_type(Context* context,
         switch (token.type) {
             case Token::Struct: {
                 Span struct_span = token.span;
+                Span struct_source_span = source_span(parser);
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(struct_span, source_span(parser),
+                    context->report_error(struct_span, struct_source_span,
                                           "Expected struct name, body, or `;` here");
                     return {Result::ErrorInvalidInput};
                 }
 
                 Span identifier_span;
+                Span identifier_source_span;
                 Hashed_Str identifier = {};
                 if (token.type == Token::Identifier) {
                     identifier = token.v.identifier;
                     identifier_span = token.span;
+                    identifier_source_span = source_span(parser);
 
                     result = next_token(context, parser, &token);
                     CZ_TRY_VAR(result);
                     if (result.type == Result::Done) {
-                        context->report_error(struct_span, source_span(parser),
+                        context->report_error(struct_span, struct_source_span,
                                               "Expected declaration, struct body, `;` here");
                         return {Result::ErrorInvalidInput};
                     }
@@ -490,7 +499,7 @@ static Result parse_base_type(Context* context,
                         Type** type = lookup_type(parser, identifier);
                         if (type) {
                             if ((*type)->tag != Type::Struct) {
-                                context->report_error(identifier_span, source_span(parser),
+                                context->report_error(identifier_span, identifier_source_span,
                                                       "Type `", identifier.str,
                                                       "` is not a struct");
                             }
@@ -518,14 +527,14 @@ static Result parse_base_type(Context* context,
                         if ((*type)->tag == Type::Struct) {
                             struct_type = (Type_Struct*)*type;
                             if (struct_type->flags & Type_Struct::Defined) {
-                                context->report_error(identifier_span, source_span(parser),
+                                context->report_error(identifier_span, identifier_source_span,
                                                       "Type `", identifier.str,
                                                       "` is already defined");
                             } else {
                                 type = nullptr;
                             }
                         } else {
-                            context->report_error(identifier_span, source_span(parser), "Type `",
+                            context->report_error(identifier_span, identifier_source_span, "Type `",
                                                   identifier.str, "` is not a struct");
                         }
                     }
@@ -552,8 +561,8 @@ static Result parse_base_type(Context* context,
 
                     cz::Vector<Statement*> initializers = {};
                     CZ_DEFER(initializers.drop(cz::heap_allocator()));
-                    CZ_TRY(
-                        parse_composite_body(context, parser, &initializers, &flags, struct_span));
+                    CZ_TRY(parse_composite_body(context, parser, &initializers, &flags, struct_span,
+                                                struct_source_span));
 
                     // If type is already defined, just don't define it again.  This allows us to
                     // continue parsing which is good.
@@ -587,7 +596,7 @@ static Result parse_base_type(Context* context,
                         Type** type = lookup_type(parser, identifier);
                         if (type) {
                             if ((*type)->tag != Type::Struct) {
-                                context->report_error(identifier_span, source_span(parser),
+                                context->report_error(identifier_span, identifier_source_span,
                                                       "Type `", identifier.str,
                                                       "` is not a struct");
                             }
@@ -607,7 +616,7 @@ static Result parse_base_type(Context* context,
                         }
                     } else {
                         context->report_error(
-                            struct_span, source_span(parser),
+                            struct_span, struct_source_span,
                             "Structs must be either named or anonymously defined");
                         base_type->set_type(parser->type_error);
                     }
@@ -617,24 +626,27 @@ static Result parse_base_type(Context* context,
 
             case Token::Union: {
                 Span union_span = token.span;
+                Span union_source_span = source_span(parser);
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(union_span, source_span(parser),
+                    context->report_error(union_span, union_source_span,
                                           "Expected union name, body, or `;` here");
                     return {Result::ErrorInvalidInput};
                 }
 
                 Span identifier_span;
+                Span identifier_source_span;
                 Hashed_Str identifier = {};
                 if (token.type == Token::Identifier) {
                     identifier = token.v.identifier;
                     identifier_span = token.span;
+                    identifier_source_span = source_span(parser);
 
                     result = next_token(context, parser, &token);
                     CZ_TRY_VAR(result);
                     if (result.type == Result::Done) {
-                        context->report_error(union_span, source_span(parser),
+                        context->report_error(union_span, union_source_span,
                                               "Expected declaration, union body, `;` here");
                         return {Result::ErrorInvalidInput};
                     }
@@ -645,7 +657,7 @@ static Result parse_base_type(Context* context,
                         Type** type = lookup_type(parser, identifier);
                         if (type) {
                             if ((*type)->tag != Type::Union) {
-                                context->report_error(identifier_span, source_span(parser),
+                                context->report_error(identifier_span, identifier_source_span,
                                                       "Type `", identifier.str, "` is not a union");
                                 return {Result::ErrorInvalidInput};
                             }
@@ -672,14 +684,14 @@ static Result parse_base_type(Context* context,
                         if ((*type)->tag == Type::Union) {
                             union_type = (Type_Union*)*type;
                             if (union_type->flags & Type_Union::Defined) {
-                                context->report_error(identifier_span, source_span(parser),
+                                context->report_error(identifier_span, identifier_source_span,
                                                       "Type `", identifier.str,
                                                       "` is already defined");
                             } else {
                                 type = nullptr;
                             }
                         } else {
-                            context->report_error(identifier_span, source_span(parser), "Type `",
+                            context->report_error(identifier_span, identifier_source_span, "Type `",
                                                   identifier.str, "` is not a union");
                         }
                     }
@@ -706,12 +718,12 @@ static Result parse_base_type(Context* context,
 
                     cz::Vector<Statement*> initializers = {};
                     CZ_DEFER(initializers.drop(cz::heap_allocator()));
-                    CZ_TRY(
-                        parse_composite_body(context, parser, &initializers, &flags, union_span));
+                    CZ_TRY(parse_composite_body(context, parser, &initializers, &flags, union_span,
+                                                union_source_span));
 
                     for (size_t i = 0; i < initializers.len(); ++i) {
                         if (initializers[i]->tag != Statement::Initializer_Default) {
-                            context->report_error(union_span, source_span(parser),
+                            context->report_error(union_span, union_source_span,
                                                   "Union variants cannot have initializers");
                         }
                     }
@@ -744,7 +756,7 @@ static Result parse_base_type(Context* context,
                         Type** type = lookup_type(parser, identifier);
                         if (type) {
                             if ((*type)->tag != Type::Union) {
-                                context->report_error(identifier_span, source_span(parser),
+                                context->report_error(identifier_span, identifier_source_span,
                                                       "Type `", identifier.str, "` is not a union");
                             }
                             base_type->set_type(*type);
@@ -761,7 +773,7 @@ static Result parse_base_type(Context* context,
                             base_type->set_type(union_type);
                         }
                     } else {
-                        context->report_error(union_span, source_span(parser),
+                        context->report_error(union_span, union_source_span,
                                               "Unions must be either named or anonymously defined");
                         base_type->set_type(parser->type_error);
                     }
@@ -771,24 +783,27 @@ static Result parse_base_type(Context* context,
 
             case Token::Enum: {
                 Span enum_span = token.span;
+                Span enum_source_span = source_span(parser);
                 result = next_token(context, parser, &token);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
-                    context->report_error(enum_span, source_span(parser),
+                    context->report_error(enum_span, enum_source_span,
                                           "Expected enum name, body, or `;` here");
                     return {Result::ErrorInvalidInput};
                 }
 
                 Span identifier_span;
+                Span identifier_source_span;
                 Hashed_Str identifier = {};
                 if (token.type == Token::Identifier) {
                     identifier = token.v.identifier;
                     identifier_span = token.span;
+                    identifier_source_span = source_span(parser);
 
                     result = next_token(context, parser, &token);
                     CZ_TRY_VAR(result);
                     if (result.type == Result::Done) {
-                        context->report_error(enum_span, source_span(parser),
+                        context->report_error(enum_span, enum_source_span,
                                               "Expected declaration, enum body, `;` here");
                         return {Result::ErrorInvalidInput};
                     }
@@ -799,7 +814,7 @@ static Result parse_base_type(Context* context,
                         Type** type = lookup_type(parser, identifier);
                         if (type) {
                             if ((*type)->tag != Type::Enum) {
-                                context->report_error(identifier_span, source_span(parser),
+                                context->report_error(identifier_span, identifier_source_span,
                                                       "Type `", identifier.str, "` is not an enum");
                             }
                         } else {
@@ -823,14 +838,14 @@ static Result parse_base_type(Context* context,
                         if ((*type)->tag == Type::Enum) {
                             enum_type = (Type_Enum*)*type;
                             if (enum_type->flags & Type_Enum::Defined) {
-                                context->report_error(identifier_span, source_span(parser),
+                                context->report_error(identifier_span, identifier_source_span,
                                                       "Type `", identifier.str,
                                                       "` is already defined");
                             } else {
                                 type = nullptr;
                             }
                         } else {
-                            context->report_error(identifier_span, source_span(parser), "Type `",
+                            context->report_error(identifier_span, identifier_source_span, "Type `",
                                                   identifier.str, "` is not an enum");
                         }
                     }
@@ -894,7 +909,7 @@ static Result parse_base_type(Context* context,
                     Type** type = lookup_type(parser, identifier);
                     if (type) {
                         if ((*type)->tag != Type::Enum) {
-                            context->report_error(identifier_span, source_span(parser), "Type `",
+                            context->report_error(identifier_span, identifier_source_span, "Type `",
                                                   identifier.str, "` is not an enum");
                         }
                         base_type->set_type(*type);
@@ -962,15 +977,16 @@ static Result parse_base_type(Context* context,
                 break;
             }
 
-#define CASE_NUMERIC_KEYWORD(CASE)                                             \
-    case Token::CASE:                                                          \
-        if (numeric_base.flags & Numeric_Base::CASE) {                         \
-            context->report_error(token.span, source_span(parser), "`", token, \
-                                  "` has already been applied to the type");   \
-        } else {                                                               \
-            numeric_base.flags |= Numeric_Base::CASE;                          \
-            numeric_base_spans[Numeric_Base::CASE##_Index] = token.span;       \
-        }                                                                      \
+#define CASE_NUMERIC_KEYWORD(CASE)                                                        \
+    case Token::CASE:                                                                     \
+        if (numeric_base.flags & Numeric_Base::CASE) {                                    \
+            context->report_error(token.span, source_span(parser), "`", token,            \
+                                  "` has already been applied to the type");              \
+        } else {                                                                          \
+            numeric_base.flags |= Numeric_Base::CASE;                                     \
+            numeric_base_spans[Numeric_Base::CASE##_Index * 2] = token.span;              \
+            numeric_base_spans[Numeric_Base::CASE##_Index * 2 + 1] = source_span(parser); \
+        }                                                                                 \
         break
 
                 CASE_NUMERIC_KEYWORD(Char);
@@ -1015,10 +1031,12 @@ stop_processing_tokens:
     if (numeric_base.flags) {
         if ((numeric_base.flags & Numeric_Base::Signed) &&
             (numeric_base.flags & Numeric_Base::Unsigned)) {
-            context->report_error(numeric_base_spans[Numeric_Base::Unsigned_Index],
-                                  source_span(parser), "Cannot be both signed and unsigned");
-            context->report_error(numeric_base_spans[Numeric_Base::Signed_Index],
-                                  source_span(parser), "Cannot be both signed and unsigned");
+            context->report_error(numeric_base_spans[Numeric_Base::Unsigned_Index * 2],
+                                  numeric_base_spans[Numeric_Base::Unsigned_Index * 2 + 1],
+                                  "Cannot be both signed and unsigned");
+            context->report_error(numeric_base_spans[Numeric_Base::Signed_Index * 2],
+                                  numeric_base_spans[Numeric_Base::Signed_Index * 2 + 1],
+                                  "Cannot be both signed and unsigned");
             base_type->set_type(parser->type_error);
             return Result::ok();
         }
@@ -1033,45 +1051,57 @@ stop_processing_tokens:
             }
 
             if (numeric_base.flags & Numeric_Base::Double) {
-                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
-                                      source_span(parser), "Cannot be both `char` and `double`");
-                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
-                                      source_span(parser), "Cannot be both `char` and `double`");
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Char_Index * 2 + 1],
+                                      "Cannot be both `char` and `double`");
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Double_Index * 2 + 1],
+                                      "Cannot be both `char` and `double`");
                 base_type->set_type(parser->type_error);
             }
             if (numeric_base.flags & Numeric_Base::Float) {
-                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
-                                      source_span(parser), "Cannot be both `char` and `float`");
-                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
-                                      source_span(parser), "Cannot be both `char` and `float`");
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Char_Index * 2 + 1],
+                                      "Cannot be both `char` and `float`");
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
+                                      "Cannot be both `char` and `float`");
                 base_type->set_type(parser->type_error);
             }
             if (numeric_base.flags & Numeric_Base::Int) {
-                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
-                                      source_span(parser), "Cannot be both `char` and `int`");
-                context->report_error(numeric_base_spans[Numeric_Base::Int_Index],
-                                      source_span(parser), "Cannot be both `char` and `int`");
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Char_Index * 2 + 1],
+                                      "Cannot be both `char` and `int`");
+                context->report_error(numeric_base_spans[Numeric_Base::Int_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Int_Index * 2 + 1],
+                                      "Cannot be both `char` and `int`");
                 base_type->set_type(parser->type_error);
             }
             if (numeric_base.flags & Numeric_Base::Short) {
-                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
-                                      source_span(parser), "Cannot be both `char` and `short`");
-                context->report_error(numeric_base_spans[Numeric_Base::Short_Index],
-                                      source_span(parser), "Cannot be both `char` and `short`");
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Char_Index * 2 + 1],
+                                      "Cannot be both `char` and `short`");
+                context->report_error(numeric_base_spans[Numeric_Base::Short_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Short_Index * 2 + 1],
+                                      "Cannot be both `char` and `short`");
                 base_type->set_type(parser->type_error);
             }
             if (numeric_base.flags & Numeric_Base::Long) {
-                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
-                                      source_span(parser), "Cannot be both `char` and `long`");
-                context->report_error(numeric_base_spans[Numeric_Base::Long_Index],
-                                      source_span(parser), "Cannot be both `char` and `long`");
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Char_Index * 2 + 1],
+                                      "Cannot be both `char` and `long`");
+                context->report_error(numeric_base_spans[Numeric_Base::Long_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Long_Index * 2 + 1],
+                                      "Cannot be both `char` and `long`");
                 base_type->set_type(parser->type_error);
             }
             if (numeric_base.flags & Numeric_Base::Long_Long) {
-                context->report_error(numeric_base_spans[Numeric_Base::Char_Index],
-                                      source_span(parser), "Cannot be both `char` and `long long`");
-                context->report_error(numeric_base_spans[Numeric_Base::Long_Long_Index],
-                                      source_span(parser), "Cannot be both `char` and `long long`");
+                context->report_error(numeric_base_spans[Numeric_Base::Char_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Char_Index * 2 + 1],
+                                      "Cannot be both `char` and `long long`");
+                context->report_error(numeric_base_spans[Numeric_Base::Long_Long_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Long_Long_Index * 2 + 1],
+                                      "Cannot be both `char` and `long long`");
                 base_type->set_type(parser->type_error);
             }
             return Result::ok();
@@ -1086,49 +1116,59 @@ stop_processing_tokens:
 
             if (numeric_base.flags & Numeric_Base::Signed) {
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Float_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Float_Index * 2],
+                    numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
                     "Cannot be both `double` and `signed`.  Hint: removed the keyword `signed`.");
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Double_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Double_Index * 2],
+                    numeric_base_spans[Numeric_Base::Double_Index * 2 + 1],
                     "Cannot be both `double` and `signed`.  Hint: remove the keyword `signed`.");
             }
             if (numeric_base.flags & Numeric_Base::Unsigned) {
-                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
-                                      source_span(parser),
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Double_Index * 2 + 1],
                                       "Cannot be both `double` and `unsigned`");
-                context->report_error(numeric_base_spans[Numeric_Base::Unsigned_Index],
-                                      source_span(parser),
+                context->report_error(numeric_base_spans[Numeric_Base::Unsigned_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Unsigned_Index * 2 + 1],
                                       "Cannot be both `double` and `unsigned`");
             }
             if (numeric_base.flags & Numeric_Base::Float) {
-                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
-                                      source_span(parser), "Cannot be both `double` and `float`");
-                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
-                                      source_span(parser), "Cannot be both `double` and `float`");
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Double_Index * 2 + 1],
+                                      "Cannot be both `double` and `float`");
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
+                                      "Cannot be both `double` and `float`");
                 base_type->set_type(parser->type_double);
             }
             if (numeric_base.flags & Numeric_Base::Int) {
-                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
-                                      source_span(parser), "Cannot be both `double` and `int`");
-                context->report_error(numeric_base_spans[Numeric_Base::Int_Index],
-                                      source_span(parser), "Cannot be both `double` and `int`");
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Double_Index * 2 + 1],
+                                      "Cannot be both `double` and `int`");
+                context->report_error(numeric_base_spans[Numeric_Base::Int_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Int_Index * 2 + 1],
+                                      "Cannot be both `double` and `int`");
                 base_type->set_type(parser->type_error);
             }
             if (numeric_base.flags & Numeric_Base::Short) {
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Double_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Double_Index * 2],
+                    numeric_base_spans[Numeric_Base::Double_Index * 2 + 1],
                     "Cannot be both `double` and `short`.  Perhaps you meant `float`?");
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Short_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Short_Index * 2],
+                    numeric_base_spans[Numeric_Base::Short_Index * 2 + 1],
                     "Cannot be both `double` and `short`.  Perhaps you meant `float`?");
                 base_type->set_type(parser->type_float);
             }
             if (numeric_base.flags & Numeric_Base::Long_Long) {
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Double_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Double_Index * 2],
+                    numeric_base_spans[Numeric_Base::Double_Index * 2 + 1],
                     "Cannot be both `double` and `long long`.  Perhaps you meant `long double`?");
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Long_Long_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Long_Long_Index * 2],
+                    numeric_base_spans[Numeric_Base::Long_Long_Index * 2 + 1],
                     "Cannot be both `double` and `long long`.  Perhaps you meant `long double`?");
                 base_type->set_type(parser->type_long_double);
             }
@@ -1140,53 +1180,67 @@ stop_processing_tokens:
 
             if (numeric_base.flags & Numeric_Base::Signed) {
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Float_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Float_Index * 2],
+                    numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
                     "Cannot be both `float` and `signed`.  Hint: removed the keyword `signed`.");
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Double_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Double_Index * 2],
+                    numeric_base_spans[Numeric_Base::Double_Index * 2 + 1],
                     "Cannot be both `float` and `signed`.  Hint: remove the keyword `signed`.");
             }
             if (numeric_base.flags & Numeric_Base::Unsigned) {
-                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
-                                      source_span(parser), "Cannot be both `float` and `unsigned`");
-                context->report_error(numeric_base_spans[Numeric_Base::Unsigned_Index],
-                                      source_span(parser), "Cannot be both `float` and `unsigned`");
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
+                                      "Cannot be both `float` and `unsigned`");
+                context->report_error(numeric_base_spans[Numeric_Base::Unsigned_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Unsigned_Index * 2 + 1],
+                                      "Cannot be both `float` and `unsigned`");
             }
             if (numeric_base.flags & Numeric_Base::Double) {
-                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
-                                      source_span(parser), "Cannot be both `float` and `double`");
-                context->report_error(numeric_base_spans[Numeric_Base::Double_Index],
-                                      source_span(parser), "Cannot be both `float` and `double`");
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
+                                      "Cannot be both `float` and `double`");
+                context->report_error(numeric_base_spans[Numeric_Base::Double_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Double_Index * 2 + 1],
+                                      "Cannot be both `float` and `double`");
                 base_type->set_type(parser->type_double);
             }
             if (numeric_base.flags & Numeric_Base::Int) {
-                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
-                                      source_span(parser), "Cannot be both `float` and `int`");
-                context->report_error(numeric_base_spans[Numeric_Base::Int_Index],
-                                      source_span(parser), "Cannot be both `float` and `int`");
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
+                                      "Cannot be both `float` and `int`");
+                context->report_error(numeric_base_spans[Numeric_Base::Int_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Int_Index * 2 + 1],
+                                      "Cannot be both `float` and `int`");
                 base_type->set_type(parser->type_error);
             }
             if (numeric_base.flags & Numeric_Base::Short) {
-                context->report_error(numeric_base_spans[Numeric_Base::Float_Index],
-                                      source_span(parser), "Cannot be both `float` and `short`");
-                context->report_error(numeric_base_spans[Numeric_Base::Short_Index],
-                                      source_span(parser), "Cannot be both `float` and `short`");
+                context->report_error(numeric_base_spans[Numeric_Base::Float_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
+                                      "Cannot be both `float` and `short`");
+                context->report_error(numeric_base_spans[Numeric_Base::Short_Index * 2],
+                                      numeric_base_spans[Numeric_Base::Short_Index * 2 + 1],
+                                      "Cannot be both `float` and `short`");
             }
             if (numeric_base.flags & Numeric_Base::Long) {
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Float_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Float_Index * 2],
+                    numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
                     "Cannot be both `float` and `long`.  Perhaps you meant `double`?");
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Long_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Long_Index * 2],
+                    numeric_base_spans[Numeric_Base::Long_Index * 2 + 1],
                     "Cannot be both `float` and `long`.  Perhaps you meant `double`?");
                 base_type->set_type(parser->type_double);
             }
             if (numeric_base.flags & Numeric_Base::Long_Long) {
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Float_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Float_Index * 2],
+                    numeric_base_spans[Numeric_Base::Float_Index * 2 + 1],
                     "Cannot be both `float` and `long long`.  Perhaps you meant `long double`?");
                 context->report_error(
-                    numeric_base_spans[Numeric_Base::Long_Long_Index], source_span(parser),
+                    numeric_base_spans[Numeric_Base::Long_Long_Index * 2],
+                    numeric_base_spans[Numeric_Base::Long_Long_Index * 2 + 1],
                     "Cannot be both `float` and `long long`.  Perhaps you meant `long double`?");
                 base_type->set_type(parser->type_long_double);
             }
@@ -1195,9 +1249,11 @@ stop_processing_tokens:
 
         if ((numeric_base.flags & Numeric_Base::Short) &&
             (numeric_base.flags & Numeric_Base::Long)) {
-            context->report_error(numeric_base_spans[Numeric_Base::Short_Index],
-                                  source_span(parser), "Cannot be both `short` and `long`");
-            context->report_error(numeric_base_spans[Numeric_Base::Long_Index], source_span(parser),
+            context->report_error(numeric_base_spans[Numeric_Base::Short_Index * 2],
+                                  numeric_base_spans[Numeric_Base::Short_Index * 2 + 1],
+                                  "Cannot be both `short` and `long`");
+            context->report_error(numeric_base_spans[Numeric_Base::Long_Index * 2],
+                                  numeric_base_spans[Numeric_Base::Long_Index * 2 + 1],
                                   "Cannot be both `short` and `long`");
             base_type->set_type(parser->type_error);
             return Result::ok();
