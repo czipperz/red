@@ -25,11 +25,10 @@ Result File_Contents::read(const char* cstr_file_name, cz::Allocator buffers_arr
         CZ_ASSERT(buffer);
         size_t len = fread(buffer, 1, buffer_size, file);
 
-        // empty chunk means eof so stop
-        if (len == 0) {
-            this->len = buffers_len * buffer_size;
-            free(buffer);
-            break;
+        // we reached the end of the file (eof) but still have some final characters to consume
+        if (len < buffer_size) {
+            buffer[len] = eof;
+            ++len;
         }
 
         // reserve a spot
@@ -78,22 +77,25 @@ Result File_Contents::read(const char* cstr_file_name, cz::Allocator buffers_arr
 }
 
 void File_Contents::load_str(cz::Str contents, cz::Allocator allocator) {
-    buffers_len = (contents.len + File_Contents::buffer_size - 1) / File_Contents::buffer_size;
+    // We add an extra EOF byte so we don't need to subtract 1 here.
+    buffers_len = (contents.len + File_Contents::buffer_size /*- 1*/) / File_Contents::buffer_size;
     len = contents.len;
     buffers = static_cast<char**>(allocator.alloc({sizeof(char*) * buffers_len, alignof(char*)}));
 
-    for (size_t i = 0; i < buffers_len; ++i) {
-        size_t offset = i * File_Contents::buffer_size;
-        size_t size;
-        if (i + 1 < buffers_len) {
-            size = File_Contents::buffer_size;
-        } else {
-            size = len - offset;
-        }
-
+    size_t offset = 0;
+    for (size_t i = 0; i + 1 < buffers_len; ++i, offset += File_Contents::buffer_size) {
+        size_t size = File_Contents::buffer_size;
         char* buffer = static_cast<char*>(malloc(size));
         buffers[i] = buffer;
         memcpy(buffer, contents.buffer + offset, size);
+    }
+
+    if (buffers_len > 0) {
+        size_t size = len - offset;
+        char* buffer = static_cast<char*>(malloc(size + 1));
+        buffers[buffers_len - 1] = buffer;
+        memcpy(buffer, contents.buffer + offset, size);
+        buffer[size] = eof;
     }
 }
 

@@ -14,6 +14,9 @@ struct File_Contents {
     static constexpr const size_t inner_mask = buffer_size - 1;
     static constexpr const size_t outer_mask = ((size_t)-1) - inner_mask;
 
+    /// 255 = 0b11111111 which is invalid utf8.
+    static constexpr const char eof = 255;
+
     char** buffers;
     size_t buffers_len;
     size_t len;
@@ -29,7 +32,7 @@ struct File_Contents {
     size_t get_offset(size_t index) const { return index & inner_mask; }
 
     char get(size_t index) const {
-        CZ_DEBUG_ASSERT(index < len);
+        CZ_DEBUG_ASSERT(index <= len);
         return buffers[get_base(index)][get_offset(index)];
     }
 };
