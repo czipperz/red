@@ -13,14 +13,13 @@ namespace lex {
 bool next_character(const File_Contents& file_contents, Location* location, char* out) {
     ZoneScoped;
 top:
-    if (location->index == file_contents.len) {
-        return false;
-    }
-
     *out = file_contents.get(location->index);
 
 switch_:
     switch (*out) {
+        case File_Contents::eof:
+            return false;
+
         case '\\': {
             if (file_contents.get(location->index + 1) == '\n') {
                 location->index += 2;
@@ -32,50 +31,48 @@ switch_:
         }
 
         case '?': {
-            if (location->index + 2 < file_contents.len) {
-                if (file_contents.get(location->index + 1) == '?') {
-                    switch (file_contents.get(location->index + 2)) {
-                        case '=':
-                            *out = '#';
-                            break;
-                        case '/':
-                            *out = '\\';
-                            location->index += 2;
-                            location->column += 2;
-                            goto switch_;
-                        case '\'':
-                            *out = '^';
-                            break;
-                        case '(':
-                            *out = '[';
-                            break;
-                        case ')':
-                            *out = ']';
-                            break;
-                        case '!':
-                            *out = '|';
-                            break;
-                        case '<':
-                            *out = '{';
-                            break;
-                        case '>':
-                            *out = '}';
-                            break;
-                        case '-':
-                            *out = '~';
-                            break;
-                        default:
-                            ++location->index;
-                            ++location->column;
-                            *out = '?';
-                            return true;
-                    }
-
-                    location->index += 3;
-                    location->column += 3;
-
-                    return true;
+            if (file_contents.get(location->index + 1) == '?') {
+                switch (file_contents.get(location->index + 2)) {
+                    case '=':
+                        *out = '#';
+                        break;
+                    case '/':
+                        *out = '\\';
+                        location->index += 2;
+                        location->column += 2;
+                        goto switch_;
+                    case '\'':
+                        *out = '^';
+                        break;
+                    case '(':
+                        *out = '[';
+                        break;
+                    case ')':
+                        *out = ']';
+                        break;
+                    case '!':
+                        *out = '|';
+                        break;
+                    case '<':
+                        *out = '{';
+                        break;
+                    case '>':
+                        *out = '}';
+                        break;
+                    case '-':
+                        *out = '~';
+                        break;
+                    default:
+                        ++location->index;
+                        ++location->column;
+                        *out = '?';
+                        return true;
                 }
+
+                location->index += 3;
+                location->column += 3;
+
+                return true;
             }
             goto default_;
         }
@@ -242,25 +239,19 @@ static void next_token_identifier(Lexer* lexer,
     Location start = *location;
 
     while (1) {
-        if (point.index == file_contents.len) {
-            break;
-        }
-
         switch (file_contents.get(point.index)) {
         IDENTIFIER_MIDDLE_CASES:
             ++point.index;
             break;
 
             case '\\':
-                if (point.index + 1 < file_contents.len &&
-                    file_contents.get(point.index + 1) == '\n') {
+                if (file_contents.get(point.index + 1) == '\n') {
                     goto expensive_loop_backslash_newline;
                 }
                 goto commit_cheap_identifier;
 
             case '?':
-                if (point.index + 3 < file_contents.len &&
-                    file_contents.get(point.index + 1) == '?' &&
+                if (file_contents.get(point.index + 1) == '?' &&
                     file_contents.get(point.index + 2) == '/' &&
                     file_contents.get(point.index + 3) == '\n') {
                     goto expensive_loop_trigraph_backslash_newline;
@@ -324,25 +315,19 @@ commit_cheap_identifier : {
     start = point;
 
     while (1) {
-        if (point.index == file_contents.len) {
-            break;
-        }
-
         switch (file_contents.get(point.index)) {
         IDENTIFIER_MIDDLE_CASES:
             ++point.index;
             break;
 
             case '\\':
-                if (point.index + 1 < file_contents.len &&
-                    file_contents.get(point.index + 1) == '\n') {
+                if (file_contents.get(point.index + 1) == '\n') {
                     goto continue_expensive_loop_backslash_newline;
                 }
                 goto commit_expensive_identifier;
 
             case '?':
-                if (point.index + 3 < file_contents.len &&
-                    file_contents.get(point.index + 1) == '?' &&
+                if (file_contents.get(point.index + 1) == '?' &&
                     file_contents.get(point.index + 2) == '/' &&
                     file_contents.get(point.index + 3) == '\n') {
                     goto continue_expensive_loop_trigraph_backslash_newline;
@@ -499,30 +484,55 @@ top:
                 if (next == '*') {
                     ZoneScopedN("lex::next_token block comment");
                     while (1) {
-                        char ch;
-                        if (!next_character(file_contents, &point, &ch)) {
-                            context->report_lex_error({*location, point},
-                                                      "Unterminated block comment");
-                            *location = point;
-                            return false;
-                        }
+                    block_comment_switch:
+                        switch (file_contents.get(point.index)) {
+                            case '*': {
+                                size_t start_index = point.index;
+                                ++point.index;
+                                while (1) {
+                                    switch (file_contents.get(point.index)) {
+                                        case '*':
+                                            ++point.index;
+                                            ++point.column;
+                                            continue;
 
-                        while (1) {
-                            if (ch != '*') {
+                                        case File_Contents::eof:
+                                            context->report_lex_error({*location, point},
+                                                                      "Unterminated block comment");
+                                            point.column += point.index - start_index;
+                                            *location = point;
+                                            return false;
+
+                                        case '/':
+                                            ++point.index;
+                                            point.column += point.index - start_index;
+                                            *location = point;
+                                            goto top;
+
+                                        default:
+                                            point.column += point.index - start_index;
+                                            goto block_comment_switch;
+                                    }
+                                }
                                 break;
                             }
 
-                            if (!next_character(file_contents, &point, &ch)) {
+                            case File_Contents::eof:
                                 context->report_lex_error({*location, point},
                                                           "Unterminated block comment");
                                 *location = point;
                                 return false;
-                            }
 
-                            if (ch == '/') {
-                                *location = point;
-                                goto top;
-                            }
+                            case '\n':
+                                ++point.index;
+                                ++point.line;
+                                point.column = 0;
+                                break;
+
+                            default:
+                                ++point.index;
+                                ++point.column;
+                                break;
                         }
                     }
                 } else if (next == '/') {

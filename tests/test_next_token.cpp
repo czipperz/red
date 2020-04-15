@@ -283,6 +283,12 @@ TEST_CASE("next_token() Block comment is not recursive") {
     REQUIRE_FALSE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
 }
 
+TEST_CASE("next_token() Block comment star in middle") {
+    SETUP("/* *abc */");
+
+    REQUIRE_FALSE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+}
+
 void check_keyword(const char* str, red::Token::Type type_expected) {
     SETUP(str);
 
