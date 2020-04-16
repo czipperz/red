@@ -1656,6 +1656,7 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
     Result result = peek_token(context, parser, &token);
     CZ_TRY_VAR(result);
     if (result.type == Result::Success && token.type == Token::Typedef) {
+        Span token_source_span = source_span(parser);
         parser->back.type = Token::Parser_Null_Token;
 
         size_t len = initializers->len();
@@ -1673,7 +1674,7 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
         for (size_t i = len; i < initializers->len(); ++i) {
             Statement* init = (*initializers)[i];
             if (init->tag != Statement::Initializer_Default) {
-                context->report_error(token.span, source_span(parser),
+                context->report_error(token.span, token_source_span,
                                       "Typedef cannot have initializer");
             }
 
@@ -1684,7 +1685,7 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
             if (!typedefs->get(in->identifier.str, in->identifier.hash)) {
                 typedefs->insert(in->identifier.str, in->identifier.hash, declaration->type);
             } else {
-                context->report_error(token.span, source_span(parser), "Typedef `",
+                context->report_error(token.span, token_source_span, "Typedef `",
                                       in->identifier.str, "` has already created");
             }
         }
