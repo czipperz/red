@@ -63,6 +63,7 @@ TEST_CASE("parse_declaration type with identifier") {
     CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
+    CHECK(abc->v.initializer == initializers[0]);
 
     REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Done);
     CHECK(context.errors.len() == 0);
@@ -623,6 +624,8 @@ TEST_CASE("parse_declaration struct named two fields") {
     REQUIRE(ts->initializers[1]);
     CHECK(ts->initializers[1]->tag == Statement::Initializer_Default);
     REQUIRE(ts->flags == Type_Struct::Defined);
+    CHECK(x->v.initializer == ts->initializers[0]);
+    CHECK(y->v.initializer == ts->initializers[1]);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);

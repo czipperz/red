@@ -222,6 +222,7 @@ struct Declaration {
     Type_Pointer* o_type_pointer;
     union {
         Function_Definition* function_definition;
+        Statement_Initializer* initializer;
     } v;
 };
 

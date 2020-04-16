@@ -374,6 +374,7 @@ static Result parse_declaration_initializer(Context* context,
                 initializer->value = value;
                 initializers->reserve(cz::heap_allocator(), 1);
                 initializers->push(initializer);
+                declaration.v.initializer = initializer;
             } break;
 
             default: {
@@ -382,6 +383,7 @@ static Result parse_declaration_initializer(Context* context,
                 initializer->identifier = identifier;
                 initializers->reserve(cz::heap_allocator(), 1);
                 initializers->push(initializer);
+                declaration.v.initializer = initializer;
             } break;
         }
     }
@@ -1121,6 +1123,7 @@ static Result parse_base_type(Context* context,
                                 value->value = values.values[i];
                                 initializer->value = value;
                                 initializers->push(initializer);
+                                declaration.v.initializer = initializer;
                             }
                         }
                     }
