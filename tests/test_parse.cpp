@@ -1002,13 +1002,13 @@ TEST_CASE("parse_statement block with defined variable and expression usage") {
     REQUIRE(statement);
     REQUIRE(statement->tag == Statement::Block);
 
-    Statement_Block* block = (Statement_Block*)statement;
-    REQUIRE(block->statements.len == 2);
+    Statement_Block* body = (Statement_Block*)statement;
+    REQUIRE(body->block.statements.len == 2);
 
-    REQUIRE(block->statements[0]);
-    REQUIRE(block->statements[0]->tag == Statement::Initializer_Default);
+    REQUIRE(body->block.statements[0]);
+    REQUIRE(body->block.statements[0]->tag == Statement::Initializer_Default);
 
-    Statement* se = block->statements[1];
+    Statement* se = body->block.statements[1];
     REQUIRE(se);
     REQUIRE(se->tag == Statement::Expression);
 
@@ -1048,8 +1048,8 @@ TEST_CASE("parse_statement for loop") {
 
     REQUIRE(sfor->body);
     REQUIRE(sfor->body->tag == Statement::Block);
-    Statement_Block* block = (Statement_Block*)sfor->body;
-    CHECK(block->statements.len == 0);
+    Statement_Block* body = (Statement_Block*)sfor->body;
+    CHECK(body->block.statements.len == 0);
 
     CHECK(context.errors.len() == 0);
 }
@@ -1070,6 +1070,6 @@ TEST_CASE("parse_statement while loop") {
 
     REQUIRE(swhile->body);
     REQUIRE(swhile->body->tag == Statement::Block);
-    Statement_Block* block = (Statement_Block*)swhile->body;
-    CHECK(block->statements.len == 0);
+    Statement_Block* body = (Statement_Block*)swhile->body;
+    CHECK(body->block.statements.len == 0);
 }

@@ -160,10 +160,14 @@ struct Statement_Expression : Statement {
     struct Expression* expression;
 };
 
+struct Block {
+    cz::Slice<Statement*> statements;
+};
+
 struct Statement_Block : Statement {
     Statement_Block() : Statement(Block) {}
 
-    cz::Slice<Statement*> statements;
+    struct Block block;
 };
 
 struct Statement_For : Statement {

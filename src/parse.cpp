@@ -1645,6 +1645,74 @@ Result parse_expression(Context* context, Parser* parser, Expression** eout) {
     return parse_expression_(context, parser, eout, 100);
 }
 
+Result parse_block(Context* context, Parser* parser, Block* block, Token token) {
+    Result result;
+    Span open_curly_span = token.span;
+    parser->back.type = Token::Parser_Null_Token;
+
+    parser->type_stack.reserve(cz::heap_allocator(), 1);
+    parser->typedef_stack.reserve(cz::heap_allocator(), 1);
+    parser->declaration_stack.reserve(cz::heap_allocator(), 1);
+    parser->type_stack.push({});
+    parser->typedef_stack.push({});
+    parser->declaration_stack.push({});
+    CZ_DEFER({
+        drop_types(&parser->type_stack.last());
+        parser->typedef_stack.last().drop(cz::heap_allocator());
+        parser->declaration_stack.last().drop(cz::heap_allocator());
+        parser->type_stack.pop();
+        parser->typedef_stack.pop();
+        parser->declaration_stack.pop();
+    });
+
+    cz::Vector<Statement*> statements = {};
+    CZ_DEFER(statements.drop(context->temp_buffer_array.allocator()));
+    while (1) {
+        result = peek_token(context, parser, &token);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            context->report_error(open_curly_span, source_span(parser),
+                                  "Expected end of block to match start of block (`{`) here");
+            return {Result::ErrorInvalidInput};
+        }
+        if (token.type == Token::CloseCurly) {
+            parser->back.type = Token::Parser_Null_Token;
+            goto finish_block;
+        }
+
+        Declaration_Or_Statement which;
+        CZ_TRY(parse_declaration_or_statement(context, parser, &statements, &which));
+
+        if (which == Declaration_Or_Statement::Statement) {
+            break;
+        }
+    }
+
+    while (1) {
+        result = peek_token(context, parser, &token);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            context->report_error(open_curly_span, source_span(parser),
+                                  "Expected end of block to match start of block (`{`) here");
+            return {Result::ErrorInvalidInput};
+        }
+        if (token.type == Token::CloseCurly) {
+            parser->back.type = Token::Parser_Null_Token;
+            goto finish_block;
+        }
+
+        Statement* statement;
+        CZ_TRY(parse_statement(context, parser, &statement));
+
+        statements.reserve(context->temp_buffer_array.allocator(), 1);
+        statements.push(statement);
+    }
+
+finish_block:
+    block->statements = parser->buffer_array.allocator().duplicate(statements.as_slice());
+    return Result::ok();
+}
+
 Result parse_statement(Context* context, Parser* parser, Statement** sout) {
     Token token;
     Result result = peek_token(context, parser, &token);
@@ -1654,73 +1722,11 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
 
     switch (token.type) {
         case Token::OpenCurly: {
-            Span open_curly_span = token.span;
-            parser->back.type = Token::Parser_Null_Token;
+            Block block;
+            CZ_TRY(parse_block(context, parser, &block, token));
 
-            parser->type_stack.reserve(cz::heap_allocator(), 1);
-            parser->typedef_stack.reserve(cz::heap_allocator(), 1);
-            parser->declaration_stack.reserve(cz::heap_allocator(), 1);
-            parser->type_stack.push({});
-            parser->typedef_stack.push({});
-            parser->declaration_stack.push({});
-            CZ_DEFER({
-                drop_types(&parser->type_stack.last());
-                parser->typedef_stack.last().drop(cz::heap_allocator());
-                parser->declaration_stack.last().drop(cz::heap_allocator());
-                parser->type_stack.pop();
-                parser->typedef_stack.pop();
-                parser->declaration_stack.pop();
-            });
-
-            cz::Vector<Statement*> statements = {};
-            CZ_DEFER(statements.drop(cz::heap_allocator()));
-            while (1) {
-                result = peek_token(context, parser, &token);
-                CZ_TRY_VAR(result);
-                if (result.type == Result::Done) {
-                    context->report_error(
-                        open_curly_span, source_span(parser),
-                        "Expected end of block to match start of block (`{`) here");
-                    return {Result::ErrorInvalidInput};
-                }
-                if (token.type == Token::CloseCurly) {
-                    parser->back.type = Token::Parser_Null_Token;
-                    goto finish_block;
-                }
-
-                Declaration_Or_Statement which;
-                CZ_TRY(parse_declaration_or_statement(context, parser, &statements, &which));
-
-                if (which == Declaration_Or_Statement::Statement) {
-                    break;
-                }
-            }
-
-            while (1) {
-                result = peek_token(context, parser, &token);
-                CZ_TRY_VAR(result);
-                if (result.type == Result::Done) {
-                    context->report_error(
-                        open_curly_span, source_span(parser),
-                        "Expected end of block to match start of block (`{`) here");
-                    return {Result::ErrorInvalidInput};
-                }
-                if (token.type == Token::CloseCurly) {
-                    parser->back.type = Token::Parser_Null_Token;
-                    goto finish_block;
-                }
-
-                Statement* statement;
-                CZ_TRY(parse_statement(context, parser, &statement));
-
-                statements.reserve(cz::heap_allocator(), 1);
-                statements.push(statement);
-            }
-
-        finish_block:
             Statement_Block* statement = parser->buffer_array.allocator().create<Statement_Block>();
-            statement->statements =
-                parser->buffer_array.allocator().duplicate(statements.as_slice());
+            statement->block = block;
             *sout = statement;
             return Result::ok();
         }
