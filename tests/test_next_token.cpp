@@ -196,6 +196,50 @@ TEST_CASE("next_token() character literal '\\n'") {
     CHECK(token.v.ch == '\n');
 }
 
+TEST_CASE("next_token() character literal hex 00") {
+    SETUP("'\\x00'");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 6);
+    CHECK(is_bol == false);
+    REQUIRE(token.type == red::Token::Character);
+    CHECK(token.v.ch == (char)0x00);
+}
+
+TEST_CASE("next_token() character literal hex 1f") {
+    SETUP("'\\x1f'");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 6);
+    CHECK(is_bol == false);
+    REQUIRE(token.type == red::Token::Character);
+    CHECK(token.v.ch == (char)0x1f);
+}
+
+TEST_CASE("next_token() character literal hex d3") {
+    SETUP("'\\xd3'");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 6);
+    CHECK(is_bol == false);
+    REQUIRE(token.type == red::Token::Character);
+    CHECK(token.v.ch == (char)0xd3);
+}
+
+TEST_CASE("next_token() character literal hex bb") {
+    SETUP("'\\xbb'");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 6);
+    CHECK(is_bol == false);
+    REQUIRE(token.type == red::Token::Character);
+    CHECK(token.v.ch == (char)0xbb);
+}
+
 TEST_CASE("next_token() hash") {
     SETUP("#i");
 

@@ -91,34 +91,6 @@ switch_:
     }
 }
 
-static bool process_escaped_string(char* c) {
-    switch (*c) {
-        case '\\':
-        case '"':
-            return true;
-        case 'n':
-            *c = '\n';
-            return true;
-        case 't':
-            *c = '\t';
-            return true;
-        case 'f':
-            *c = '\f';
-            return true;
-        case 'r':
-            *c = '\r';
-            return true;
-        case 'v':
-            *c = '\v';
-            return true;
-        case '0':
-            *c = '\0';
-            return true;
-        default:
-            return false;
-    }
-}
-
 #define IDENTIFIER_START_CASES \
     case 'a':                  \
     case 'b':                  \
@@ -189,6 +161,94 @@ static bool process_escaped_string(char* c) {
     case '7':        \
     case '8':        \
     case '9'
+
+#define HEX_LETTER_CASES \
+    case 'a':            \
+    case 'b':            \
+    case 'c':            \
+    case 'd':            \
+    case 'e':            \
+    case 'f':            \
+    case 'A':            \
+    case 'B':            \
+    case 'C':            \
+    case 'D':            \
+    case 'E':            \
+    case 'F'
+
+static bool process_escaped_string(const File_Contents& file_contents,
+                                   Location* location,
+                                   char* c) {
+    switch (*c) {
+        case '\\':
+        case '"':
+            return true;
+        case 'n':
+            *c = '\n';
+            return true;
+        case 't':
+            *c = '\t';
+            return true;
+        case 'f':
+            *c = '\f';
+            return true;
+        case 'r':
+            *c = '\r';
+            return true;
+        case 'v':
+            *c = '\v';
+            return true;
+        case '0':
+            *c = '\0';
+            return true;
+        case 'x': {
+            char f;
+            if (!next_character(file_contents, location, &f)) {
+                return false;
+            }
+
+            uint8_t v = 0;
+            switch (f) {
+            NUMBER_CASES:
+                v += f - '0';
+                break;
+
+            HEX_LETTER_CASES:
+                v += f - 'a' + 10;
+                break;
+
+                default:
+                    return false;
+            }
+
+            char s;
+            if (!next_character(file_contents, location, &s)) {
+                return false;
+            }
+
+            v <<= 4;
+
+            switch (s) {
+            NUMBER_CASES:
+                v += s - '0';
+                break;
+
+            HEX_LETTER_CASES:
+                v += s - 'a' + 10;
+                break;
+
+                default:
+                    return false;
+            }
+
+            *c = v;
+            return true;
+        }
+
+        default:
+            return false;
+    }
+}
 
 static void append_buffer_contents_multi_chunk_slice(cz::String* value,
                                                      const File_Contents& file_contents,
@@ -732,7 +792,7 @@ top:
                     return false;
                 }
 
-                if (!process_escaped_string(&c)) {
+                if (!process_escaped_string(file_contents, &point, &c)) {
                     context->report_lex_error({start, point}, "Undefined escape sequence `\\", c,
                                               "`");
                     c = 0;
@@ -776,7 +836,7 @@ top:
                         return false;
                     }
 
-                    if (!process_escaped_string(&c)) {
+                    if (!process_escaped_string(file_contents, &point, &c)) {
                         context->report_lex_error({middle, point}, "Undefined escape sequence `\\",
                                                   c, "`");
                         goto skip_char;
