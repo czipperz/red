@@ -38,6 +38,7 @@ struct alignas(4) Type {
         Struct,
         Union,
         Pointer,
+        Array,
         Function,
     };
 
@@ -97,6 +98,13 @@ struct Type_Pointer : Type {
     Type_Pointer() : Type(Pointer) {}
 
     TypeP inner;
+};
+
+struct Type_Array : Type {
+    Type_Array() : Type(Array) {}
+
+    TypeP inner;
+    struct Expression* size;
 };
 
 struct Type_Function : Type {

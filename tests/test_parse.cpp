@@ -397,6 +397,43 @@ TEST_CASE("parse_declaration function returning function pointer one parameter")
     CHECK_FALSE(fun->has_varargs);
 }
 
+TEST_CASE("parse_declaration array of function pointer one parameter") {
+    SETUP("void (*f[3])(int x);");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* decl = parser.declaration_stack[0].get_hash("f");
+    REQUIRE(decl);
+    CHECK_FALSE(decl->type.is_const());
+    CHECK_FALSE(decl->type.is_volatile());
+    REQUIRE(decl->type.get_type());
+    REQUIRE(decl->type.get_type()->tag == Type::Array);
+
+    Type_Array* array = (Type_Array*)decl->type.get_type();
+    REQUIRE(array->inner.get_type());
+    REQUIRE(array->inner.get_type()->tag == Type::Pointer);
+
+    Type_Pointer* ret = (Type_Pointer*)array->inner.get_type();
+    REQUIRE(ret);
+    CHECK_FALSE(ret->inner.is_const());
+    CHECK_FALSE(ret->inner.is_volatile());
+    REQUIRE(ret->inner.get_type());
+    REQUIRE(ret->inner.get_type()->tag == Type::Function);
+
+    Type_Function* fun = (Type_Function*)ret->inner.get_type();
+    CHECK(fun->return_type.get_type() == parser.type_void);
+    REQUIRE(fun->parameter_types.len == 1);
+    CHECK(fun->parameter_types[0].get_type() == parser.type_signed_int);
+    CHECK_FALSE(fun->parameter_types[0].is_const());
+    CHECK_FALSE(fun->parameter_types[0].is_volatile());
+    CHECK_FALSE(fun->has_varargs);
+}
+
 TEST_CASE("parse_declaration long int = signed long") {
     SETUP("long int abc;");
     cz::Vector<Statement*> initializers = {};

@@ -509,6 +509,51 @@ static Result parse_declaration_identifier_and_type(Context* context,
                 }
             } break;
 
+            case Token::OpenSquare: {
+                previous_span = token->span;
+                previous_source_span = source_span(parser);
+                result = peek_token(context, parser, token);
+                CZ_TRY_VAR(result);
+
+                Expression* expression;
+                if (result.type == Result::Success && token->type == Token::CloseSquare) {
+                    expression = nullptr;
+                } else {
+                    result = parse_expression(context, parser, &expression);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        context->report_error(previous_span, previous_source_span,
+                                              "Expected size expression or `]` here");
+                        break;
+                    }
+
+                    result = next_token(context, parser, token);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        context->report_error(previous_span, previous_source_span,
+                                              "Expected `]` to match `[` here");
+                        return {Result::ErrorInvalidInput};
+                    }
+                    if (token->type != Token::CloseSquare) {
+                        context->report_error(token->span, source_span(parser),
+                                              "Expected `]` here");
+                        context->report_error(previous_span, previous_source_span,
+                                              "Expected `]` to match `[` here");
+                        return {Result::ErrorInvalidInput};
+                    }
+                }
+
+                Type_Array* array = parser->buffer_array.allocator().create<Type_Array>();
+                array->inner = *type;
+                array->size = expression;
+                if (inner_type_out) {
+                    *inner_type_out = &array->inner;
+                    inner_type_out = nullptr;
+                }
+                type->clear();
+                type->set_type(array);
+            } break;
+
             case Token::Const:
                 if (already_hit_identifier || identifier->str.len > 0) {
                     parser->back = *token;
@@ -1796,6 +1841,7 @@ static Result parse_expression_(Context* context,
         bool ltr = true;
         switch (token.type) {
             case Token::CloseParen:
+            case Token::CloseSquare:
             case Token::Semicolon:
             case Token::Colon:
                 return Result::ok();
