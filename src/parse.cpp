@@ -314,6 +314,30 @@ static Result parse_declaration_initializer(Context* context,
             case Token::OpenCurly: {
                 parser->back.type = Token::Parser_Null_Token;
 
+                cz::Str_Map<Declaration> parameters = {};
+                parameters.reserve(cz::heap_allocator(), parameter_names.len);
+                Type_Function* fun = (Type_Function*)type.get_type();
+                for (size_t i = 0; i < parameter_names.len; ++i) {
+                    Declaration declaration = {};
+                    declaration.type = fun->parameter_types[i];
+                    parameters.insert_hash(parameter_names[i], declaration);
+                }
+
+                parser->type_stack.reserve(cz::heap_allocator(), 1);
+                parser->typedef_stack.reserve(cz::heap_allocator(), 1);
+                parser->declaration_stack.reserve(cz::heap_allocator(), 1);
+                parser->type_stack.push({});
+                parser->typedef_stack.push({});
+                parser->declaration_stack.push(parameters);
+                CZ_DEFER({
+                    drop_types(&parser->type_stack.last());
+                    parser->typedef_stack.last().drop(cz::heap_allocator());
+                    parser->declaration_stack.last().drop(cz::heap_allocator());
+                    parser->type_stack.pop();
+                    parser->typedef_stack.pop();
+                    parser->declaration_stack.pop();
+                });
+
                 Block block;
                 CZ_TRY(parse_block(context, parser, &block, *token));
 
