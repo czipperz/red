@@ -1686,7 +1686,7 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
                 typedefs->insert(in->identifier.str, in->identifier.hash, declaration->type);
             } else {
                 context->report_error(token.span, token_source_span, "Typedef `",
-                                      in->identifier.str, "` has already created");
+                                      in->identifier.str, "` has already been created");
             }
         }
 
