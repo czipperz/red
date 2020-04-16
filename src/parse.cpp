@@ -1857,7 +1857,7 @@ static Result parse_expression_(Context* context,
                 parser->back.type = Token::Parser_Null_Token;
 
                 Expression* then;
-                result = parse_expression_(context, parser, &then, precedence + !ltr);
+                result = parse_expression(context, parser, &then);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
                     context->report_error(

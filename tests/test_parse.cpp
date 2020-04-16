@@ -1160,6 +1160,53 @@ TEST_CASE("parse_expression ternary inside ternary") {
     CHECK(otherwise->otherwise->tag == Expression::Integer);
 }
 
+TEST_CASE("parse_expression ternary operator comma in middle") {
+    SETUP("1 ? 2, 3 : 4;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Ternary);
+    Expression_Ternary* e = (Expression_Ternary*)expression;
+
+    REQUIRE(e->condition);
+    CHECK(e->condition->tag == Expression::Integer);
+
+    REQUIRE(e->then);
+    CHECK(e->then->tag == Expression::Binary);
+
+    REQUIRE(e->otherwise);
+    CHECK(e->otherwise->tag == Expression::Integer);
+}
+
+TEST_CASE("parse_expression ternary operator comma breaks otherwise") {
+    SETUP("1 ? 2 : 3, 4;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+
+    Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->op == Token::Comma);
+    REQUIRE(e->left);
+    CHECK(e->left->tag == Expression::Ternary);
+    REQUIRE(e->right);
+    CHECK(e->right->tag == Expression::Integer);
+
+    Expression_Ternary* ternary = (Expression_Ternary*)e->left;
+    REQUIRE(ternary->condition);
+    CHECK(ternary->condition->tag == Expression::Integer);
+
+    REQUIRE(ternary->then);
+    CHECK(ternary->then->tag == Expression::Integer);
+
+    REQUIRE(ternary->otherwise);
+    CHECK(ternary->otherwise->tag == Expression::Integer);
+}
+
 TEST_CASE("parse_statement basic binary expression") {
     SETUP("1 + 2;");
 
