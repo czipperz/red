@@ -199,8 +199,8 @@ TEST_CASE("parse_declaration basic function declaration no parameters") {
     CHECK_FALSE(ft->has_varargs);
 }
 
-TEST_CASE("parse_declaration basic function declaration one parameter") {
-    SETUP("void f(int x);");
+TEST_CASE("parse_declaration extern function declaration one parameter") {
+    SETUP("extern void f(int x);");
     cz::Vector<Statement*> initializers = {};
     CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
@@ -215,6 +215,7 @@ TEST_CASE("parse_declaration basic function declaration one parameter") {
     CHECK_FALSE(f->type.is_volatile());
     REQUIRE(f->type.get_type());
     REQUIRE(f->type.get_type()->tag == Type::Function);
+    CHECK(f->flags == Declaration::Extern);
 
     Type_Function* ft = (Type_Function*)f->type.get_type();
     CHECK(ft->return_type.get_type() == parser.type_void);

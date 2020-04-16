@@ -224,6 +224,11 @@ struct Declaration {
         Function_Definition* function_definition;
         Statement_Initializer* initializer;
     } v;
+
+    uint32_t flags;
+    enum {
+        Extern = 1,
+    };
 };
 
 namespace Declaration_Or_Statement_ {

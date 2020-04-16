@@ -290,7 +290,7 @@ static Result parse_block(Context* context, Parser* parser, Block* block, Token 
 
 static Result parse_declaration_initializer(Context* context,
                                             Parser* parser,
-                                            TypeP type,
+                                            Declaration declaration,
                                             Hashed_Str identifier,
                                             Token* token,
                                             cz::Vector<Statement*>* initializers,
@@ -301,9 +301,7 @@ static Result parse_declaration_initializer(Context* context,
     Span previous_source_span = source_span(parser);
     Result result = peek_token(context, parser, token);
 
-    Declaration declaration = {};
-
-    if (type.get_type()->tag == Type::Function) {
+    if (declaration.type.get_type()->tag == Type::Function) {
         switch (token->type) {
             case Token::Set: {
                 context->report_error(token->span, source_span(parser),
@@ -316,7 +314,7 @@ static Result parse_declaration_initializer(Context* context,
 
                 cz::Str_Map<Declaration> parameters = {};
                 parameters.reserve(cz::heap_allocator(), parameter_names.len);
-                Type_Function* fun = (Type_Function*)type.get_type();
+                Type_Function* fun = (Type_Function*)declaration.type.get_type();
                 for (size_t i = 0; i < parameter_names.len; ++i) {
                     Declaration declaration = {};
                     declaration.type = fun->parameter_types[i];
@@ -391,7 +389,6 @@ static Result parse_declaration_initializer(Context* context,
     cz::Str_Map<Declaration>* declarations = &parser->declaration_stack.last();
     if (!declarations->get(identifier.str, identifier.hash)) {
         declarations->reserve(cz::heap_allocator(), 1);
-        declaration.type = type;
         declarations->insert(identifier.str, identifier.hash, declaration);
     } else {
         context->report_error(previous_span, previous_source_span,
@@ -1539,7 +1536,10 @@ stop_processing_tokens:
     return Result::ok();
 }
 
-Result parse_declaration_(Context* context, Parser* parser, cz::Vector<Statement*>* initializers) {
+Result parse_declaration_(Context* context,
+                          Parser* parser,
+                          cz::Vector<Statement*>* initializers,
+                          uint32_t flags) {
     // Parse base type and then parse a series of declarations.
     // Example 1: int const a, b;
     //            base_type = const int
@@ -1572,7 +1572,10 @@ Result parse_declaration_(Context* context, Parser* parser, cz::Vector<Statement
 
         if (identifier.str.len > 0) {
             bool force_terminate = false;
-            CZ_TRY(parse_declaration_initializer(context, parser, type, identifier, &token,
+            Declaration declaration = {};
+            declaration.type = type;
+            declaration.flags = flags;
+            CZ_TRY(parse_declaration_initializer(context, parser, declaration, identifier, &token,
                                                  initializers, parameter_names, &force_terminate));
             if (force_terminate) {
                 return Result::ok();
@@ -1618,7 +1621,7 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
             parser->declaration_stack.pop();
         });
 
-        result = parse_declaration_(context, parser, initializers);
+        result = parse_declaration_(context, parser, initializers, 0);
 
         cz::Str_Map<TypeP>* typedefs = &parser->typedef_stack.last();
         typedefs->reserve(cz::heap_allocator(), initializers->len() - len);
@@ -1643,7 +1646,12 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
 
         return Result::ok();
     } else {
-        return parse_declaration_(context, parser, initializers);
+        uint32_t flags = 0;
+        if (result.type == Result::Success && token.type == Token::Extern) {
+            parser->back.type = Token::Parser_Null_Token;
+            flags |= Declaration::Extern;
+        }
+        return parse_declaration_(context, parser, initializers, flags);
     }
 }
 
@@ -1665,6 +1673,7 @@ Result parse_declaration_or_statement(Context* context,
         case Token::Long:
         case Token::Short:
         case Token::Void:
+        case Token::Extern:
         case Token::Enum:
         case Token::Struct:
         case Token::Union:
