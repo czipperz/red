@@ -205,6 +205,7 @@ static Result parse_declaration_identifier_and_type(Context* context,
                                                     cz::Vector<Statement*>* initializers,
                                                     Hashed_Str* identifier,
                                                     TypeP* type,
+                                                    TypeP** inner_type_out,
                                                     Token* token);
 
 static Result parse_parameters(Context* context,
@@ -252,7 +253,7 @@ static Result parse_parameters(Context* context,
         Hashed_Str identifier = {};
         if (token.type != Token::CloseParen && token.type != Token::Comma) {
             CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers, &identifier,
-                                                         &type, &token));
+                                                         &type, nullptr, &token));
         }
 
         parameter_types->reserve(cz::heap_allocator(), 1);
@@ -338,43 +339,63 @@ static Result parse_declaration_identifier_and_type(Context* context,
                                                     cz::Vector<Statement*>* initializers,
                                                     Hashed_Str* identifier,
                                                     TypeP* type,
+                                                    TypeP** inner_type_out,
                                                     Token* token) {
+    /// We need to parse `(*function)(params)` to `Pointer(Function([params], base type))`.
+    /// To do this we need to have the pointer (`*function`) apply after the function (`(params)`).
+    /// We do this by storing pointers to inside the data structures and fixing them later.
+    ///
+    /// `inner_type_out` allows an outer call to have a pointer to `x` in `Pointer(x)`.
+    /// This is assigned to on the first wrap and then made null (so consecutive wraps don't assign
+    /// to it).
+    ///
+    /// `type` stores the current node that should be wrapped.  That is, if we hit a function
+    /// wrapper, we should wrap the `type`.
+    ///
+    /// # Example
+    ///
+    /// In `int (*abc)()`, The overall type is `int` and `inner_type_out` is `nullptr` since we are
+    /// in outermost call.  We first see `(` and recurse.
+    ///
+    /// In the recursive call, `type` is `int` and `*inner_type_out` is `type` in the outer call. We
+    /// see `*` and wrap `type` with a pointer.  Our overall type is `Pointer(int)`.  We set
+    /// `*inner_type_out` (outer `type`) to point to the inner `int`.  We return and then we eat the
+    /// `)`.
+    ///
+    /// Now we see `(`.  The overall type is `Pointer(int)`, but `type` points to the inner `int`.
+    /// We parse the parameters and then wrap a function type around `type`.  This results in
+    /// `Pointer(Function([], int))`
     bool allow_qualifiers = false;
+    bool already_hit_identifier = false;
     while (1) {
         Span previous_span = token->span;
         Span previous_source_span = source_span(parser);
         Result result = next_token(context, parser, token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
-            context->report_error(previous_span, previous_source_span,
-                                  "Expected ';' to end declaration here");
-            return {Result::ErrorInvalidInput};
+            return Result::ok();
         }
 
         switch (token->type) {
             case Token::Star: {
+                if (already_hit_identifier || identifier->str.len > 0) {
+                    parser->back = *token;
+                    return Result::ok();
+                }
+
                 Type_Pointer* pointer = parser->buffer_array.allocator().create<Type_Pointer>();
                 pointer->inner = *type;
+                if (inner_type_out) {
+                    *inner_type_out = &pointer->inner;
+                    inner_type_out = nullptr;
+                }
                 type->clear();
                 type->set_type(pointer);
                 allow_qualifiers = true;
-                break;
-            }
+            } break;
 
-            case Token::Identifier:
-                previous_span = token->span;
-                previous_source_span = source_span(parser);
-                *identifier = token->v.identifier;
-
-                result = peek_token(context, parser, token);
-                CZ_TRY_VAR(result);
-                if (result.type == Result::Done) {
-                    context->report_error(previous_span, previous_source_span,
-                                          "Expected ';' to end declaration here");
-                    return {Result::ErrorInvalidInput};
-                }
-
-                if (token->type == Token::OpenParen) {
+            case Token::OpenParen: {
+                if (already_hit_identifier || identifier->str.len > 0) {
                     cz::Vector<TypeP> parameter_types = {};
                     cz::Vector<cz::Str> parameter_names = {};
                     bool has_varargs = false;
@@ -383,22 +404,47 @@ static Result parse_declaration_identifier_and_type(Context* context,
                         parameter_names.drop(cz::heap_allocator());
                     });
 
+                    parser->back = *token;
                     CZ_TRY(parse_parameters(context, parser, initializers, &parameter_types,
                                             &parameter_names, &has_varargs));
 
                     Type_Function* function =
                         parser->buffer_array.allocator().create<Type_Function>();
-                    function->return_type = (*type);
+                    function->return_type = *type;
                     function->parameter_types =
                         parser->buffer_array.allocator().duplicate(parameter_types.as_slice());
                     function->has_varargs = has_varargs;
+                    if (inner_type_out) {
+                        *inner_type_out = &function->return_type;
+                        inner_type_out = nullptr;
+                    }
                     type->clear();
                     type->set_type(function);
-                }
+                    return Result::ok();
+                } else {
+                    previous_span = token->span;
+                    previous_source_span = source_span(parser);
 
-                return Result::ok();
+                    CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers,
+                                                                 identifier, type, &type, token));
+                    already_hit_identifier = true;
+
+                    result = next_token(context, parser, token);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done || token->type != Token::CloseParen) {
+                        context->report_error(previous_span, previous_source_span,
+                                              "Expected ')' to match '(' here");
+                        return {Result::ErrorInvalidInput};
+                    }
+                }
+            } break;
 
             case Token::Const:
+                if (already_hit_identifier || identifier->str.len > 0) {
+                    parser->back = *token;
+                    return Result::ok();
+                }
+
                 if (!allow_qualifiers) {
                     context->report_error(token->span, source_span(parser),
                                           "East const must be used immediately after base type");
@@ -408,15 +454,30 @@ static Result parse_declaration_identifier_and_type(Context* context,
                 break;
 
             case Token::Volatile:
+                if (already_hit_identifier || identifier->str.len > 0) {
+                    parser->back = *token;
+                    return Result::ok();
+                }
+
                 if (!allow_qualifiers) {
                     context->report_error(token->span, source_span(parser),
-                                          "East const must be used immediately after base type");
+                                          "East volatile must be used immediately after base type");
                     break;
                 }
                 parse_volatile(context, type, *token, source_span(parser));
                 break;
 
+            case Token::Identifier:
+                if (identifier->str.len > 0) {
+                    parser->back = *token;
+                    return Result::ok();
+                }
+
+                *identifier = token->v.identifier;
+                break;
+
             default:
+                parser->back = *token;
                 return Result::ok();
         }
     }
@@ -1432,7 +1493,7 @@ Result parse_declaration_(Context* context, Parser* parser, cz::Vector<Statement
         TypeP type = base_type;
         Hashed_Str identifier = {};
         CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers, &identifier,
-                                                     &type, &token));
+                                                     &type, nullptr, &token));
 
         if (identifier.str.len > 0) {
             CZ_TRY(parse_declaration_initializer(context, parser, type, identifier, &token,
