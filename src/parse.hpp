@@ -212,8 +212,7 @@ struct Statement_Initializer_Copy : Statement_Initializer {
     struct Expression* value;
 };
 
-struct Statement_Function : Statement {
-    Type_Function* type;
+struct Function_Definition {
     cz::Slice<cz::Str> parameter_names;
     struct Block block;
 };
@@ -221,6 +220,9 @@ struct Statement_Function : Statement {
 struct Declaration {
     TypeP type;
     Type_Pointer* o_type_pointer;
+    union {
+        Function_Definition* function_definition;
+    } v;
 };
 
 namespace Declaration_Or_Statement_ {

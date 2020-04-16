@@ -206,7 +206,8 @@ static Result parse_declaration_identifier_and_type(Context* context,
                                                     Hashed_Str* identifier,
                                                     TypeP* type,
                                                     TypeP** inner_type_out,
-                                                    Token* token);
+                                                    Token* token,
+                                                    cz::Slice<cz::Str>* parameter_names);
 
 static Result parse_parameters(Context* context,
                                Parser* parser,
@@ -252,14 +253,16 @@ static Result parse_parameters(Context* context,
 
         Hashed_Str identifier = {};
         if (token.type != Token::CloseParen && token.type != Token::Comma) {
+            cz::Slice<cz::Str> inner_parameter_names;
             CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers, &identifier,
-                                                         &type, nullptr, &token));
+                                                         &type, nullptr, &token,
+                                                         &inner_parameter_names));
         }
 
         parameter_types->reserve(cz::heap_allocator(), 1);
         parameter_names->reserve(cz::heap_allocator(), 1);
         parameter_types->push(type);
-        parameter_names->push({});
+        parameter_names->push(identifier.str);
 
         previous_span = token.span;
         previous_source_span = source_span(parser);
@@ -283,48 +286,85 @@ static Result parse_parameters(Context* context,
     }
 }
 
+static Result parse_block(Context* context, Parser* parser, Block* block, Token token);
+
 static Result parse_declaration_initializer(Context* context,
                                             Parser* parser,
                                             TypeP type,
                                             Hashed_Str identifier,
                                             Token* token,
-                                            cz::Vector<Statement*>* initializers) {
+                                            cz::Vector<Statement*>* initializers,
+                                            cz::Slice<cz::Str> parameter_names,
+                                            bool* force_terminate) {
     // Todo: support arrays
     Span previous_span = token->span;
     Span previous_source_span = source_span(parser);
     Result result = peek_token(context, parser, token);
 
-    if (token->type == Token::Set) {
-        parser->back.type = Token::Parser_Null_Token;
+    Declaration declaration = {};
 
-        // Eat the value.
-        Expression* value;
-        result = parse_expression_(context, parser, &value, 17);
-        CZ_TRY_VAR(result);
-        if (result.type == Result::Done) {
-            context->report_error(previous_span, previous_source_span,
-                                  "Expected ';' to end declaration here");
-            return {Result::ErrorInvalidInput};
+    if (type.get_type()->tag == Type::Function) {
+        switch (token->type) {
+            case Token::Set: {
+                context->report_error(token->span, source_span(parser),
+                                      "Function must be defined with `{` not assigned with `=`");
+                return {Result::ErrorInvalidInput};
+            }
+
+            case Token::OpenCurly: {
+                parser->back.type = Token::Parser_Null_Token;
+
+                Block block;
+                CZ_TRY(parse_block(context, parser, &block, *token));
+
+                Function_Definition* function_definition =
+                    parser->buffer_array.allocator().create<Function_Definition>();
+                function_definition->parameter_names = parameter_names;
+                function_definition->block = block;
+                declaration.v.function_definition = function_definition;
+
+                *force_terminate = true;
+            } break;
+
+            default:
+                break;
         }
-
-        Statement_Initializer_Copy* initializer =
-            parser->buffer_array.allocator().create<Statement_Initializer_Copy>();
-        initializer->identifier = identifier;
-        initializer->value = value;
-        initializers->reserve(cz::heap_allocator(), 1);
-        initializers->push(initializer);
     } else {
-        Statement_Initializer_Default* initializer =
-            parser->buffer_array.allocator().create<Statement_Initializer_Default>();
-        initializer->identifier = identifier;
-        initializers->reserve(cz::heap_allocator(), 1);
-        initializers->push(initializer);
+        switch (token->type) {
+            case Token::Set: {
+                parser->back.type = Token::Parser_Null_Token;
+
+                // Eat the value.
+                Expression* value;
+                result = parse_expression_(context, parser, &value, 17);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(previous_span, previous_source_span,
+                                          "Expected ';' to end declaration here");
+                    return {Result::ErrorInvalidInput};
+                }
+
+                Statement_Initializer_Copy* initializer =
+                    parser->buffer_array.allocator().create<Statement_Initializer_Copy>();
+                initializer->identifier = identifier;
+                initializer->value = value;
+                initializers->reserve(cz::heap_allocator(), 1);
+                initializers->push(initializer);
+            } break;
+
+            default: {
+                Statement_Initializer_Default* initializer =
+                    parser->buffer_array.allocator().create<Statement_Initializer_Default>();
+                initializer->identifier = identifier;
+                initializers->reserve(cz::heap_allocator(), 1);
+                initializers->push(initializer);
+            } break;
+        }
     }
 
     cz::Str_Map<Declaration>* declarations = &parser->declaration_stack.last();
     if (!declarations->get(identifier.str, identifier.hash)) {
         declarations->reserve(cz::heap_allocator(), 1);
-        Declaration declaration = {};
         declaration.type = type;
         declarations->insert(identifier.str, identifier.hash, declaration);
     } else {
@@ -338,9 +378,10 @@ static Result parse_declaration_identifier_and_type(Context* context,
                                                     Parser* parser,
                                                     cz::Vector<Statement*>* initializers,
                                                     Hashed_Str* identifier,
-                                                    TypeP* type,
+                                                    TypeP* overall_type,
                                                     TypeP** inner_type_out,
-                                                    Token* token) {
+                                                    Token* token,
+                                                    cz::Slice<cz::Str>* parameter_names_out) {
     /// We need to parse `(*function)(params)` to `Pointer(Function([params], base type))`.
     /// To do this we need to have the pointer (`*function`) apply after the function (`(params)`).
     /// We do this by storing pointers to inside the data structures and fixing them later.
@@ -365,6 +406,7 @@ static Result parse_declaration_identifier_and_type(Context* context,
     /// Now we see `(`.  The overall type is `Pointer(int)`, but `type` points to the inner `int`.
     /// We parse the parameters and then wrap a function type around `type`.  This results in
     /// `Pointer(Function([], int))`
+    TypeP* type = overall_type;
     bool allow_qualifiers = false;
     bool already_hit_identifier = false;
     while (1) {
@@ -407,6 +449,10 @@ static Result parse_declaration_identifier_and_type(Context* context,
                     parser->back = *token;
                     CZ_TRY(parse_parameters(context, parser, initializers, &parameter_types,
                                             &parameter_names, &has_varargs));
+                    if (type == overall_type) {
+                        *parameter_names_out =
+                            parser->buffer_array.allocator().duplicate(parameter_names.as_slice());
+                    }
 
                     Type_Function* function =
                         parser->buffer_array.allocator().create<Type_Function>();
@@ -426,7 +472,8 @@ static Result parse_declaration_identifier_and_type(Context* context,
                     previous_source_span = source_span(parser);
 
                     CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers,
-                                                                 identifier, type, &type, token));
+                                                                 identifier, type, &type, token,
+                                                                 parameter_names_out));
                     already_hit_identifier = true;
 
                     result = next_token(context, parser, token);
@@ -1492,12 +1539,17 @@ Result parse_declaration_(Context* context, Parser* parser, cz::Vector<Statement
     while (1) {
         TypeP type = base_type;
         Hashed_Str identifier = {};
+        cz::Slice<cz::Str> parameter_names;
         CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers, &identifier,
-                                                     &type, nullptr, &token));
+                                                     &type, nullptr, &token, &parameter_names));
 
         if (identifier.str.len > 0) {
+            bool force_terminate = false;
             CZ_TRY(parse_declaration_initializer(context, parser, type, identifier, &token,
-                                                 initializers));
+                                                 initializers, parameter_names, &force_terminate));
+            if (force_terminate) {
+                return Result::ok();
+            }
         }
 
         Span previous_span = token.span;
@@ -1833,7 +1885,7 @@ Result parse_expression(Context* context, Parser* parser, Expression** eout) {
     return parse_expression_(context, parser, eout, 100);
 }
 
-Result parse_block(Context* context, Parser* parser, Block* block, Token token) {
+static Result parse_block(Context* context, Parser* parser, Block* block, Token token) {
     Result result;
     Span open_curly_span = token.span;
     parser->back.type = Token::Parser_Null_Token;
