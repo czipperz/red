@@ -90,6 +90,7 @@ static int try_run_main(Context* context) {
 
             const Compiler_Error& error = context->errors[i];
             const File& source_file = context->files.files[error.source_span.start.file];
+            const File& error_file = context->files.files[error.error_span.start.file];
 
             fwrite(source_file.path.buffer, 1, source_file.path.len, stderr);
             fprintf(stderr, ":%zu:%zu: Error: ", error.source_span.start.line + 1,
@@ -97,19 +98,17 @@ static int try_run_main(Context* context) {
             fwrite(context->errors[i].message.buffer, 1, context->errors[i].message.len, stderr);
             fputs(":\n", stderr);
 
-            draw_error_span(&source_file.contents, error.source_span);
-
             if (error.error_span.start.file != error.source_span.start.file ||
                 // error.error_span.start.index != error.source_span.start.index ||
                 error.error_span.end.index != error.source_span.end.index) {
-                const File& error_file = context->files.files[error.error_span.start.file];
+                draw_error_span(&source_file.contents, error.source_span);
 
                 fwrite(error_file.path.buffer, 1, error_file.path.len, stderr);
                 fprintf(stderr, ":%zu:%zu: Macro expanded from here:\n",
                         error.error_span.start.line + 1, error.error_span.start.column + 1);
-
-                draw_error_span(&error_file.contents, error.error_span);
             }
+
+            draw_error_span(&error_file.contents, error.error_span);
         }
 
         if (result.is_err()) {
