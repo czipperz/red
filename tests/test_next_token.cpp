@@ -337,6 +337,20 @@ TEST_CASE("next_token() block comment terminator has trigraph backslash newline 
     CHECK(token.span.end.column == 5);
 }
 
+TEST_CASE("next_token() line comment") {
+    SETUP("//abc\ndef");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(is_bol);
+    CHECK(token.type == red::Token::Identifier);
+    CHECK(token.span.start.index == 6);
+    CHECK(token.span.start.line == 1);
+    CHECK(token.span.start.column == 0);
+    CHECK(token.span.end.index == 9);
+    CHECK(token.span.end.line == 1);
+    CHECK(token.span.end.column == 3);
+}
+
 void check_keyword(const char* str, red::Token::Type type_expected) {
     SETUP(str);
 

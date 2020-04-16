@@ -610,6 +610,7 @@ top:
                     }
 
                     *location = point;
+                    *at_bol = true;
                     goto top;
                 } else if (next == '=') {
                     token_out->type = Token::DivideSet;

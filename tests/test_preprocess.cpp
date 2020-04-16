@@ -471,6 +471,23 @@ TEST_CASE("cpp::next_token #elif not taken") {
     CHECK(context.errors.len() == 0);
 }
 
+TEST_CASE("cpp::next_token #endif trailing comment") {
+    SETUP("#if 1\n#if 1\nx\n#endif //\n#endif\ny\n");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "x");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "y");
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+    CHECK(context.errors.len() == 0);
+}
+
 TEST_CASE("cpp::next_token #define no value") {
     SETUP("#define abc\nabc");
 
