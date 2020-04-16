@@ -195,24 +195,107 @@ static Result parse_expression_(Context* context,
                                 Expression** eout,
                                 int max_precedence);
 
-static Result parse_declaration_after_identifier(Context* context,
-                                                 Parser* parser,
-                                                 Declaration* declaration,
-                                                 Hashed_Str identifier,
-                                                 Token* token,
-                                                 cz::Vector<Statement*>* initializers) {
-    // Todo: support arrays
-    Span previous_span = token->span;
+static Result parse_base_type(Context* context,
+                              Parser* parser,
+                              cz::Vector<Statement*>* initializers,
+                              TypeP* base_type);
+
+static Result parse_declaration_identifier_and_type(Context* context,
+                                                    Parser* parser,
+                                                    cz::Vector<Statement*>* initializers,
+                                                    Hashed_Str* identifier,
+                                                    TypeP* type,
+                                                    Token* token);
+
+static Result parse_parameters(Context* context,
+                               Parser* parser,
+                               cz::Vector<Statement*>* initializers,
+                               cz::Vector<TypeP>* parameter_types,
+                               cz::Vector<cz::Str>* parameter_names,
+                               bool* has_varargs) {
+    Token token;
+    next_token(context, parser, &token);
+    Span previous_span = token.span;
     Span previous_source_span = source_span(parser);
-    Result result = next_token(context, parser, token);
+    Result result = peek_token(context, parser, &token);
     CZ_TRY_VAR(result);
     if (result.type == Result::Done) {
         context->report_error(previous_span, previous_source_span,
-                              "Expected ';' to end declaration here");
+                              "Expected ')' to end parameter list here");
         return {Result::ErrorInvalidInput};
     }
+    if (token.type == Token::CloseParen) {
+        parser->back.type = Token::Parser_Null_Token;
+        return Result::ok();
+    }
+
+    while (1) {
+        TypeP type = {};
+        result = parse_base_type(context, parser, initializers, &type);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            context->report_error(previous_span, previous_source_span,
+                                  "Expected ')' to end parameter list here");
+            return {Result::ErrorInvalidInput};
+        }
+
+        previous_span = token.span;
+        previous_source_span = source_span(parser);
+        result = peek_token(context, parser, &token);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            context->report_error(previous_span, previous_source_span,
+                                  "Expected ')' to end parameter list here");
+            return {Result::ErrorInvalidInput};
+        }
+
+        Hashed_Str identifier = {};
+        if (token.type != Token::CloseParen && token.type != Token::Comma) {
+            CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers, &identifier,
+                                                         &type, &token));
+        }
+
+        parameter_types->reserve(cz::heap_allocator(), 1);
+        parameter_names->reserve(cz::heap_allocator(), 1);
+        parameter_types->push(type);
+        parameter_names->push({});
+
+        previous_span = token.span;
+        previous_source_span = source_span(parser);
+        result = next_token(context, parser, &token);
+        CZ_TRY_VAR(result);
+        if (result.type == Result::Done) {
+            context->report_error(previous_span, previous_source_span,
+                                  "Expected ')' to end parameter list here");
+            return {Result::ErrorInvalidInput};
+        }
+
+        if (token.type == Token::CloseParen) {
+            return Result::ok();
+        } else if (token.type == Token::Comma) {
+            continue;
+        } else {
+            context->report_error(token.span, source_span(parser),
+                                  "Expected ')' to end parameter list here");
+            return {Result::ErrorInvalidInput};
+        }
+    }
+}
+
+static Result parse_declaration_initializer(Context* context,
+                                            Parser* parser,
+                                            TypeP type,
+                                            Hashed_Str identifier,
+                                            Token* token,
+                                            cz::Vector<Statement*>* initializers) {
+    // Todo: support arrays
+    Span previous_span = token->span;
+    Span previous_source_span = source_span(parser);
+    Result result = peek_token(context, parser, token);
 
     if (token->type == Token::Set) {
+        parser->back.type = Token::Parser_Null_Token;
+
         // Eat the value.
         Expression* value;
         result = parse_expression_(context, parser, &value, 17);
@@ -229,17 +312,6 @@ static Result parse_declaration_after_identifier(Context* context,
         initializer->value = value;
         initializers->reserve(cz::heap_allocator(), 1);
         initializers->push(initializer);
-
-        // Then eat `;` or `,` after the value.
-        previous_span = token->span;
-        previous_source_span = source_span(parser);
-        result = next_token(context, parser, token);
-        CZ_TRY_VAR(result);
-        if (result.type == Result::Done) {
-            context->report_error(previous_span, previous_source_span,
-                                  "Expected ';' to end declaration here");
-            return {Result::ErrorInvalidInput};
-        }
     } else {
         Statement_Initializer_Default* initializer =
             parser->buffer_array.allocator().create<Statement_Initializer_Default>();
@@ -251,69 +323,101 @@ static Result parse_declaration_after_identifier(Context* context,
     cz::Str_Map<Declaration>* declarations = &parser->declaration_stack.last();
     if (!declarations->get(identifier.str, identifier.hash)) {
         declarations->reserve(cz::heap_allocator(), 1);
-        declarations->insert(identifier.str, identifier.hash, *declaration);
+        Declaration declaration = {};
+        declaration.type = type;
+        declarations->insert(identifier.str, identifier.hash, declaration);
     } else {
         context->report_error(previous_span, previous_source_span,
                               "Declaration with same name also in scope");
     }
-
-    if (token->type == Token::Comma) {
-        return Result::ok();
-    } else if (token->type == Token::Semicolon) {
-        return {Result::Done};
-    } else {
-        context->report_error(previous_span, previous_source_span,
-                              "Expected ';' to end declaration here");
-        return {Result::ErrorInvalidInput};
-    }
+    return Result::ok();
 }
 
-static Result parse_declaration_after_base_type(Context* context,
-                                                Parser* parser,
-                                                TypeP base_type,
-                                                Token* token,
-                                                cz::Vector<Statement*>* initializers) {
-    Declaration declaration = {};
-    declaration.type = base_type;
-
+static Result parse_declaration_identifier_and_type(Context* context,
+                                                    Parser* parser,
+                                                    cz::Vector<Statement*>* initializers,
+                                                    Hashed_Str* identifier,
+                                                    TypeP* type,
+                                                    Token* token) {
     bool allow_qualifiers = false;
     while (1) {
         Span previous_span = token->span;
         Span previous_source_span = source_span(parser);
         Result result = next_token(context, parser, token);
         CZ_TRY_VAR(result);
-        if (result.type != Result::Success) {
+        if (result.type == Result::Done) {
             context->report_error(previous_span, previous_source_span,
                                   "Expected ';' to end declaration here");
             return {Result::ErrorInvalidInput};
         }
 
-        previous_span = token->span;
-        previous_source_span = source_span(parser);
-
-        if (allow_qualifiers &&
-            parse_type_qualifier(context, &declaration.type, *token, previous_source_span)) {
-            continue;
-        }
-
         switch (token->type) {
             case Token::Star: {
                 Type_Pointer* pointer = parser->buffer_array.allocator().create<Type_Pointer>();
-                pointer->inner = declaration.type;
-                declaration.type.clear();
-                declaration.type.set_type(pointer);
+                pointer->inner = *type;
+                type->clear();
+                type->set_type(pointer);
                 allow_qualifiers = true;
                 break;
             }
 
             case Token::Identifier:
-                return parse_declaration_after_identifier(context, parser, &declaration,
-                                                          token->v.identifier, token, initializers);
+                previous_span = token->span;
+                previous_source_span = source_span(parser);
+                *identifier = token->v.identifier;
+
+                result = peek_token(context, parser, token);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(previous_span, previous_source_span,
+                                          "Expected ';' to end declaration here");
+                    return {Result::ErrorInvalidInput};
+                }
+
+                if (token->type == Token::OpenParen) {
+                    cz::Vector<TypeP> parameter_types = {};
+                    cz::Vector<cz::Str> parameter_names = {};
+                    bool has_varargs = false;
+                    CZ_DEFER({
+                        parameter_types.drop(cz::heap_allocator());
+                        parameter_names.drop(cz::heap_allocator());
+                    });
+
+                    CZ_TRY(parse_parameters(context, parser, initializers, &parameter_types,
+                                            &parameter_names, &has_varargs));
+
+                    Type_Function* function =
+                        parser->buffer_array.allocator().create<Type_Function>();
+                    function->return_type = (*type);
+                    function->parameter_types =
+                        parser->buffer_array.allocator().duplicate(parameter_types.as_slice());
+                    function->has_varargs = has_varargs;
+                    type->clear();
+                    type->set_type(function);
+                }
+
+                return Result::ok();
+
+            case Token::Const:
+                if (!allow_qualifiers) {
+                    context->report_error(token->span, source_span(parser),
+                                          "East const must be used immediately after base type");
+                    break;
+                }
+                parse_const(context, type, *token, source_span(parser));
+                break;
+
+            case Token::Volatile:
+                if (!allow_qualifiers) {
+                    context->report_error(token->span, source_span(parser),
+                                          "East const must be used immediately after base type");
+                    break;
+                }
+                parse_volatile(context, type, *token, source_span(parser));
+                break;
 
             default:
-                context->report_error(previous_span, previous_source_span,
-                                      "Expected identifier here to complete declaration");
-                return {Result::ErrorInvalidInput};
+                return Result::ok();
         }
     }
 }
@@ -1325,11 +1429,34 @@ Result parse_declaration_(Context* context, Parser* parser, cz::Vector<Statement
     }
 
     while (1) {
-        result =
-            parse_declaration_after_base_type(context, parser, base_type, &token, initializers);
+        TypeP type = base_type;
+        Hashed_Str identifier = {};
+        CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers, &identifier,
+                                                     &type, &token));
+
+        if (identifier.str.len > 0) {
+            CZ_TRY(parse_declaration_initializer(context, parser, type, identifier, &token,
+                                                 initializers));
+        }
+
+        Span previous_span = token.span;
+        Span previous_source_span = source_span(parser);
+        result = next_token(context, parser, &token);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
+            context->report_error(previous_span, previous_source_span,
+                                  "Expected ';' to end declaration here");
+            return {Result::ErrorInvalidInput};
+        }
+
+        if (token.type == Token::Comma) {
+            continue;
+        } else if (token.type == Token::Semicolon) {
             break;
+        } else {
+            context->report_error(token.span, source_span(parser),
+                                  "Expected ';' to end declaration here");
+            return {Result::ErrorInvalidInput};
         }
     }
 
@@ -1666,7 +1793,7 @@ Result parse_block(Context* context, Parser* parser, Block* block, Token token) 
     });
 
     cz::Vector<Statement*> statements = {};
-    CZ_DEFER(statements.drop(context->temp_buffer_array.allocator()));
+    CZ_DEFER(statements.drop(cz::heap_allocator()));
     while (1) {
         result = peek_token(context, parser, &token);
         CZ_TRY_VAR(result);
@@ -1704,7 +1831,7 @@ Result parse_block(Context* context, Parser* parser, Block* block, Token token) 
         Statement* statement;
         CZ_TRY(parse_statement(context, parser, &statement));
 
-        statements.reserve(context->temp_buffer_array.allocator(), 1);
+        statements.reserve(cz::heap_allocator(), 1);
         statements.push(statement);
     }
 

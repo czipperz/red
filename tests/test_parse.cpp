@@ -151,9 +151,9 @@ TEST_CASE("parse_declaration const cannot be used after an identifier") {
     cz::Vector<Statement*> initializers = {};
     CZ_DEFER(initializers.drop(cz::heap_allocator()));
 
-    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::ErrorInvalidInput);
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
     REQUIRE(parser.declaration_stack.len() == 1);
-    CHECK(parser.declaration_stack[0].count == 1);
+    CHECK(parser.declaration_stack[0].count == 2);
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
@@ -161,7 +161,67 @@ TEST_CASE("parse_declaration const cannot be used after an identifier") {
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
+    Declaration* def = parser.declaration_stack[0].get_hash("def");
+    REQUIRE(def);
+    CHECK_FALSE(def->type.is_const());
+    CHECK_FALSE(def->type.is_volatile());
+    REQUIRE(def->type.get_type());
+    REQUIRE(def->type.get_type()->tag == Type::Pointer);
+    Type_Pointer* deft = (Type_Pointer*)def->type.get_type();
+    CHECK(deft->inner.get_type() == parser.type_signed_int);
+    CHECK_FALSE(deft->inner.is_const());
+    CHECK_FALSE(deft->inner.is_volatile());
+
     CHECK(context.errors.len() == 1);
+}
+
+TEST_CASE("parse_declaration basic function declaration no parameters") {
+    SETUP("void f();");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* f = parser.declaration_stack[0].get_hash("f");
+    REQUIRE(f);
+    CHECK_FALSE(f->type.is_const());
+    CHECK_FALSE(f->type.is_volatile());
+    REQUIRE(f->type.get_type());
+    REQUIRE(f->type.get_type()->tag == Type::Function);
+
+    Type_Function* ft = (Type_Function*)f->type.get_type();
+    CHECK(ft->return_type.get_type() == parser.type_void);
+    CHECK(ft->parameter_types.len == 0);
+    CHECK_FALSE(ft->has_varargs);
+}
+
+TEST_CASE("parse_declaration basic function declaration one parameter") {
+    SETUP("void f(int x);");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* f = parser.declaration_stack[0].get_hash("f");
+    REQUIRE(f);
+    CHECK_FALSE(f->type.is_const());
+    CHECK_FALSE(f->type.is_volatile());
+    REQUIRE(f->type.get_type());
+    REQUIRE(f->type.get_type()->tag == Type::Function);
+
+    Type_Function* ft = (Type_Function*)f->type.get_type();
+    CHECK(ft->return_type.get_type() == parser.type_void);
+    REQUIRE(ft->parameter_types.len == 1);
+    CHECK(ft->parameter_types[0].get_type() == parser.type_signed_int);
+    CHECK_FALSE(ft->parameter_types[0].is_const());
+    CHECK_FALSE(ft->parameter_types[0].is_volatile());
+    CHECK_FALSE(ft->has_varargs);
 }
 
 TEST_CASE("parse_declaration long int = signed long") {

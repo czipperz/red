@@ -38,6 +38,7 @@ struct alignas(4) Type {
         Struct,
         Union,
         Pointer,
+        Function,
     };
 
     Type(Tag tag) : tag(tag) {}
@@ -98,6 +99,14 @@ struct Type_Pointer : Type {
     TypeP inner;
 };
 
+struct Type_Function : Type {
+    Type_Function() : Type(Function) {}
+
+    TypeP return_type;
+    cz::Slice<TypeP> parameter_types;
+    bool has_varargs;
+};
+
 struct Expression {
     enum Tag {
         Integer,
@@ -147,6 +156,7 @@ struct Statement {
         While,
         Initializer_Default,
         Initializer_Copy,
+        Function,
     };
 
     Tag tag;
@@ -200,6 +210,12 @@ struct Statement_Initializer_Copy : Statement_Initializer {
     Statement_Initializer_Copy() : Statement_Initializer(Initializer_Copy) {}
 
     struct Expression* value;
+};
+
+struct Statement_Function : Statement {
+    Type_Function* type;
+    cz::Slice<cz::Str> parameter_names;
+    struct Block block;
 };
 
 struct Declaration {
