@@ -28,7 +28,12 @@ static void draw_error_span(const File_Contents* file_contents, Span error_span)
     size_t line_start = error_span.start.index - error_span.start.column;
     for (size_t i = line_start;; ++i) {
         char ch = file_contents->get(i);
-        putc(ch, stderr);
+        // Todo: handle tabs correctly
+        if (ch == '\t') {
+            putc(' ', stderr);
+        } else {
+            putc(ch, stderr);
+        }
 
         if (ch == '\n') {
             fputs("    ", stderr);
