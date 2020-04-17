@@ -1711,10 +1711,34 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
         return Result::ok();
     } else {
         uint32_t flags = 0;
-        if (result.type == Result::Success && pair.token.type == Token::Extern) {
+        while (result.type == Result::Success) {
+            switch (pair.token.type) {
+                case Token::Extern: {
+                    if (flags & Declaration::Extern) {
+                        context->report_error(pair.token.span, pair.source_span,
+                                              "Declaration has already been declared `extern`");
+                    }
+                    flags |= Declaration::Extern;
+                } break;
+
+                case Token::Static: {
+                    if (flags & Declaration::Static) {
+                        context->report_error(pair.token.span, pair.source_span,
+                                              "Declaration has already been declared `static`");
+                    }
+                    flags |= Declaration::Static;
+                } break;
+
+                default:
+                    goto pd;
+            }
+
             next_token_after_peek(parser);
-            flags |= Declaration::Extern;
+            result = peek_token(context, parser, &pair);
+            CZ_TRY_VAR(result);
         }
+
+    pd:
         return parse_declaration_(context, parser, initializers, flags);
     }
 }

@@ -176,6 +176,32 @@ TEST_CASE("parse_declaration const cannot be used after an identifier") {
     CHECK(context.errors.len() == 1);
 }
 
+TEST_CASE("parse_declaration static") {
+    SETUP("static int abc;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    REQUIRE(initializers.len() == 1);
+    REQUIRE(initializers[0]);
+    REQUIRE(initializers[0]->tag == Statement::Initializer_Default);
+
+    Declaration* abc = parser.declaration_stack[0].get_hash("abc");
+    REQUIRE(abc);
+    CHECK(abc->type.get_type() == parser.type_signed_int);
+    CHECK_FALSE(abc->type.is_const());
+    CHECK_FALSE(abc->type.is_volatile());
+    CHECK(abc->v.initializer == initializers[0]);
+    CHECK(abc->flags == Declaration::Static);
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Done);
+    CHECK(context.errors.len() == 0);
+}
+
 TEST_CASE("parse_declaration basic function declaration no parameters") {
     SETUP("void f();");
     cz::Vector<Statement*> initializers = {};

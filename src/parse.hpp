@@ -236,6 +236,7 @@ struct Declaration {
     uint32_t flags;
     enum {
         Extern = 1,
+        Static = 2,
     };
 };
 
