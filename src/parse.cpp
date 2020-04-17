@@ -112,8 +112,7 @@ static Result peek_token(Context* context, Parser* parser, Token_Source_Span_Pai
         Result result =
             cpp::next_token(context, &parser->preprocessor, &parser->lexer, &pair->token);
         if (result.type == Result::Success) {
-            Location location = parser->preprocessor.location();
-            pair->source_span = {location, location};
+            pair->source_span = parser->preprocessor.include_stack.last().span;
             *pair_out = *pair;
         } else {
             pair->token.type = Token::Parser_Null_Token;

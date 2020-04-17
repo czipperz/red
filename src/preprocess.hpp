@@ -2,7 +2,7 @@
 
 #include <cz/str_map_removable.hpp>
 #include <cz/vector.hpp>
-#include "location.hpp"
+#include "span.hpp"
 
 namespace red {
 namespace lex {
@@ -11,14 +11,13 @@ struct Lexer;
 
 struct Context;
 struct Result;
-struct Span;
 struct Token;
 
 namespace pre {
 struct Definition;
 
 struct Include_Info {
-    Location location;
+    Span span;
     cz::Vector<Span> if_stack;
 };
 
@@ -39,8 +38,6 @@ struct Preprocessor {
     cz::Vector<Definition_Info> definition_stack;
 
     void destroy();
-
-    Location location() const;
 };
 
 Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer, Token* token);

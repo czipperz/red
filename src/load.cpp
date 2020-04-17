@@ -20,7 +20,8 @@ void include_file_reserve(Files* files, pre::Preprocessor* preprocessor) {
 
 static void push_file(pre::Preprocessor* preprocessor, size_t index) {
     pre::Include_Info info = {};
-    info.location.file = index;
+    info.span.start.file = index;
+    info.span.end.file = index;
     preprocessor->include_stack.push(info);
 }
 

@@ -37,13 +37,8 @@ void Preprocessor::destroy() {
     definition_stack.drop(cz::heap_allocator());
 }
 
-Location Preprocessor::location() const {
-    return include_stack.last().location;
-}
-
 static Span source_span(Preprocessor* preprocessor) {
-    Location end = preprocessor->location();
-    return {end, end};
+    return preprocessor->include_stack.last().span;
 }
 
 static void drop(Definition_Info* info) {
@@ -96,7 +91,7 @@ static Result process_include(Context* context,
                               lex::Lexer* lexer,
                               Token* token) {
     ZoneScoped;
-    Location* point = &preprocessor->include_stack.last().location;
+    Location* point = &preprocessor->include_stack.last().span.end;
     advance_over_whitespace(context->files.files[point->file].contents, point);
 
     Location backup = *point;
@@ -179,7 +174,7 @@ static bool skip_until_eol(Context* context,
                            lex::Lexer* lexer,
                            Token* token) {
     ZoneScoped;
-    Location* point = &preprocessor->include_stack.last().location;
+    Location* point = &preprocessor->include_stack.last().span.end;
     while (1) {
         bool at_bol = false;
         if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
@@ -203,7 +198,7 @@ static Result process_pragma(Context* context,
                              lex::Lexer* lexer,
                              Token* token) {
     ZoneScoped;
-    Location* point = &preprocessor->include_stack.last().location;
+    Location* point = &preprocessor->include_stack.last().span.end;
     bool at_bol = false;
     if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
                          &at_bol)) {
@@ -244,7 +239,7 @@ static Result process_if_true(Context* context,
                               lex::Lexer* lexer,
                               Token* token) {
     ZoneScoped;
-    Location* point = &preprocessor->include_stack.last().location;
+    Location* point = &preprocessor->include_stack.last().span.end;
     bool at_bol = true;
     if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
                          &at_bol)) {
@@ -271,7 +266,7 @@ static Result process_if_false(Context* context,
 
     bool at_bol;
     if (start_at_bol) {
-        Location* point = &preprocessor->include_stack.last().location;
+        Location* point = &preprocessor->include_stack.last().span.end;
         at_bol = true;
         at_bol = lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                                  token, &at_bol);
@@ -294,8 +289,8 @@ static Result process_if_false(Context* context,
         if (token->type == Token::Hash) {
             at_bol = false;
             Include_Info* info = &preprocessor->include_stack.last();
-            if (!lex::next_token(context, lexer, context->files.files[info->location.file].contents,
-                                 &info->location, token, &at_bol)) {
+            if (!lex::next_token(context, lexer, context->files.files[info->span.end.file].contents,
+                                 &info->span.end, token, &at_bol)) {
                 Include_Info entry = preprocessor->include_stack.last();
                 for (size_t i = 0; i < entry.if_stack.len(); ++i) {
                     context->report_lex_error(entry.if_stack[i], "Unterminated #if");
@@ -317,7 +312,7 @@ static Result process_if_false(Context* context,
                     }
                 } else if (token->v.identifier.str == "elif") {
                     if (allow_else && skip_depth == 0) {
-                        preprocessor->include_stack.last().if_stack.pop();
+                        info->if_stack.pop();
                         return process_if(context, preprocessor, lexer, token);
                     }
                 } else if (token->v.identifier.str == "endif") {
@@ -345,8 +340,8 @@ static Result process_ifdef(Context* context,
 
     Include_Info* point = &preprocessor->include_stack.last();
     bool at_bol = false;
-    if (!lex::next_token(context, lexer, context->files.files[point->location.file].contents,
-                         &point->location, token, &at_bol) ||
+    if (!lex::next_token(context, lexer, context->files.files[point->span.end.file].contents,
+                         &point->span.end, token, &at_bol) ||
         at_bol) {
         context->report_lex_error(ifdef_span, "No macro to test");
         // It doesn't make sense to continue after #if because we can't deduce
@@ -579,7 +574,7 @@ static Result process_defined_macro(Context* context,
                                     Token* token) {
     ZoneScoped;
 
-    Location* point = &preprocessor->include_stack.last().location;
+    Location* point = &preprocessor->include_stack.last().span.end;
     Span defined_span = token->span;
     bool at_bol = false;
     if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
@@ -651,14 +646,14 @@ static Result process_if(Context* context,
             if (ntid_result.type == Result::Done) {
                 bool at_bol = false;
                 point = &preprocessor->include_stack.last();
-                Location backup_point = point->location;
+                Location backup_point = point->span.end;
                 if (!lex::next_token(context, lexer,
-                                     context->files.files[point->location.file].contents,
-                                     &point->location, token, &at_bol)) {
+                                     context->files.files[point->span.end.file].contents,
+                                     &point->span.end, token, &at_bol)) {
                     break;
                 }
                 if (at_bol) {
-                    point->location = backup_point;
+                    point->span.end = backup_point;
                     break;
                 }
             }
@@ -796,7 +791,7 @@ static Result process_define(Context* context,
     ZoneScoped;
     Span define_span = token->span;
 
-    Location* point = &preprocessor->include_stack.last().location;
+    Location* point = &preprocessor->include_stack.last().span.end;
     bool at_bol = false;
     if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
                          &at_bol)) {
@@ -1012,8 +1007,8 @@ static Result process_undef(Context* context,
 
     Include_Info* point = &preprocessor->include_stack.last();
     bool at_bol = false;
-    if (!lex::next_token(context, lexer, context->files.files[point->location.file].contents,
-                         &point->location, token, &at_bol)) {
+    if (!lex::next_token(context, lexer, context->files.files[point->span.end.file].contents,
+                         &point->span.end, token, &at_bol)) {
         context->report_lex_error(undef_span, "Must specify the macro to undefine");
         return next_token(context, preprocessor, lexer, token);
     }
@@ -1060,7 +1055,7 @@ static Result process_defined_identifier(Context* context,
     if (definition->is_function) {
         // Process arguments.
         Token identifier_token = *token;
-        Location* point = &preprocessor->include_stack.last().location;
+        Location* point = &preprocessor->include_stack.last().span.end;
         Location backup_point_open_paren = *point;
 
         // We expect an open parenthesis here.  If there isn't one, just don't expand the macro.
@@ -1205,7 +1200,8 @@ static Result process_token(Context* context,
                             bool at_bol) {
     ZoneScoped;
 top:
-    Location* point = &preprocessor->include_stack.last().location;
+    preprocessor->include_stack.last().span = token->span;
+    Location* point = &preprocessor->include_stack.last().span.end;
     if (at_bol && token->type == Token::Hash) {
         at_bol = false;
         if (lex::next_token(context, lexer, context->files.files[point->file].contents, point,
@@ -1258,6 +1254,7 @@ top:
         return process_identifier(context, preprocessor, lexer, token);
     }
 
+    preprocessor->include_stack.last().span = token->span;
     return Result::ok();
 }
 
@@ -1501,7 +1498,7 @@ Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexe
         return Result::done();
     }
 
-    Location* point = &preprocessor->include_stack.last().location;
+    Location* point = &preprocessor->include_stack.last().span.end;
     while (point->index == context->files.files[point->file].contents.len) {
         Include_Info entry = preprocessor->include_stack.pop();
 
@@ -1515,7 +1512,7 @@ Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexe
             return Result::done();
         }
 
-        point = &preprocessor->include_stack.last().location;
+        point = &preprocessor->include_stack.last().span.end;
     }
 
     bool at_bol = point->index == 0;
@@ -1533,6 +1530,14 @@ Result next_token(Context* context,
                   lex::Lexer* lexer,
                   Token* token) {
     Result result = pre::next_token(context, preprocessor, lexer, token);
+
+    if (result.type == Result::Success) {
+        if (preprocessor->definition_stack.len() == 0) {
+            CZ_DEBUG_ASSERT(
+                memcmp(&preprocessor->include_stack.last().span, &token->span, sizeof(Span)) == 0);
+        }
+    }
+
     if (result.type == Result::Success && token->type == Token::Identifier) {
         ZoneScopedN("cpp::next_token keyword");
 
