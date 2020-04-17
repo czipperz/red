@@ -2267,6 +2267,40 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             return Result::ok();
         }
 
+        case Token::Return: {
+            next_token_after_peek(parser);
+            result = peek_token(context, parser, &pair);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected semicolon here to end expression statement");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Expression* value;
+            if (pair.token.type == Token::Semicolon) {
+                value = nullptr;
+            } else {
+                CZ_TRY(parse_expression(context, parser, &value));
+
+                previous_token(parser, &pair);
+                result = peek_token(context, parser, &pair);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done || pair.token.type != Token::Semicolon) {
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Expected semicolon here to end expression statement");
+                    return {Result::ErrorInvalidInput};
+                }
+            }
+            next_token_after_peek(parser);
+
+            Statement_Return* statement =
+                parser->buffer_array.allocator().create<Statement_Return>();
+            statement->o_value = value;
+            *sout = statement;
+            return Result::ok();
+        }
+
         default: {
             Expression* expression;
             CZ_TRY(parse_expression(context, parser, &expression));

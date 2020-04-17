@@ -162,6 +162,7 @@ struct Statement {
         Block,
         For,
         While,
+        Return,
         Initializer_Default,
         Initializer_Copy,
         Function,
@@ -202,6 +203,12 @@ struct Statement_While : Statement {
 
     struct Expression* condition;
     Statement* body;
+};
+
+struct Statement_Return : Statement {
+    Statement_Return() : Statement(Return) {}
+
+    struct Expression* o_value;
 };
 
 struct Statement_Initializer : Statement {

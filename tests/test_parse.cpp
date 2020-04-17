@@ -1418,3 +1418,28 @@ TEST_CASE("parse_statement while loop") {
     Statement_Block* body = (Statement_Block*)swhile->body;
     CHECK(body->block.statements.len == 0);
 }
+
+TEST_CASE("parse_statement return no expression") {
+    SETUP("return;");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    REQUIRE(statement);
+    REQUIRE(statement->tag == Statement::Return);
+
+    Statement_Return* sreturn = (Statement_Return*)statement;
+    CHECK_FALSE(sreturn->o_value);
+}
+
+TEST_CASE("parse_statement return expression") {
+    SETUP("return 13;");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    REQUIRE(statement);
+    REQUIRE(statement->tag == Statement::Return);
+
+    Statement_Return* sreturn = (Statement_Return*)statement;
+    REQUIRE(sreturn->o_value);
+    CHECK(sreturn->o_value->tag == Expression::Integer);
+}
