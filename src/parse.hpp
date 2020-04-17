@@ -247,6 +247,11 @@ enum Declaration_Or_Statement {
 }
 using Declaration_Or_Statement_::Declaration_Or_Statement;
 
+struct Token_Source_Span_Pair {
+    Token token;
+    Span source_span;
+};
+
 struct Parser {
     pre::Preprocessor preprocessor;
     lex::Lexer lexer;
@@ -277,7 +282,8 @@ struct Parser {
     Type* type_void;
     Type* type_error;
 
-    Token back;
+    Token_Source_Span_Pair pairs[2];
+    int pair_index;
 
     void init();
     void drop();
