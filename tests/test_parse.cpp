@@ -966,7 +966,7 @@ TEST_CASE("parse_declaration enum with two values") {
     CHECK(parser.typedef_stack[0].count == 0);
     REQUIRE(parser.declaration_stack.len() == 1);
     CHECK(parser.declaration_stack[0].count == 2);
-    CHECK(initializers.len() == 2);
+    CHECK(initializers.len() == 0);
 }
 
 TEST_CASE("parse_declaration unnamed struct no body") {

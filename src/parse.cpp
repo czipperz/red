@@ -194,14 +194,10 @@ static Result parse_expression_(Context* context,
                                 Expression** eout,
                                 int max_precedence);
 
-static Result parse_base_type(Context* context,
-                              Parser* parser,
-                              cz::Vector<Statement*>* initializers,
-                              TypeP* base_type);
+static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type);
 
 static Result parse_declaration_identifier_and_type(Context* context,
                                                     Parser* parser,
-                                                    cz::Vector<Statement*>* initializers,
                                                     Hashed_Str* identifier,
                                                     TypeP* type,
                                                     TypeP** inner_type_out,
@@ -209,7 +205,6 @@ static Result parse_declaration_identifier_and_type(Context* context,
 
 static Result parse_parameters(Context* context,
                                Parser* parser,
-                               cz::Vector<Statement*>* initializers,
                                cz::Vector<TypeP>* parameter_types,
                                cz::Vector<cz::Str>* parameter_names,
                                bool* has_varargs) {
@@ -231,7 +226,7 @@ static Result parse_parameters(Context* context,
 
     while (1) {
         TypeP type = {};
-        result = parse_base_type(context, parser, initializers, &type);
+        result = parse_base_type(context, parser, &type);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
             context->report_error(previous_span, previous_source_span,
@@ -252,8 +247,8 @@ static Result parse_parameters(Context* context,
         Hashed_Str identifier = {};
         if (pair.token.type != Token::CloseParen && pair.token.type != Token::Comma) {
             cz::Slice<cz::Str> inner_parameter_names;
-            CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers, &identifier,
-                                                         &type, nullptr, &inner_parameter_names));
+            CZ_TRY(parse_declaration_identifier_and_type(context, parser, &identifier, &type,
+                                                         nullptr, &inner_parameter_names));
         }
 
         parameter_types->reserve(cz::heap_allocator(), 1);
@@ -395,7 +390,6 @@ static Result parse_declaration_initializer(Context* context,
 
 static Result parse_declaration_identifier_and_type(Context* context,
                                                     Parser* parser,
-                                                    cz::Vector<Statement*>* initializers,
                                                     Hashed_Str* identifier,
                                                     TypeP* overall_type,
                                                     TypeP** inner_type_out,
@@ -467,8 +461,8 @@ static Result parse_declaration_identifier_and_type(Context* context,
                         parameter_names.drop(cz::heap_allocator());
                     });
 
-                    CZ_TRY(parse_parameters(context, parser, initializers, &parameter_types,
-                                            &parameter_names, &has_varargs));
+                    CZ_TRY(parse_parameters(context, parser, &parameter_types, &parameter_names,
+                                            &has_varargs));
                     if (type == overall_type) {
                         *parameter_names_out =
                             parser->buffer_array.allocator().duplicate(parameter_names.as_slice());
@@ -493,9 +487,8 @@ static Result parse_declaration_identifier_and_type(Context* context,
 
                     next_token_after_peek(parser);
 
-                    CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers,
-                                                                 identifier, type, &type,
-                                                                 parameter_names_out));
+                    CZ_TRY(parse_declaration_identifier_and_type(context, parser, identifier, type,
+                                                                 &type, parameter_names_out));
                     already_hit_identifier = true;
 
                     result = next_token(context, parser, &pair);
@@ -731,10 +724,7 @@ struct Numeric_Base {
     };
 };
 
-static Result parse_base_type(Context* context,
-                              Parser* parser,
-                              cz::Vector<Statement*>* initializers,
-                              TypeP* base_type) {
+static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type) {
     // Todo: dealloc anonymous structures.  This will probably work by copying the type information
     // into the buffer array.
 
@@ -1159,7 +1149,6 @@ static Result parse_base_type(Context* context,
 
                     cz::Str_Map<Declaration>* declarations = &parser->declaration_stack.last();
                     declarations->reserve(cz::heap_allocator(), values.cap);
-                    initializers->reserve(cz::heap_allocator(), values.cap);
                     for (size_t i = 0; i < values.cap; ++i) {
                         if (values.is_present(i)) {
                             Hashed_Str key = Hashed_Str::from_str(values.keys[i]);
@@ -1168,7 +1157,6 @@ static Result parse_base_type(Context* context,
                                 // Todo: expand to long / long long when values are too big
                                 declaration.type.set_type(parser->type_signed_int);
                                 declaration.type.set_const();
-                                declarations->insert(key.str, key.hash, declaration);
 
                                 Statement_Initializer_Copy* initializer =
                                     parser->buffer_array.allocator()
@@ -1178,8 +1166,9 @@ static Result parse_base_type(Context* context,
                                     parser->buffer_array.allocator().create<Expression_Integer>();
                                 value->value = values.values[i];
                                 initializer->value = value;
-                                initializers->push(initializer);
                                 declaration.v.initializer = initializer;
+
+                                declarations->insert(key.str, key.hash, declaration);
                             }
                         }
                     }
@@ -1613,7 +1602,7 @@ Result parse_declaration_(Context* context,
     //            declaration 1 = *a
     //            declaration 2 = b
     TypeP base_type = {};
-    Result result = parse_base_type(context, parser, initializers, &base_type);
+    Result result = parse_base_type(context, parser, &base_type);
     if (result.type != Result::Success) {
         return result;
     }
@@ -1630,8 +1619,8 @@ Result parse_declaration_(Context* context,
         TypeP type = base_type;
         Hashed_Str identifier = {};
         cz::Slice<cz::Str> parameter_names;
-        CZ_TRY(parse_declaration_identifier_and_type(context, parser, initializers, &identifier,
-                                                     &type, nullptr, &parameter_names));
+        CZ_TRY(parse_declaration_identifier_and_type(context, parser, &identifier, &type, nullptr,
+                                                     &parameter_names));
 
         if (identifier.str.len > 0) {
             bool force_terminate = false;
