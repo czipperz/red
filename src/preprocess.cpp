@@ -512,8 +512,6 @@ static Result parse_and_eval_expression(Context* context,
                 precedence = 12;
                 break;
             case Token::LeftShift:
-                precedence = 7;
-                break;
             case Token::RightShift:
                 precedence = 7;
                 break;

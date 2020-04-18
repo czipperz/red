@@ -2040,6 +2040,10 @@ static Result parse_expression_(Context* context,
             case Token::Or:
                 precedence = 15;
                 break;
+            case Token::LeftShift:
+            case Token::RightShift:
+                precedence = 7;
+                break;
             default:
                 context->report_error(pair.token.span, pair.source_span,
                                       "Expected binary operator here to connect expressions");
