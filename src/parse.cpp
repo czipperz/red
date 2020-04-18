@@ -805,6 +805,10 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         } else {
                             Type_Struct* struct_type =
                                 parser->buffer_array.allocator().create<Type_Struct>();
+                            // Todo: :MacroSpan rather than always using the source span, use the
+                            // spans from the outermost macro that contains all the tokens.
+                            struct_type->span = {struct_source_span.start,
+                                                 identifier_source_span.end};
                             struct_type->types = {};
                             struct_type->typedefs = {};
                             struct_type->declarations = {};
@@ -878,6 +882,9 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         }
 
                         cleanup_last_stack = false;
+                        // Todo: :MacroSpan rather than always using the source span, use the
+                        // spans from the outermost macro that contains all the tokens.
+                        struct_type->span = {struct_source_span.start, pair.source_span.end};
                         struct_type->types = parser->type_stack.last();
                         struct_type->typedefs = parser->typedef_stack.last();
                         struct_type->declarations = parser->declaration_stack.last();
@@ -903,6 +910,10 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         } else {
                             Type_Struct* struct_type =
                                 parser->buffer_array.allocator().create<Type_Struct>();
+                            // Todo: :MacroSpan rather than always using the source span, use the
+                            // spans from the outermost macro that contains all the tokens.
+                            struct_type->span = {struct_source_span.start,
+                                                 identifier_source_span.end};
                             struct_type->types = {};
                             struct_type->typedefs = {};
                             struct_type->declarations = {};
@@ -965,6 +976,10 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         } else {
                             Type_Union* union_type =
                                 parser->buffer_array.allocator().create<Type_Union>();
+                            // Todo: :MacroSpan rather than always using the source span, use the
+                            // spans from the outermost macro that contains all the tokens.
+                            union_type->span = {union_source_span.start,
+                                                identifier_source_span.end};
                             union_type->types = {};
                             union_type->typedefs = {};
                             union_type->declarations = {};
@@ -1042,6 +1057,9 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         }
 
                         cleanup_last_stack = false;
+                        // Todo: :MacroSpan rather than always using the source span, use the
+                        // spans from the outermost macro that contains all the tokens.
+                        union_type->span = {union_source_span.start, pair.source_span.end};
                         union_type->types = parser->type_stack.last();
                         union_type->typedefs = parser->typedef_stack.last();
                         union_type->declarations = parser->declaration_stack.last();
@@ -1064,6 +1082,10 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         } else {
                             Type_Union* union_type =
                                 parser->buffer_array.allocator().create<Type_Union>();
+                            // Todo: :MacroSpan rather than always using the source span, use the
+                            // spans from the outermost macro that contains all the tokens.
+                            union_type->span = {union_source_span.start,
+                                                identifier_source_span.end};
                             union_type->types = {};
                             union_type->typedefs = {};
                             union_type->declarations = {};
@@ -1123,6 +1145,9 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         } else {
                             Type_Enum* enum_type =
                                 parser->buffer_array.allocator().create<Type_Enum>();
+                            // Todo: :MacroSpan rather than always using the source span, use the
+                            // spans from the outermost macro that contains all the tokens.
+                            enum_type->span = {enum_source_span.start, identifier_source_span.end};
                             enum_type->values = {};
                             enum_type->flags = 0;
                             cz::Str_Map<Type*>* types = &parser->type_stack.last();
@@ -1201,6 +1226,9 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         }
 
                         destroy_values = false;
+                        // Todo: :MacroSpan rather than always using the source span, use the
+                        // spans from the outermost macro that contains all the tokens.
+                        enum_type->span = {enum_source_span.start, pair.source_span.end};
                         enum_type->values = values;
                         enum_type->flags = flags;
 
@@ -1219,6 +1247,9 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         base_type->set_type(*type);
                     } else {
                         Type_Enum* enum_type = parser->buffer_array.allocator().create<Type_Enum>();
+                        // Todo: :MacroSpan rather than always using the source span, use the
+                        // spans from the outermost macro that contains all the tokens.
+                        enum_type->span = {enum_source_span.start, identifier_source_span.end};
                         enum_type->values = {};
                         enum_type->flags = 0;
                         cz::Str_Map<Type*>* types = &parser->type_stack.last();

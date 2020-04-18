@@ -64,6 +64,7 @@ struct TypeP {
 struct Type_Enum : Type {
     Type_Enum() : Type(Enum) {}
 
+    Span span;
     cz::Str_Map<int64_t> values;
 
     enum Flags : uint32_t {
@@ -75,6 +76,7 @@ struct Type_Enum : Type {
 struct Type_Composite : Type {
     Type_Composite(Tag tag) : Type(tag) {}
 
+    Span span;
     cz::Str_Map<Type*> types;
     cz::Str_Map<TypeP> typedefs;
     cz::Str_Map<Declaration> declarations;
