@@ -1255,6 +1255,32 @@ TEST_CASE("parse_expression type cast") {
     CHECK(cast->type.get_type() == parser.type_signed_int);
 }
 
+TEST_CASE("parse_expression type cast user defined typedef") {
+    SETUP("typedef int A; (A)2 + 3;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+
+    Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->op == Token::Plus);
+    REQUIRE(e->left);
+    CHECK(e->left->tag == Expression::Cast);
+    REQUIRE(e->right);
+    CHECK(e->right->tag == Expression::Integer);
+
+    Expression_Cast* cast = (Expression_Cast*)e->left;
+    REQUIRE(cast->value);
+    CHECK(cast->value->tag == Expression::Integer);
+    CHECK(cast->type.get_type() == parser.type_signed_int);
+}
+
 TEST_CASE("parse_statement basic binary expression") {
     SETUP("1 + 2;");
 

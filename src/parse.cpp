@@ -1844,8 +1844,9 @@ static Result parse_expression_(Context* context,
 
             switch (peek_pair.token.type) {
                 case Token::Identifier: {
-                    Declaration* declaration = lookup_declaration(parser, pair.token.v.identifier);
-                    TypeP* typedef_ = lookup_typedef(parser, pair.token.v.identifier);
+                    Declaration* declaration =
+                        lookup_declaration(parser, peek_pair.token.v.identifier);
+                    TypeP* typedef_ = lookup_typedef(parser, peek_pair.token.v.identifier);
                     if (declaration || !typedef_) {
                         goto open_paren_expression;
                     }
