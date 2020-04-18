@@ -1036,6 +1036,11 @@ static Result process_error(Context* context,
     return SKIP_UNTIL_EOL();
 }
 
+static Result peek_token_in_definition_no_expansion(Context* context,
+                                                    Preprocessor* preprocessor,
+                                                    lex::Lexer* lexer,
+                                                    Token* token);
+
 static Result process_defined_identifier(Context* context,
                                          Preprocessor* preprocessor,
                                          lex::Lexer* lexer,
@@ -1057,7 +1062,7 @@ static Result process_defined_identifier(Context* context,
         // We expect an open parenthesis here.  If there isn't one, just don't expand the macro.
         bool at_bol = false;
         Result ntid_result =
-            next_token_in_definition(context, preprocessor, lexer, token, this_line_only, 0);
+            peek_token_in_definition_no_expansion(context, preprocessor, lexer, token);
         if (ntid_result.type == Result::Done) {
             if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                                  token, &at_bol)) {
@@ -1070,6 +1075,12 @@ static Result process_defined_identifier(Context* context,
                 *token = identifier_token;
                 return Result::ok();
             }
+        } else {
+            if (token->type != Token::OpenParen) {
+                *token = identifier_token;
+                return Result::ok();
+            }
+            next_token_in_definition(context, preprocessor, lexer, token, this_line_only, 0);
         }
 
         Span open_paren_span = token->span;
@@ -1266,6 +1277,25 @@ static Result process_next(Context* context,
     } else {
         return next_token(context, preprocessor, lexer, token);
     }
+}
+
+static Result peek_token_in_definition_no_expansion(Context* context,
+                                                    Preprocessor* preprocessor,
+                                                    lex::Lexer* lexer,
+                                                    Token* token) {
+    while (preprocessor->definition_stack.len() > 0) {
+        Definition_Info* info = &preprocessor->definition_stack.last();
+        if (info->index == info->definition->tokens.len()) {
+            // This definition has ran through all its tokens.
+            Definition_Info info = preprocessor->definition_stack.pop();
+            drop(&info);
+            continue;
+        }
+
+        *token = info->definition->tokens[info->index];
+        return Result::ok();
+    }
+    return {Result::Done};
 }
 
 static Result next_token_in_definition(Context* context,

@@ -535,6 +535,28 @@ TEST_CASE("cpp::next_token #define function macro no parameters isn't replaced w
     REQUIRE(EAT_NEXT().type == Result::Done);
 }
 
+TEST_CASE(
+    "cpp::next_token #define function macro no parameters isn't replaced when not invoked through "
+    "macro expansion") {
+    SETUP("#define abc(def) def y)\n#define mac() x\nabc(mac)");
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "mac");
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::Identifier);
+    CHECK(token.v.identifier.str == "y");
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Success);
+    CHECK(token.type == Token::CloseParen);
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(EAT_NEXT().type == Result::Done);
+}
+
 TEST_CASE("cpp::next_token #define function macro no parameters is replaced when invoked") {
     SETUP("#define abc() def\nabc()");
 
