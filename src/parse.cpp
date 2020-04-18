@@ -247,6 +247,8 @@ void Parser::init() {
 
     pairs[0].token.type = Token::Parser_Null_Token;
     pairs[1].token.type = Token::Parser_Null_Token;
+    pairs[2].token.type = Token::Parser_Null_Token;
+    pairs[3].token.type = Token::Parser_Null_Token;
 
     type_stack.reserve(cz::heap_allocator(), 4);
     typedef_stack.reserve(cz::heap_allocator(), 4);
@@ -328,8 +330,8 @@ static Result peek_token(Context* context, Parser* parser, Token_Source_Span_Pai
 }
 
 static void next_token_after_peek(Parser* parser) {
-    parser->pair_index = 1 - parser->pair_index;
     parser->pairs[parser->pair_index].token.type = Token::Parser_Null_Token;
+    parser->pair_index = (parser->pair_index + 1) & 3;
 }
 
 static Result next_token(Context* context, Parser* parser, Token_Source_Span_Pair* pair) {
@@ -340,12 +342,13 @@ static Result next_token(Context* context, Parser* parser, Token_Source_Span_Pai
     return result;
 }
 
-static void reverse_next_token(Parser* parser) {
-    parser->pair_index = 1 - parser->pair_index;
+static void reverse_next_token(Parser* parser, Token_Source_Span_Pair pair) {
+    parser->pair_index = (parser->pair_index - 1) & 3;
+    parser->pairs[parser->pair_index] = pair;
 }
 
 static void previous_token(Parser* parser, Token_Source_Span_Pair* pair) {
-    *pair = parser->pairs[1 - parser->pair_index];
+    *pair = parser->pairs[(parser->pair_index - 1) & 3];
 }
 
 static Declaration* lookup_declaration(Parser* parser, Hashed_Str id) {
@@ -2106,6 +2109,103 @@ static Result parse_expression_(Context* context,
             }
         }
 
+        case Token::Sizeof: {
+            Token_Source_Span_Pair open_paren_pair;
+            result = peek_token(context, parser, &open_paren_pair);
+            CZ_TRY(result);
+            if (result.type == Result::Done) {
+                context->report_error(
+                    open_paren_pair.token.span, open_paren_pair.source_span,
+                    "Expected expression or parenthesized type to take the size of here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            if (open_paren_pair.token.type == Token::OpenParen) {
+                Token_Source_Span_Pair peek_pair;
+                next_token_after_peek(parser);
+                result = peek_token(context, parser, &peek_pair);
+                CZ_TRY(result);
+                if (result.type == Result::Done) {
+                sizeof_open_paren_done:
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Unmatched parenthesis (`(`)");
+                    return {Result::ErrorInvalidInput};
+                }
+
+                switch (peek_pair.token.type) {
+                    case Token::Identifier: {
+                        Declaration* declaration =
+                            lookup_declaration(parser, peek_pair.token.v.identifier);
+                        TypeP* typedef_ = lookup_typedef(parser, peek_pair.token.v.identifier);
+                        if (declaration || !typedef_) {
+                            goto sizeof_open_paren_expression;
+                        }
+                    }  // fallthrough
+
+                    TYPE_TOKEN_CASES : {
+                        TypeP type = {};
+                        result = parse_base_type(context, parser, &type);
+                        CZ_TRY_VAR(result);
+                        if (result.type == Result::Done) {
+                            goto sizeof_open_paren_done;
+                        }
+
+                        Hashed_Str identifier = {};
+                        cz::Slice<cz::Str> inner_parameter_names;
+                        CZ_TRY(parse_declaration_identifier_and_type(
+                            context, parser, &identifier, &type, nullptr, &inner_parameter_names));
+
+                        Token_Source_Span_Pair open_paren_pair = pair;
+                        if (identifier.str.len > 0) {
+                            context->report_error(
+                                open_paren_pair.token.span, open_paren_pair.source_span,
+                                "Variables cannot be declared inside a `sizeof` expression");
+                        }
+
+                        Expression_Sizeof_Type* expression =
+                            parser->buffer_array.allocator().create<Expression_Sizeof_Type>();
+                        expression->type = type;
+                        *eout = expression;
+                    } break;
+
+                    sizeof_open_paren_expression:
+                    default: {
+                        reverse_next_token(parser, open_paren_pair);
+                        goto sizeof_expression;
+                    } break;
+                }
+
+                Token_Source_Span_Pair open_paren_pair = pair;
+                result = next_token(context, parser, &pair);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(open_paren_pair.token.span, open_paren_pair.source_span,
+                                          "Unmatched parenthesis (`(`)");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (pair.token.type != Token::CloseParen) {
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Expected close parenthesis (`)`) here");
+                    return {Result::ErrorInvalidInput};
+                }
+            } else {
+            sizeof_expression:
+                result = parse_expression_(context, parser, eout, 4);
+                CZ_TRY_VAR(result);
+
+                if (result.type == Result::Done) {
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Unmatched parenthesis (`(`)");
+                    return {Result::ErrorInvalidInput};
+                }
+
+                Expression_Sizeof_Expression* expression =
+                    parser->buffer_array.allocator().create<Expression_Sizeof_Expression>();
+                expression->expression = *eout;
+                *eout = expression;
+            }
+        } break;
+
         case Token::OpenParen: {
             Token_Source_Span_Pair peek_pair;
             result = peek_token(context, parser, &peek_pair);
@@ -2624,10 +2724,16 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             } else {
                 CZ_TRY(parse_expression(context, parser, &value));
 
-                previous_token(parser, &pair);
+                Token_Source_Span_Pair previous;
+                previous_token(parser, &previous);
                 result = peek_token(context, parser, &pair);
                 CZ_TRY_VAR(result);
-                if (result.type == Result::Done || pair.token.type != Token::Semicolon) {
+                if (result.type == Result::Done) {
+                    context->report_error(previous.token.span, previous.source_span,
+                                          "Expected semicolon here to end expression statement");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (pair.token.type != Token::Semicolon) {
                     context->report_error(pair.token.span, pair.source_span,
                                           "Expected semicolon here to end expression statement");
                     return {Result::ErrorInvalidInput};
@@ -2651,7 +2757,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             result = next_token(context, parser, &pair);
             CZ_TRY_VAR(result);
             if (result.type == Result::Done) {
-                context->report_error(pair.token.span, pair.source_span,
+                context->report_error(previous.token.span, previous.source_span,
                                       "Expected semicolon here to end expression statement");
                 return {Result::ErrorInvalidInput};
             }

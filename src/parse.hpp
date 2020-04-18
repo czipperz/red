@@ -130,6 +130,8 @@ struct Expression {
         Binary,
         Ternary,
         Cast,
+        Sizeof_Type,
+        Sizeof_Expression,
     };
 
     Span span;
@@ -171,6 +173,18 @@ struct Expression_Cast : Expression {
 
     TypeP type;
     Expression* value;
+};
+
+struct Expression_Sizeof_Type : Expression {
+    Expression_Sizeof_Type() : Expression(Sizeof_Type) {}
+
+    TypeP type;
+};
+
+struct Expression_Sizeof_Expression : Expression {
+    Expression_Sizeof_Expression() : Expression(Sizeof_Expression) {}
+
+    Expression* expression;
 };
 
 struct Statement {
@@ -304,7 +318,7 @@ struct Parser {
     Type* type_void;
     Type* type_error;
 
-    Token_Source_Span_Pair pairs[2];
+    Token_Source_Span_Pair pairs[4];
     int pair_index;
 
     void init();

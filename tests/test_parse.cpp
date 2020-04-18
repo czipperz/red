@@ -1262,6 +1262,59 @@ TEST_CASE("parse_expression type cast") {
     CHECK(cast->type.get_type() == parser.type_signed_int);
 }
 
+TEST_CASE("parse_expression sizeof parenthesized type") {
+    SETUP("sizeof(int);");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Sizeof_Type);
+
+    Expression_Sizeof_Type* st = (Expression_Sizeof_Type*)expression;
+    CHECK(st->type.get_type() == parser.type_signed_int);
+}
+
+TEST_CASE("parse_expression sizeof parenthesized expression") {
+    SETUP("sizeof(1 + 2);");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Sizeof_Expression);
+
+    Expression_Sizeof_Expression* se = (Expression_Sizeof_Expression*)expression;
+    REQUIRE(se->expression->tag == Expression::Binary);
+
+    Expression_Binary* e = (Expression_Binary*)se->expression;
+    CHECK(e->op == Token::Plus);
+    REQUIRE(e->left);
+    CHECK(e->left->tag == Expression::Integer);
+    REQUIRE(e->right);
+    CHECK(e->right->tag == Expression::Integer);
+}
+
+TEST_CASE("parse_expression sizeof unparenthesized expression") {
+    SETUP("sizeof 1 + 2;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+
+    Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->op == Token::Plus);
+    REQUIRE(e->left);
+    CHECK(e->left->tag == Expression::Sizeof_Expression);
+    REQUIRE(e->right);
+    CHECK(e->right->tag == Expression::Integer);
+
+    Expression_Sizeof_Expression* se = (Expression_Sizeof_Expression*)e->left;
+    CHECK(se->expression->tag == Expression::Integer);
+}
+
 TEST_CASE("parse_expression type cast user defined typedef") {
     SETUP("typedef int A; (A)2 + 3;");
     cz::Vector<Statement*> initializers = {};
