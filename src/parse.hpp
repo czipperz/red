@@ -255,6 +255,7 @@ struct Declaration {
     enum {
         Extern = 1,
         Static = 2,
+        Enum_Variant = 4,
     };
 };
 

@@ -1209,6 +1209,8 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                                 initializer->value = value;
                                 declaration.v.initializer = initializer;
 
+                                declaration.flags = Declaration::Enum_Variant;
+
                                 declarations->insert(key.str, key.hash, declaration);
                             }
                         }
