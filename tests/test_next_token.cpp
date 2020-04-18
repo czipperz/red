@@ -66,6 +66,53 @@ TEST_CASE("next_token() integer 0") {
     CHECK(token.v.integer.suffix == 0);
 }
 
+TEST_CASE("next_token() integer 08 (invalid octal) then 032 works correctly") {
+    SETUP("08 032");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(context.errors.len() == 1);
+    CHECK(token.type == red::Token::Integer);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 2);
+    CHECK(is_bol == false);
+    CHECK(token.v.integer.value == 0);
+    CHECK(token.v.integer.suffix == 0);
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(context.errors.len() == 1);
+    CHECK(token.type == red::Token::Integer);
+    CHECK(token.span.start.index == 3);
+    CHECK(token.span.end.index == 6);
+    CHECK(is_bol == false);
+    CHECK(token.v.integer.value == 032);
+    CHECK(token.v.integer.suffix == 0);
+}
+
+TEST_CASE("next_token() integer 073") {
+    SETUP("073");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(context.errors.len() == 0);
+    CHECK(token.type == red::Token::Integer);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 3);
+    CHECK(is_bol == false);
+    CHECK(token.v.integer.value == 073);
+    CHECK(token.v.integer.suffix == 0);
+}
+
+TEST_CASE("next_token() integer 0xff") {
+    SETUP("0xff");
+
+    REQUIRE(next_token(&context, &lexer, file_contents, &location, &token, &is_bol));
+    CHECK(token.type == red::Token::Integer);
+    CHECK(token.span.start.index == 0);
+    CHECK(token.span.end.index == 4);
+    CHECK(is_bol == false);
+    CHECK(token.v.integer.value == 0xff);
+    CHECK(token.v.integer.suffix == 0);
+}
+
 TEST_CASE("next_token() integer 33ul") {
     SETUP("33ul");
 

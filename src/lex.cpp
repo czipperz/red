@@ -162,18 +162,20 @@ switch_:
     case '8':        \
     case '9'
 
-#define HEX_LETTER_CASES \
-    case 'a':            \
-    case 'b':            \
-    case 'c':            \
-    case 'd':            \
-    case 'e':            \
-    case 'f':            \
-    case 'A':            \
-    case 'B':            \
-    case 'C':            \
-    case 'D':            \
-    case 'E':            \
+#define HEX_LOWER_LETTER_CASES \
+    case 'a':                  \
+    case 'b':                  \
+    case 'c':                  \
+    case 'd':                  \
+    case 'e':                  \
+    case 'f'
+
+#define HEX_UPPER_LETTER_CASES \
+    case 'A':                  \
+    case 'B':                  \
+    case 'C':                  \
+    case 'D':                  \
+    case 'E':                  \
     case 'F'
 
 static bool process_escaped_string(const File_Contents& file_contents,
@@ -213,8 +215,12 @@ static bool process_escaped_string(const File_Contents& file_contents,
                 v += f - '0';
                 break;
 
-            HEX_LETTER_CASES:
+            HEX_LOWER_LETTER_CASES:
                 v += f - 'a' + 10;
+                break;
+
+            HEX_UPPER_LETTER_CASES:
+                v += f - 'A' + 10;
                 break;
 
                 default:
@@ -233,8 +239,12 @@ static bool process_escaped_string(const File_Contents& file_contents,
                 v += s - '0';
                 break;
 
-            HEX_LETTER_CASES:
+            HEX_LOWER_LETTER_CASES:
                 v += s - 'a' + 10;
+                break;
+
+            HEX_UPPER_LETTER_CASES:
+                v += s - 'A' + 10;
                 break;
 
                 default:
@@ -876,17 +886,106 @@ top:
             ZoneScopedN("lex::next_token number");
 
             uint64_t value = 0;
-            while (1) {
-                value *= 10;
-                value += c - '0';
-
+            if (c == '0') {
                 *location = point;
-                if (!next_character(file_contents, &point, &c)) {
+                if (next_character(file_contents, &point, &c)) {
+                    if (isdigit(c)) {
+                        // octal
+                        while (1) {
+                            if (c == '8' || c == '9') {
+                                context->report_lex_error(
+                                    {*location, point},
+                                    "Octal number digits must be in the range 0 to 7, found `", c,
+                                    "`");
+                                while (1) {
+                                    *location = point;
+                                    if (!next_character(file_contents, &point, &c)) {
+                                        c = 0;
+                                        break;
+                                    }
+                                    if (!isdigit(c)) {
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+
+                            value *= 8;
+                            value += c - '0';
+
+                            *location = point;
+                            if (!next_character(file_contents, &point, &c)) {
+                                c = 0;
+                                break;
+                            }
+                            if (!isdigit(c)) {
+                                break;
+                            }
+                        }
+                    } else if (c == 'x' || c == 'X') {
+                        // hex
+                        Location backup = point;
+                        char ch = c;
+                        if (!next_character(file_contents, &point, &c)) {
+                            point = backup;
+                            c = ch;
+                            break;
+                        }
+                        switch (c) {
+                            default:
+                                point = backup;
+                                c = ch;
+                                goto break_hex_loop;
+
+                            NUMBER_CASES:
+                            HEX_LOWER_LETTER_CASES:
+                            HEX_UPPER_LETTER_CASES:
+                                while (1) {
+                                    switch (c) {
+                                    NUMBER_CASES:
+                                        value <<= 4;
+                                        value += c - '0';
+                                        break;
+
+                                    HEX_LOWER_LETTER_CASES:
+                                        value <<= 4;
+                                        value += c - 'a' + 10;
+                                        break;
+
+                                    HEX_UPPER_LETTER_CASES:
+                                        value <<= 4;
+                                        value += c - 'A' + 10;
+                                        break;
+
+                                        default:
+                                            goto break_hex_loop;
+                                    }
+
+                                    *location = point;
+                                    if (!next_character(file_contents, &point, &c)) {
+                                        c = 0;
+                                        break;
+                                    }
+                                }
+                        }
+                    break_hex_loop:;
+                    }
+                } else {
                     c = 0;
-                    break;
                 }
-                if (!isdigit(c)) {
-                    break;
+            } else {
+                while (1) {
+                    value *= 10;
+                    value += c - '0';
+
+                    *location = point;
+                    if (!next_character(file_contents, &point, &c)) {
+                        c = 0;
+                        break;
+                    }
+                    if (!isdigit(c)) {
+                        break;
+                    }
                 }
             }
 
@@ -922,8 +1021,7 @@ top:
             token_out->v.integer.value = value;
             token_out->v.integer.suffix = suffix;
             token_out->type = Token::Integer;
-            break;
-        }
+        } break;
 
         default:
             context->report_lex_error({*location, point}, "Unable to process character `", c, "`");
