@@ -68,8 +68,6 @@ static void draw_error_span(const File_Contents* file_contents, Span error_span)
             }
         }
     }
-
-    putc('\n', stderr);
 }
 
 static int try_run_main(Context* context) {
@@ -109,6 +107,8 @@ static int try_run_main(Context* context) {
             }
 
             draw_error_span(&error_file.contents, error.error_span);
+
+            putc('\n', stderr);
         }
 
         if (result.is_err()) {
