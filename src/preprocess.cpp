@@ -15,6 +15,7 @@
 #include "load.hpp"
 #include "result.hpp"
 #include "token.hpp"
+#include "token_source_span_pair.hpp"
 
 namespace red {
 namespace pre {
@@ -378,8 +379,7 @@ static Result next_token_in_definition(Context* context,
                                        int expand_macros);
 
 static Result parse_and_eval_expression(Context* context,
-                                        Span if_span,
-                                        cz::Slice<Token> tokens,
+                                        cz::Slice<Token_Source_Span_Pair> tokens,
                                         size_t* index,
                                         int64_t* value,
                                         int max_precedence) {
@@ -387,37 +387,37 @@ static Result parse_and_eval_expression(Context* context,
 
     if (*index == tokens.len) {
         CZ_DEBUG_ASSERT(*index >= 1);
-        context->report_error(tokens[*index - 1].span, if_span, "Unterminated expression");
+        context->report_error(tokens[*index - 1].token.span, tokens[*index - 1].source_span,
+                              "Unterminated expression");
         return {Result::ErrorInvalidInput};
     }
 
-    switch (tokens[*index].type) {
+    switch (tokens[*index].token.type) {
         case Token::Minus: {
             ++*index;
-            CZ_TRY(parse_and_eval_expression(context, if_span, tokens, index, value, 0));
+            CZ_TRY(parse_and_eval_expression(context, tokens, index, value, 0));
             *value = -*value;
             break;
         }
 
         case Token::Not: {
             ++*index;
-            CZ_TRY(parse_and_eval_expression(context, if_span, tokens, index, value, 0));
+            CZ_TRY(parse_and_eval_expression(context, tokens, index, value, 0));
             *value = !*value;
             break;
         }
 
         case Token::Integer: {
-            *value = tokens[*index].v.integer.value;
+            *value = tokens[*index].token.v.integer.value;
             ++*index;
             break;
         }
 
         case Token::OpenParen: {
-            Location open_paren = tokens[*index].span.start;
             ++*index;
-            CZ_TRY(parse_and_eval_expression(context, if_span, tokens, index, value, 100));
-            if (*index == tokens.len || tokens[*index].type != Token::CloseParen) {
-                context->report_error({open_paren, tokens[*index - 1].span.end}, if_span,
+            CZ_TRY(parse_and_eval_expression(context, tokens, index, value, 100));
+            if (*index == tokens.len || tokens[*index].token.type != Token::CloseParen) {
+                context->report_error(tokens[*index - 1].token.span, tokens[*index - 1].source_span,
                                       "Unterminated parenthesized expression");
                 return {Result::ErrorInvalidInput};
             }
@@ -426,8 +426,9 @@ static Result parse_and_eval_expression(Context* context,
         }
 
         default:
-            context->report_error(tokens[*index].span, if_span, "Unexpected token `",
-                                  tokens[*index], "` in #if expression");
+            context->report_error(tokens[*index].token.span, tokens[*index].source_span,
+                                  "Unexpected token `", tokens[*index].token,
+                                  "` in #if expression");
             return {Result::ErrorInvalidInput};
     }
 
@@ -437,7 +438,7 @@ static Result parse_and_eval_expression(Context* context,
         }
 
         int precedence;
-        Token::Type op = tokens[*index].type;
+        Token::Type op = tokens[*index].token.type;
         switch (op) {
             case Token::CloseParen:
             case Token::Colon:
@@ -451,23 +452,23 @@ static Result parse_and_eval_expression(Context* context,
                     return Result::ok();
                 }
 
-                Span question_mark_span = tokens[*index].span;
+                Span question_mark_span = tokens[*index].token.span;
+                Span question_mark_source_span = tokens[*index].source_span;
 
                 ++*index;
                 int64_t then;
-                CZ_TRY(parse_and_eval_expression(context, if_span, tokens, index, &then,
-                                                 precedence + !ltr));
+                CZ_TRY(parse_and_eval_expression(context, tokens, index, &then, precedence + !ltr));
 
-                if (*index == tokens.len || tokens[*index].type != Token::Colon) {
+                if (*index == tokens.len || tokens[*index].token.type != Token::Colon) {
                     context->report_error(
-                        question_mark_span, if_span,
+                        question_mark_span, question_mark_source_span,
                         "Expected `:` and then otherwise expression side for ternary operator");
                     return {Result::ErrorInvalidInput};
                 }
                 ++*index;
 
                 int64_t otherwise;
-                CZ_TRY(parse_and_eval_expression(context, if_span, tokens, index, &otherwise,
+                CZ_TRY(parse_and_eval_expression(context, tokens, index, &otherwise,
                                                  precedence + !ltr));
 
                 *value = *value ? then : otherwise;
@@ -517,7 +518,7 @@ static Result parse_and_eval_expression(Context* context,
                 precedence = 7;
                 break;
             default:
-                context->report_error(tokens[*index].span, if_span,
+                context->report_error(tokens[*index].token.span, tokens[*index].source_span,
                                       "Expected binary operator here to connect expressions");
                 return {Result::ErrorInvalidInput};
         }
@@ -528,7 +529,7 @@ static Result parse_and_eval_expression(Context* context,
 
         ++*index;
         int64_t right;
-        CZ_TRY(parse_and_eval_expression(context, if_span, tokens, index, &right, precedence));
+        CZ_TRY(parse_and_eval_expression(context, tokens, index, &right, precedence));
 
         switch (op) {
 #define CASE(TYPE, OP)            \
@@ -631,7 +632,7 @@ static Result process_if(Context* context,
         Span if_span = token->span;
 
         // Todo: make this more efficient by not storing all the tokens.
-        cz::Vector<Token> tokens = {};
+        cz::Vector<Token_Source_Span_Pair> tokens = {};
         CZ_DEFER(tokens.drop(context->temp_buffer_array.allocator()));
         tokens.reserve(context->temp_buffer_array.allocator(), 8);
 
@@ -639,6 +640,7 @@ static Result process_if(Context* context,
         while (1) {
             Result ntid_result =
                 next_token_in_definition(context, preprocessor, lexer, token, true, 1);
+            Span source_span;
             if (ntid_result.type == Result::Done) {
                 bool at_bol = false;
                 point = &preprocessor->include_stack.last();
@@ -652,6 +654,11 @@ static Result process_if(Context* context,
                     point->span.end = backup_point;
                     break;
                 }
+                preprocessor->include_stack.last().span = token->span;
+
+                source_span = token->span;
+            } else {
+                source_span = preprocessor->include_stack.last().span;
             }
 
         retest:
@@ -692,7 +699,7 @@ static Result process_if(Context* context,
 
         add_token:
             tokens.reserve(context->temp_buffer_array.allocator(), 1);
-            tokens.push(*token);
+            tokens.push({*token, source_span});
         }
 
         point->if_stack.reserve(cz::heap_allocator(), 1);
@@ -704,11 +711,11 @@ static Result process_if(Context* context,
             return {Result::ErrorInvalidInput};
         }
 
-        CZ_TRY(parse_and_eval_expression(context, if_span, tokens, &index, &value, 100));
+        CZ_TRY(parse_and_eval_expression(context, tokens, &index, &value, 100));
 
         if (index < tokens.len()) {
-            CZ_DEBUG_ASSERT(tokens[index].type == Token::CloseParen);
-            context->report_error(tokens[index].span, if_span,
+            CZ_DEBUG_ASSERT(tokens[index].token.type == Token::CloseParen);
+            context->report_error(tokens[index].token.span, tokens[index].source_span,
                                   "Unmatched closing parenthesis (`)`)");
             return {Result::ErrorInvalidInput};
         }

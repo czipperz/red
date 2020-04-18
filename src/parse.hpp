@@ -5,6 +5,7 @@
 #include <cz/vector.hpp>
 #include "lex.hpp"
 #include "preprocess.hpp"
+#include "token_source_span_pair.hpp"
 
 namespace red {
 namespace parse {
@@ -254,11 +255,6 @@ enum Declaration_Or_Statement {
 };
 }
 using Declaration_Or_Statement_::Declaration_Or_Statement;
-
-struct Token_Source_Span_Pair {
-    Token token;
-    Span source_span;
-};
 
 struct Parser {
     pre::Preprocessor preprocessor;
