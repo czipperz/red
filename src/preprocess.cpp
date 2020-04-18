@@ -1086,28 +1086,28 @@ static Result process_defined_identifier(Context* context,
         Span open_paren_span = token->span;
         Span open_paren_source_span = preprocessor->include_stack.last().span;
 
-        // Get the first token of the body.  After this point no more tokens form errors.
         at_bol = false;
-        ntid_result =
-            next_token_in_definition(context, preprocessor, lexer, token, this_line_only, 0);
-        if (ntid_result.type == Result::Done) {
-            if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                                 token, &at_bol)) {
-                context->report_error(open_paren_span, open_paren_source_span,
-                                      "Unpaired parenthesis (`(`)");
-                return {Result::ErrorInvalidInput};
-            }
-            if (at_bol && this_line_only) {
-                context->report_error(open_paren_span, open_paren_source_span,
-                                      "Unpaired parenthesis (`(`)");
-                return {Result::ErrorInvalidInput};
-            }
-        }
 
         // Process arguments
         cz::Vector<Token> argument_tokens = {};
         size_t paren_depth = 0;
         while (1) {
+            ntid_result =
+                next_token_in_definition(context, preprocessor, lexer, token, this_line_only, 0);
+            if (ntid_result.type == Result::Done) {
+                if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
+                                     point, token, &at_bol)) {
+                    context->report_error(open_paren_span, open_paren_source_span,
+                                          "Unpaired parenthesis (`(`)");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (at_bol && this_line_only) {
+                    context->report_error(open_paren_span, open_paren_source_span,
+                                          "Unpaired parenthesis (`(`)");
+                    return {Result::ErrorInvalidInput};
+                }
+            }
+
             if (token->type == Token::OpenParen) {
                 ++paren_depth;
             } else if (token->type == Token::CloseParen) {
@@ -1156,29 +1156,12 @@ static Result process_defined_identifier(Context* context,
                 info.arguments.reserve(cz::heap_allocator(), 1);
                 info.arguments.push(argument_tokens);
                 argument_tokens = {};
-                goto next_argument_token;
+                continue;
             }
 
         append_argument_token:
             argument_tokens.reserve(cz::heap_allocator(), 1);
             argument_tokens.push(*token);
-
-        next_argument_token:
-            ntid_result =
-                next_token_in_definition(context, preprocessor, lexer, token, this_line_only, 0);
-            if (ntid_result.type == Result::Done) {
-                if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
-                                     point, token, &at_bol)) {
-                    context->report_error(open_paren_span, open_paren_source_span,
-                                          "Unpaired parenthesis (`(`)");
-                    return {Result::ErrorInvalidInput};
-                }
-                if (at_bol && this_line_only) {
-                    context->report_error(open_paren_span, open_paren_source_span,
-                                          "Unpaired parenthesis (`(`)");
-                    return {Result::ErrorInvalidInput};
-                }
-            }
         }
     }
 
