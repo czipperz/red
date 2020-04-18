@@ -122,6 +122,7 @@ struct Expression {
         Variable,
         Binary,
         Ternary,
+        Cast,
     };
 
     Tag tag;
@@ -155,6 +156,13 @@ struct Expression_Ternary : Expression {
     Expression* condition;
     Expression* then;
     Expression* otherwise;
+};
+
+struct Expression_Cast : Expression {
+    Expression_Cast() : Expression(Cast) {}
+
+    TypeP type;
+    Expression* value;
 };
 
 struct Statement {

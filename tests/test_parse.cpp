@@ -1233,6 +1233,28 @@ TEST_CASE("parse_expression ternary operator comma breaks otherwise") {
     CHECK(ternary->otherwise->tag == Expression::Integer);
 }
 
+TEST_CASE("parse_expression type cast") {
+    SETUP("(int)2 + 3;");
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+
+    Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->op == Token::Plus);
+    REQUIRE(e->left);
+    CHECK(e->left->tag == Expression::Cast);
+    REQUIRE(e->right);
+    CHECK(e->right->tag == Expression::Integer);
+
+    Expression_Cast* cast = (Expression_Cast*)e->left;
+    REQUIRE(cast->value);
+    CHECK(cast->value->tag == Expression::Integer);
+    CHECK(cast->type.get_type() == parser.type_signed_int);
+}
+
 TEST_CASE("parse_statement basic binary expression") {
     SETUP("1 + 2;");
 

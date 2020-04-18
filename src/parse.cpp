@@ -10,6 +10,22 @@
 namespace red {
 namespace parse {
 
+#define TYPE_TOKEN_CASES \
+    case Token::Char:    \
+    case Token::Double:  \
+    case Token::Float:   \
+    case Token::Int:     \
+    case Token::Long:    \
+    case Token::Short:   \
+    case Token::Void:    \
+    case Token::Extern:  \
+    case Token::Enum:    \
+    case Token::Struct:  \
+    case Token::Union:   \
+    case Token::Typedef: \
+    case Token::Const:   \
+    case Token::Volatile
+
 static Type* make_primitive(cz::Allocator allocator, Type::Tag tag) {
     Type* type = allocator.alloc<Type>();
     new (type) Type(tag);
@@ -1742,48 +1758,15 @@ Result parse_declaration_or_statement(Context* context,
     }
 
     switch (pair.token.type) {
-        case Token::Char:
-        case Token::Double:
-        case Token::Float:
-        case Token::Int:
-        case Token::Long:
-        case Token::Short:
-        case Token::Void:
-        case Token::Extern:
-        case Token::Enum:
-        case Token::Struct:
-        case Token::Union:
-        case Token::Typedef:
-        case Token::Const:
-        case Token::Volatile: {
-            *which = Declaration_Or_Statement::Declaration;
-            return parse_declaration(context, parser, statements);
-        }
+    TYPE_TOKEN_CASES : {
+        *which = Declaration_Or_Statement::Declaration;
+        return parse_declaration(context, parser, statements);
+    }
 
-        case Token::Identifier: {
-            Declaration* declaration = lookup_declaration(parser, pair.token.v.identifier);
-            TypeP* type = lookup_typedef(parser, pair.token.v.identifier);
-            if (declaration) {
-                *which = Declaration_Or_Statement::Statement;
-
-                Statement* statement;
-                result = parse_statement(context, parser, &statement);
-                if (result.type == Result::Success) {
-                    statements->reserve(cz::heap_allocator(), 1);
-                    statements->push(statement);
-                }
-                return result;
-            } else if (type) {
-                *which = Declaration_Or_Statement::Declaration;
-                return parse_declaration(context, parser, statements);
-            } else {
-                context->report_error(pair.token.span, pair.source_span, "Undefined identifier `",
-                                      pair.token.v.identifier.str, "`");
-                return {Result::ErrorInvalidInput};
-            }
-        }
-
-        default: {
+    case Token::Identifier: {
+        Declaration* declaration = lookup_declaration(parser, pair.token.v.identifier);
+        TypeP* type = lookup_typedef(parser, pair.token.v.identifier);
+        if (declaration) {
             *which = Declaration_Or_Statement::Statement;
 
             Statement* statement;
@@ -1793,7 +1776,27 @@ Result parse_declaration_or_statement(Context* context,
                 statements->push(statement);
             }
             return result;
+        } else if (type) {
+            *which = Declaration_Or_Statement::Declaration;
+            return parse_declaration(context, parser, statements);
+        } else {
+            context->report_error(pair.token.span, pair.source_span, "Undefined identifier `",
+                                  pair.token.v.identifier.str, "`");
+            return {Result::ErrorInvalidInput};
         }
+    }
+
+    default: {
+        *which = Declaration_Or_Statement::Statement;
+
+        Statement* statement;
+        result = parse_statement(context, parser, &statement);
+        if (result.type == Result::Success) {
+            statements->reserve(cz::heap_allocator(), 1);
+            statements->push(statement);
+        }
+        return result;
+    }
     }
 }
 
@@ -1832,29 +1835,102 @@ static Result parse_expression_(Context* context,
         }
 
         case Token::OpenParen: {
-            result = parse_expression(context, parser, eout);
-            CZ_TRY_VAR(result);
+            Token_Source_Span_Pair peek_pair;
+            result = peek_token(context, parser, &peek_pair);
+            CZ_TRY(result);
             if (result.type == Result::Done) {
-                context->report_error(pair.token.span, pair.source_span,
-                                      "Unmatched parenthesis (`(`)");
-                return {Result::ErrorInvalidInput};
+                goto open_paren_done;
             }
 
-            Token_Source_Span_Pair open_paren_pair = pair;
-            result = next_token(context, parser, &pair);
-            CZ_TRY_VAR(result);
-            if (result.type == Result::Done) {
-                context->report_error(open_paren_pair.token.span, open_paren_pair.source_span,
-                                      "Unmatched parenthesis (`(`)");
-                return {Result::ErrorInvalidInput};
+            switch (peek_pair.token.type) {
+                case Token::Identifier: {
+                    Declaration* declaration = lookup_declaration(parser, pair.token.v.identifier);
+                    TypeP* typedef_ = lookup_typedef(parser, pair.token.v.identifier);
+                    if (declaration || !typedef_) {
+                        goto open_paren_expression;
+                    }
+                }  // fallthrough
+
+                TYPE_TOKEN_CASES : {
+                    TypeP type = {};
+                    result = parse_base_type(context, parser, &type);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        goto open_paren_done;
+                    }
+
+                    Hashed_Str identifier = {};
+                    cz::Slice<cz::Str> inner_parameter_names;
+                    CZ_TRY(parse_declaration_identifier_and_type(
+                        context, parser, &identifier, &type, nullptr, &inner_parameter_names));
+
+                    Token_Source_Span_Pair open_paren_pair = pair;
+                    if (identifier.str.len > 0) {
+                        context->report_error(
+                            open_paren_pair.token.span, open_paren_pair.source_span,
+                            "Variable declarations cannot be in parenthesis.  This is interpreted "
+                            "as a type cast, which cannot have a variable name.");
+                    }
+
+                    result = next_token(context, parser, &pair);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        context->report_error(open_paren_pair.token.span,
+                                              open_paren_pair.source_span,
+                                              "Unmatched parenthesis (`(`)");
+                        return {Result::ErrorInvalidInput};
+                    }
+                    if (pair.token.type != Token::CloseParen) {
+                        context->report_error(pair.token.span, pair.source_span,
+                                              "Expected close parenthesis (`)`) here");
+                        return {Result::ErrorInvalidInput};
+                    }
+
+                    Expression* value;
+                    result = parse_expression_(context, parser, &value, 4);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        context->report_error(pair.token.span, pair.source_span,
+                                              "Expected expression to cast here");
+                        return {Result::ErrorInvalidInput};
+                    }
+
+                    Expression_Cast* expression =
+                        parser->buffer_array.allocator().create<Expression_Cast>();
+                    expression->type = type;
+                    expression->value = value;
+                    *eout = expression;
+                } break;
+
+                open_paren_expression:
+                default: {
+                    result = parse_expression(context, parser, eout);
+                    CZ_TRY_VAR(result);
+
+                    if (result.type == Result::Done) {
+                    open_paren_done:
+                        context->report_error(pair.token.span, pair.source_span,
+                                              "Unmatched parenthesis (`(`)");
+                        return {Result::ErrorInvalidInput};
+                    }
+
+                    Token_Source_Span_Pair open_paren_pair = pair;
+                    result = next_token(context, parser, &pair);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        context->report_error(open_paren_pair.token.span,
+                                              open_paren_pair.source_span,
+                                              "Unmatched parenthesis (`(`)");
+                        return {Result::ErrorInvalidInput};
+                    }
+                    if (pair.token.type != Token::CloseParen) {
+                        context->report_error(pair.token.span, pair.source_span,
+                                              "Expected close parenthesis (`)`) here");
+                        return {Result::ErrorInvalidInput};
+                    }
+                } break;
             }
-            if (pair.token.type != Token::CloseParen) {
-                context->report_error(pair.token.span, pair.source_span,
-                                      "Expected close parenthesis (`)`) here");
-                return {Result::ErrorInvalidInput};
-            }
-            break;
-        }
+        } break;
 
         default:
             context->report_error(pair.token.span, pair.source_span, "Expected expression here");
