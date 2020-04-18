@@ -26,6 +26,193 @@ namespace parse {
     case Token::Const:   \
     case Token::Volatile
 
+static bool evaluate_expression(Expression* e, int64_t* value) {
+    switch (e->tag) {
+        case Expression::Integer: {
+            Expression_Integer* expression = (Expression_Integer*)e;
+            *value = expression->value;
+            return true;
+        }
+
+        case Expression::Variable:
+            return false;
+
+        case Expression::Binary: {
+            Expression_Binary* expression = (Expression_Binary*)e;
+            int64_t left, right;
+            if (!evaluate_expression(expression->left, &left)) {
+                return false;
+            }
+            if (!evaluate_expression(expression->right, &right)) {
+                return false;
+            }
+
+            switch (expression->op) {
+#define EVAL_OP(TK, OP)         \
+    case Token::TK:             \
+        *value = left OP right; \
+        break
+                EVAL_OP(LessThan, <);
+                EVAL_OP(LessEqual, <=);
+                EVAL_OP(GreaterThan, >);
+                EVAL_OP(GreaterEqual, >=);
+                EVAL_OP(Equals, ==);
+                EVAL_OP(NotEquals, !=);
+
+                {
+                    case Token::Comma:
+                        *value = right;
+                        break;
+                }
+
+                EVAL_OP(Plus, +);
+                EVAL_OP(Minus, -);
+                EVAL_OP(Divide, /);
+                EVAL_OP(Star, *);
+                EVAL_OP(Ampersand, &);
+                EVAL_OP(And, &&);
+                EVAL_OP(Pipe, |);
+                EVAL_OP(Or, ||);
+                EVAL_OP(LeftShift, <<);
+                EVAL_OP(RightShift, >>);
+
+                default:
+                    return false;
+#undef EVAL_OP
+            }
+
+            return true;
+        }
+
+        case Expression::Ternary: {
+            Expression_Ternary* expression = (Expression_Ternary*)e;
+            int64_t condition;
+            if (!evaluate_expression(expression->condition, &condition)) {
+                return false;
+            }
+            if (condition) {
+                return evaluate_expression(expression->then, value);
+            } else {
+                return evaluate_expression(expression->otherwise, value);
+            }
+        }
+
+        case Expression::Cast: {
+            Expression_Cast* cast = (Expression_Cast*)e;
+            return evaluate_expression(cast->value, value);
+        }
+    }
+
+    CZ_PANIC("");
+}
+
+bool get_type_size_alignment(const Type* type, size_t* size, size_t* alignment) {
+    switch (type->tag) {
+        case Type::Builtin_Char:
+            *size = 1;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Signed_Char:
+            *size = 1;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Unsigned_Char:
+            *size = 1;
+            *alignment = *size;
+            return true;
+
+        case Type::Builtin_Float:
+            *size = 4;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Double:
+            *size = 8;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Long_Double:
+            *size = 16;
+            *alignment = *size;
+            return true;
+
+        case Type::Builtin_Signed_Short:
+            *size = 2;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Signed_Int:
+            *size = 4;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Signed_Long:
+            *size = 8;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Signed_Long_Long:
+            *size = 8;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Unsigned_Short:
+            *size = 2;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Unsigned_Int:
+            *size = 4;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Unsigned_Long:
+            *size = 8;
+            *alignment = *size;
+            return true;
+        case Type::Builtin_Unsigned_Long_Long:
+            *size = 8;
+            *alignment = *size;
+            return true;
+
+        case Type::Builtin_Void:
+        case Type::Builtin_Error:
+        case Type::Function:
+            return false;
+
+        case Type::Enum:
+            *size = 8;
+            *alignment = *size;
+            return true;
+
+        case Type::Struct:
+        case Type::Union: {
+            Type_Composite* c = (Type_Composite*)type;
+            if (c->flags & Type_Composite::Defined) {
+                *size = c->size;
+                *alignment = c->alignment;
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        case Type::Pointer:
+            *size = 8;
+            *alignment = *size;
+            return true;
+
+        case Type::Array: {
+            Type_Array* array = (Type_Array*)type;
+            if (!get_type_size_alignment(array->inner.get_type(), size, alignment)) {
+                return false;
+            }
+
+            int64_t length;
+            if (!evaluate_expression(array->length, &length)) {
+                return false;
+            }
+
+            *size *= length;
+            return true;
+        }
+    }
+
+    CZ_PANIC("");
+}
+
 static Type* make_primitive(cz::Allocator allocator, Type::Tag tag) {
     Type* type = allocator.alloc<Type>();
     new (type) Type(tag);
@@ -556,7 +743,7 @@ static Result parse_declaration_identifier_and_type(Context* context,
 
                 Type_Array* array = parser->buffer_array.allocator().create<Type_Array>();
                 array->inner = *type;
-                array->size = expression;
+                array->length = expression;
                 if (inner_type_out) {
                     *inner_type_out = &array->inner;
                     inner_type_out = nullptr;
@@ -892,6 +1079,35 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                             parser->buffer_array.allocator().duplicate(initializers.as_slice());
                         struct_type->flags = flags;
 
+                        struct_type->size = 0;
+                        struct_type->alignment = 1;
+                        for (size_t i = 0; i < struct_type->initializers.len; ++i) {
+                            Statement_Initializer* initializer =
+                                (Statement_Initializer*)struct_type->initializers[i];
+
+                            Declaration* declaration = struct_type->declarations.get(
+                                initializer->identifier.str, initializer->identifier.hash);
+                            CZ_DEBUG_ASSERT(declaration);
+
+                            size_t size, alignment;
+                            if (!get_type_size_alignment(declaration->type.get_type(), &size,
+                                                         &alignment)) {
+                                context->report_error(declaration->span, declaration->span,
+                                                      "Declaration must have constant size");
+                                size = 0;
+                                alignment = 1;
+                            }
+
+                            if (alignment > struct_type->alignment) {
+                                struct_type->alignment = alignment;
+                            }
+
+                            struct_type->size += alignment - 1;
+                            struct_type->size &= ~(alignment - 1);
+
+                            struct_type->size += size;
+                        }
+
                         base_type->set_type(struct_type);
                     } else {
                         base_type->set_type(*type);
@@ -1064,6 +1280,29 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                         union_type->typedefs = parser->typedef_stack.last();
                         union_type->declarations = parser->declaration_stack.last();
                         union_type->flags = flags;
+
+                        union_type->size = 0;
+                        union_type->alignment = 1;
+                        for (size_t i = 0; i < union_type->declarations.cap; ++i) {
+                            if (union_type->declarations.is_present(i)) {
+                                Declaration* declaration = &union_type->declarations.values[i];
+                                size_t size, alignment;
+                                if (!get_type_size_alignment(declaration->type.get_type(), &size,
+                                                             &alignment)) {
+                                    context->report_error(declaration->span, declaration->span,
+                                                          "Declaration must have constant size");
+                                    size = 0;
+                                    alignment = 1;
+                                }
+
+                                if (size > union_type->size) {
+                                    union_type->size = size;
+                                }
+                                if (alignment > union_type->alignment) {
+                                    union_type->alignment = alignment;
+                                }
+                            }
+                        }
 
                         base_type->set_type(union_type);
                     } else {

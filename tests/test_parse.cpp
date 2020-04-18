@@ -642,11 +642,13 @@ TEST_CASE("parse_declaration struct named empty body") {
     REQUIRE(*type);
     REQUIRE((*type)->tag == Type::Struct);
     Type_Struct* ts = (Type_Struct*)*type;
-    REQUIRE(ts->types.count == 0);
-    REQUIRE(ts->typedefs.count == 0);
-    REQUIRE(ts->declarations.count == 0);
-    REQUIRE(ts->initializers.len == 0);
-    REQUIRE(ts->flags == Type_Struct::Defined);
+    CHECK(ts->types.count == 0);
+    CHECK(ts->typedefs.count == 0);
+    CHECK(ts->declarations.count == 0);
+    CHECK(ts->initializers.len == 0);
+    CHECK(ts->flags == Type_Struct::Defined);
+    CHECK(ts->size == 0);
+    CHECK(ts->alignment == 1);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);
@@ -669,8 +671,10 @@ TEST_CASE("parse_declaration struct named two fields") {
     REQUIRE(*type);
     REQUIRE((*type)->tag == Type::Struct);
     Type_Struct* ts = (Type_Struct*)*type;
-    REQUIRE(ts->types.count == 0);
-    REQUIRE(ts->typedefs.count == 0);
+    CHECK(ts->types.count == 0);
+    CHECK(ts->typedefs.count == 0);
+    CHECK(ts->size == 8);
+    CHECK(ts->alignment == 4);
     REQUIRE(ts->declarations.count == 2);
     Declaration* x = ts->declarations.get_hash("x");
     REQUIRE(x);
@@ -759,10 +763,10 @@ TEST_CASE("parse_declaration union named empty body") {
     REQUIRE(*type);
     REQUIRE((*type)->tag == Type::Union);
     Type_Union* ts = (Type_Union*)*type;
-    REQUIRE(ts->types.count == 0);
-    REQUIRE(ts->typedefs.count == 0);
-    REQUIRE(ts->declarations.count == 0);
-    REQUIRE(ts->flags == Type_Union::Defined);
+    CHECK(ts->types.count == 0);
+    CHECK(ts->typedefs.count == 0);
+    CHECK(ts->declarations.count == 0);
+    CHECK(ts->flags == Type_Union::Defined);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);
@@ -785,8 +789,12 @@ TEST_CASE("parse_declaration union named two fields") {
     REQUIRE(*type);
     REQUIRE((*type)->tag == Type::Union);
     Type_Union* ts = (Type_Union*)*type;
-    REQUIRE(ts->types.count == 0);
-    REQUIRE(ts->typedefs.count == 0);
+    CHECK(ts->types.count == 0);
+    CHECK(ts->typedefs.count == 0);
+    CHECK(ts->size == 4);
+    CHECK(ts->alignment == 4);
+    CHECK(ts->flags == Type_Union::Defined);
+
     REQUIRE(ts->declarations.count == 2);
     Declaration* x = ts->declarations.get_hash("x");
     REQUIRE(x);
@@ -798,7 +806,6 @@ TEST_CASE("parse_declaration union named two fields") {
     CHECK(y->type.get_type() == parser.type_float);
     CHECK_FALSE(y->type.is_const());
     CHECK_FALSE(y->type.is_volatile());
-    REQUIRE(ts->flags == Type_Union::Defined);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);
@@ -821,10 +828,10 @@ TEST_CASE("parse_declaration union named with variable") {
     REQUIRE(*type);
     REQUIRE((*type)->tag == Type::Union);
     Type_Union* ts = (Type_Union*)*type;
-    REQUIRE(ts->types.count == 0);
-    REQUIRE(ts->typedefs.count == 0);
-    REQUIRE(ts->declarations.count == 0);
-    REQUIRE(ts->flags == Type_Union::Defined);
+    CHECK(ts->types.count == 0);
+    CHECK(ts->typedefs.count == 0);
+    CHECK(ts->declarations.count == 0);
+    CHECK(ts->flags == Type_Union::Defined);
 
     REQUIRE(parser.typedef_stack.len() == 1);
     CHECK(parser.typedef_stack[0].count == 0);

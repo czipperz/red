@@ -48,6 +48,8 @@ struct alignas(4) Type {
     Tag tag;
 };
 
+bool get_type_size_alignment(const Type* type, size_t* size, size_t* alignment);
+
 struct TypeP {
     uintptr_t value;
 
@@ -81,6 +83,9 @@ struct Type_Composite : Type {
     cz::Str_Map<TypeP> typedefs;
     cz::Str_Map<Declaration> declarations;
 
+    size_t size;
+    size_t alignment;
+
     enum Flags : uint32_t {
         Defined = 1,
     };
@@ -107,7 +112,7 @@ struct Type_Array : Type {
     Type_Array() : Type(Array) {}
 
     TypeP inner;
-    struct Expression* size;
+    struct Expression* length;
 };
 
 struct Type_Function : Type {
@@ -127,6 +132,7 @@ struct Expression {
         Cast,
     };
 
+    Span span;
     Tag tag;
 
     Expression(Tag tag) : tag(tag) {}
@@ -244,6 +250,7 @@ struct Function_Definition {
 };
 
 struct Declaration {
+    Span span;
     TypeP type;
     Type_Pointer* o_type_pointer;
     union {
