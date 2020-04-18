@@ -37,10 +37,6 @@ void Preprocessor::destroy() {
     definition_stack.drop(cz::heap_allocator());
 }
 
-static Span source_span(Preprocessor* preprocessor) {
-    return preprocessor->include_stack.last().span;
-}
-
 static void drop(Definition_Info* info) {
     for (size_t i = 0; i < info->arguments.len(); ++i) {
         info->arguments[i].drop(cz::heap_allocator());
@@ -1077,6 +1073,7 @@ static Result process_defined_identifier(Context* context,
         }
 
         Span open_paren_span = token->span;
+        Span open_paren_source_span = preprocessor->include_stack.last().span;
 
         // Get the first token of the body.  After this point no more tokens form errors.
         at_bol = false;
@@ -1085,12 +1082,12 @@ static Result process_defined_identifier(Context* context,
         if (ntid_result.type == Result::Done) {
             if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                                  token, &at_bol)) {
-                context->report_error(open_paren_span, source_span(preprocessor),
+                context->report_error(open_paren_span, open_paren_source_span,
                                       "Unpaired parenthesis (`(`)");
                 return {Result::ErrorInvalidInput};
             }
             if (at_bol && this_line_only) {
-                context->report_error(open_paren_span, source_span(preprocessor),
+                context->report_error(open_paren_span, open_paren_source_span,
                                       "Unpaired parenthesis (`(`)");
                 return {Result::ErrorInvalidInput};
             }
@@ -1117,14 +1114,14 @@ static Result process_defined_identifier(Context* context,
                     }
 
                     if (info.arguments.len() < definition->parameter_len) {
-                        context->report_error(open_paren_span, source_span(preprocessor),
+                        context->report_error(open_paren_span, open_paren_source_span,
                                               "Too few arguments to macro (expected ",
                                               definition->parameter_len, ")");
                         return {Result::ErrorInvalidInput};
                     }
                     if (info.arguments.len() >
                         definition->parameter_len + definition->has_varargs) {
-                        context->report_error(open_paren_span, source_span(preprocessor),
+                        context->report_error(open_paren_span, open_paren_source_span,
                                               "Too many arguments to macro (expected ",
                                               definition->parameter_len, ")");
                         return {Result::ErrorInvalidInput};
@@ -1161,12 +1158,12 @@ static Result process_defined_identifier(Context* context,
             if (ntid_result.type == Result::Done) {
                 if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
                                      point, token, &at_bol)) {
-                    context->report_error(open_paren_span, source_span(preprocessor),
+                    context->report_error(open_paren_span, open_paren_source_span,
                                           "Unpaired parenthesis (`(`)");
                     return {Result::ErrorInvalidInput};
                 }
                 if (at_bol && this_line_only) {
-                    context->report_error(open_paren_span, source_span(preprocessor),
+                    context->report_error(open_paren_span, open_paren_source_span,
                                           "Unpaired parenthesis (`(`)");
                     return {Result::ErrorInvalidInput};
                 }
