@@ -1,8 +1,41 @@
 #include "token.hpp"
 
+#include <ctype.h>
 #include <cz/write.hpp>
 
 namespace cz {
+
+static Result write_hex_digit(Writer writer, unsigned char ch) {
+    if (ch >= 10) {
+        return write(writer, ch + 'A' - 10);
+    } else {
+        return write(writer, ch + '0');
+    }
+}
+
+static Result write_char(Writer writer, char c) {
+    if (c == '\\' || c == '"' || c == '\'') {
+        return write(writer, '\\', c);
+    } else if (c == '\n') {
+        return write(writer, "\\n");
+    } else if (c == '\t') {
+        return write(writer, "\\t");
+    } else if (c == '\f') {
+        return write(writer, "\\f");
+    } else if (c == '\r') {
+        return write(writer, "\\r");
+    } else if (c == '\v') {
+        return write(writer, "\\v");
+    } else if (!isprint(c)) {
+        unsigned char first = ((unsigned char)c & 0xF0) >> 4;
+        unsigned char second = (unsigned char)c & 0x0F;
+        CZ_TRY(write(writer, "\\x"));
+        CZ_TRY(write_hex_digit(writer, first));
+        return write_hex_digit(writer, second);
+    } else {
+        return write(writer, c);
+    }
+}
 
 Result write(Writer writer, red::Token token) {
     using namespace red;
@@ -28,8 +61,6 @@ Result write(Writer writer, red::Token token) {
             return write(writer, '>');
         case Token::GreaterEqual:
             return write(writer, ">=");
-        case Token::Set:
-            return write(writer, '=');
         case Token::Equals:
             return write(writer, "==");
         case Token::NotEquals:
@@ -38,6 +69,9 @@ Result write(Writer writer, red::Token token) {
             return write(writer, '.');
         case Token::Comma:
             return write(writer, ',');
+
+        case Token::Set:
+            return write(writer, '=');
         case Token::Plus:
             return write(writer, '+');
         case Token::Minus:
@@ -46,6 +80,8 @@ Result write(Writer writer, red::Token token) {
             return write(writer, '/');
         case Token::Star:
             return write(writer, '*');
+        case Token::Modulus:
+            return write(writer, '%');
         case Token::Ampersand:
             return write(writer, '&');
         case Token::And:
@@ -54,12 +90,42 @@ Result write(Writer writer, red::Token token) {
             return write(writer, '|');
         case Token::Or:
             return write(writer, "||");
+        case Token::Xor:
+            return write(writer, '^');
+        case Token::LeftShift:
+            return write(writer, "<<");
+        case Token::RightShift:
+            return write(writer, ">>");
+
+        case Token::PlusSet:
+            return write(writer, "+=");
+        case Token::MinusSet:
+            return write(writer, "-=");
+        case Token::DivideSet:
+            return write(writer, "/=");
+        case Token::MultiplySet:
+            return write(writer, "*=");
+        case Token::ModulusSet:
+            return write(writer, "%=");
+        case Token::BitAndSet:
+            return write(writer, "&=");
+        case Token::BitOrSet:
+            return write(writer, "|=");
+        case Token::BitXorSet:
+            return write(writer, "^=");
+        case Token::LeftShiftSet:
+            return write(writer, "<<=");
+        case Token::RightShiftSet:
+            return write(writer, ">>=");
+
         case Token::Semicolon:
             return write(writer, ';');
         case Token::Not:
             return write(writer, '!');
         case Token::QuestionMark:
             return write(writer, '?');
+        case Token::Tilde:
+            return write(writer, '~');
         case Token::Colon:
             return write(writer, ':');
         case Token::ColonColon:
@@ -68,29 +134,17 @@ Result write(Writer writer, red::Token token) {
             return write(writer, '#');
         case Token::HashHash:
             return write(writer, "##");
+
+        case Token::Character: {
+            CZ_TRY(write(writer, '\''));
+            write_char(writer, token.v.ch);
+            CZ_TRY(write(writer, '\''));
+        }
+
         case Token::String: {
             CZ_TRY(write(writer, '"'));
             for (size_t i = 0; i < token.v.string.len; ++i) {
-                char c = token.v.string[i];
-                if (c == '\\' || c == '"') {
-                    CZ_TRY(write(writer, '\\'));
-                } else if (c == '\n') {
-                    CZ_TRY(write(writer, '\\'));
-                    c = 'n';
-                } else if (c == '\t') {
-                    CZ_TRY(write(writer, '\\'));
-                    c = 't';
-                } else if (c == '\f') {
-                    CZ_TRY(write(writer, '\\'));
-                    c = 'f';
-                } else if (c == '\r') {
-                    CZ_TRY(write(writer, '\\'));
-                    c = 'r';
-                } else if (c == '\v') {
-                    CZ_TRY(write(writer, '\\'));
-                    c = 'v';
-                }
-                CZ_TRY(write(writer, c));
+                write_char(writer, token.v.string[i]);
             }
             CZ_TRY(write(writer, '"'));
             return Result::ok();
@@ -175,6 +229,11 @@ Result write(Writer writer, red::Token token) {
             return write(writer, "volatile");
         case Token::While:
             return write(writer, "while");
+
+        case Token::Preprocessor_Parameter:
+        case Token::Preprocessor_Varargs_Parameter_Indicator:
+        case Token::Parser_Null_Token:
+            CZ_PANIC("Cannot print a special token value");
     }
 
     CZ_PANIC("Unimplemented stringify Token variant");

@@ -101,9 +101,24 @@ static bool evaluate_expression(Expression* e, int64_t* value) {
             Expression_Cast* cast = (Expression_Cast*)e;
             return evaluate_expression(cast->value, value);
         }
+
+        case Expression::Sizeof_Type: {
+            Expression_Sizeof_Type* sizeof_type = (Expression_Sizeof_Type*)e;
+            size_t size, alignment;
+            if (!get_type_size_alignment(sizeof_type->type.get_type(), &size, &alignment)) {
+                return false;
+            }
+
+            *value = size;
+            return true;
+        }
+
+        case Expression::Sizeof_Expression: {
+            CZ_PANIC("evaluate_expression unhandled case sizeof(expression)");
+        }
     }
 
-    CZ_PANIC("");
+    CZ_PANIC("evaluate_expression unhandled case");
 }
 
 bool get_type_size_alignment(const Type* type, size_t* size, size_t* alignment) {
@@ -918,15 +933,15 @@ struct Numeric_Base {
         Signed_Index = 8 - 1,
         Unsigned_Index = 9 - 1,
 
-        Char = 1 << Char_Index + 1,
-        Double = 1 << Double_Index + 1,
-        Float = 1 << Float_Index + 1,
-        Int = 1 << Int_Index + 1,
-        Short = 1 << Short_Index + 1,
-        Long = 1 << Long_Index + 1,
-        Long_Long = 1 << Long_Long_Index + 1,
-        Signed = 1 << Signed_Index + 1,
-        Unsigned = 1 << Unsigned_Index + 1,
+        Char = 1 << (Char_Index + 1),
+        Double = 1 << (Double_Index + 1),
+        Float = 1 << (Float_Index + 1),
+        Int = 1 << (Int_Index + 1),
+        Short = 1 << (Short_Index + 1),
+        Long = 1 << (Long_Index + 1),
+        Long_Long = 1 << (Long_Long_Index + 1),
+        Signed = 1 << (Signed_Index + 1),
+        Unsigned = 1 << (Unsigned_Index + 1),
     };
 };
 
