@@ -207,22 +207,27 @@ bool get_type_size_alignment(const Type* type, size_t* size, size_t* alignment) 
         }
 
         case Type::Pointer:
+        ptr:
             *size = 8;
             *alignment = *size;
             return true;
 
         case Type::Array: {
             Type_Array* array = (Type_Array*)type;
-            if (!get_type_size_alignment(array->inner.get_type(), size, alignment)) {
-                return false;
-            }
+            if (array->o_length) {
+                if (!get_type_size_alignment(array->inner.get_type(), size, alignment)) {
+                    return false;
+                }
 
-            int64_t length;
-            if (!evaluate_expression(array->length, &length)) {
-                return false;
-            }
+                int64_t length;
+                if (!evaluate_expression(array->o_length, &length)) {
+                    return false;
+                }
 
-            *size *= length;
+                *size *= length;
+            } else {
+                goto ptr;
+            }
             return true;
         }
     }
@@ -733,11 +738,11 @@ static Result parse_declaration_identifier_and_type(Context* context,
                 result = peek_token(context, parser, &pair);
                 CZ_TRY_VAR(result);
 
-                Expression* expression;
+                Expression* length;
                 if (result.type == Result::Success && pair.token.type == Token::CloseSquare) {
-                    expression = nullptr;
+                    length = nullptr;
                 } else {
-                    result = parse_expression(context, parser, &expression);
+                    result = parse_expression(context, parser, &length);
                     CZ_TRY_VAR(result);
                     if (result.type == Result::Done) {
                         context->report_error(previous_span, previous_source_span,
@@ -763,7 +768,7 @@ static Result parse_declaration_identifier_and_type(Context* context,
 
                 Type_Array* array = parser->buffer_array.allocator().create<Type_Array>();
                 array->inner = *type;
-                array->length = expression;
+                array->o_length = length;
                 if (inner_type_out) {
                     *inner_type_out = &array->inner;
                     inner_type_out = nullptr;

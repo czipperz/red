@@ -112,7 +112,7 @@ struct Type_Array : Type {
     Type_Array() : Type(Array) {}
 
     TypeP inner;
-    struct Expression* length;
+    struct Expression* o_length;
 };
 
 struct Type_Function : Type {
