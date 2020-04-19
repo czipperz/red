@@ -740,6 +740,7 @@ static Result parse_declaration_identifier_and_type(Context* context,
 
                 Expression* length;
                 if (result.type == Result::Success && pair.token.type == Token::CloseSquare) {
+                    next_token_after_peek(parser);
                     length = nullptr;
                 } else {
                     result = parse_expression(context, parser, &length);

@@ -441,6 +441,8 @@ TEST_CASE("parse_declaration array of function pointer one parameter") {
     REQUIRE(decl->type.get_type()->tag == Type::Array);
 
     Type_Array* array = (Type_Array*)decl->type.get_type();
+    REQUIRE(array->o_length);
+    CHECK(array->o_length->tag == Expression::Integer);
     REQUIRE(array->inner.get_type());
     REQUIRE(array->inner.get_type()->tag == Type::Pointer);
 
@@ -458,6 +460,35 @@ TEST_CASE("parse_declaration array of function pointer one parameter") {
     CHECK_FALSE(fun->parameter_types[0].is_const());
     CHECK_FALSE(fun->parameter_types[0].is_volatile());
     CHECK_FALSE(fun->has_varargs);
+}
+
+TEST_CASE("parse_declaration array no length") {
+    SETUP("void* f[];");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 1);
+
+    Declaration* decl = parser.declaration_stack[0].get_hash("f");
+    REQUIRE(decl);
+    CHECK_FALSE(decl->type.is_const());
+    CHECK_FALSE(decl->type.is_volatile());
+    REQUIRE(decl->type.get_type());
+    REQUIRE(decl->type.get_type()->tag == Type::Array);
+
+    Type_Array* array = (Type_Array*)decl->type.get_type();
+    CHECK_FALSE(array->o_length);
+    REQUIRE(array->inner.get_type());
+    REQUIRE(array->inner.get_type()->tag == Type::Pointer);
+
+    Type_Pointer* ret = (Type_Pointer*)array->inner.get_type();
+    REQUIRE(ret);
+    CHECK_FALSE(ret->inner.is_const());
+    CHECK_FALSE(ret->inner.is_volatile());
+    CHECK(ret->inner.get_type() == parser.type_void);
 }
 
 TEST_CASE("parse_declaration long int = signed long") {
