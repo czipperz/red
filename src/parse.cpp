@@ -558,10 +558,15 @@ static Result parse_declaration_initializer(Context* context,
                 Block block;
                 CZ_TRY(parse_block(context, parser, &block));
 
+                Token_Source_Span_Pair end_pair;
+                previous_token(parser, &end_pair);
+
                 Function_Definition* function_definition =
                     parser->buffer_array.allocator().create<Function_Definition>();
                 function_definition->parameter_names = parameter_names;
                 function_definition->block = block;
+                function_definition->block_span.start = pair.source_span.start;
+                function_definition->block_span.end = end_pair.source_span.end;
                 declaration.v.function_definition = function_definition;
 
                 *force_terminate = true;
@@ -587,6 +592,8 @@ static Result parse_declaration_initializer(Context* context,
 
                 Statement_Initializer_Copy* initializer =
                     parser->buffer_array.allocator().create<Statement_Initializer_Copy>();
+                initializer->span.start = declaration.span.start;
+                initializer->span.end = value->span.end;
                 initializer->identifier = identifier;
                 initializer->value = value;
                 initializers->reserve(cz::heap_allocator(), 1);
@@ -597,6 +604,7 @@ static Result parse_declaration_initializer(Context* context,
             default: {
                 Statement_Initializer_Default* initializer =
                     parser->buffer_array.allocator().create<Statement_Initializer_Default>();
+                initializer->span = declaration.span;
                 initializer->identifier = identifier;
                 initializers->reserve(cz::heap_allocator(), 1);
                 initializers->push(initializer);
@@ -2152,6 +2160,7 @@ static Result parse_expression_(Context* context,
         case Token::Integer: {
             Expression_Integer* expression =
                 parser->buffer_array.allocator().create<Expression_Integer>();
+            expression->span = pair.source_span;
             expression->value = pair.token.v.integer.value;
             *eout = expression;
             break;
@@ -2161,6 +2170,7 @@ static Result parse_expression_(Context* context,
             if (lookup_declaration(parser, pair.token.v.identifier)) {
                 Expression_Variable* expression =
                     parser->buffer_array.allocator().create<Expression_Variable>();
+                expression->span = pair.source_span;
                 expression->variable = pair.token.v.identifier;
                 *eout = expression;
                 break;
@@ -2189,7 +2199,7 @@ static Result parse_expression_(Context* context,
                 CZ_TRY(result);
                 if (result.type == Result::Done) {
                 sizeof_open_paren_done:
-                    context->report_error(pair.token.span, pair.source_span,
+                    context->report_error(open_paren_pair.token.span, open_paren_pair.source_span,
                                           "Unmatched parenthesis (`(`)");
                     return {Result::ErrorInvalidInput};
                 }
@@ -2217,7 +2227,6 @@ static Result parse_expression_(Context* context,
                         CZ_TRY(parse_declaration_identifier_and_type(
                             context, parser, &identifier, &type, nullptr, &inner_parameter_names));
 
-                        Token_Source_Span_Pair open_paren_pair = pair;
                         if (identifier.str.len > 0) {
                             context->report_error(
                                 open_paren_pair.token.span, open_paren_pair.source_span,
@@ -2237,7 +2246,7 @@ static Result parse_expression_(Context* context,
                     } break;
                 }
 
-                Token_Source_Span_Pair open_paren_pair = pair;
+                Location sizeof_source_span_start = pair.source_span.start;
                 result = next_token(context, parser, &pair);
                 CZ_TRY_VAR(result);
                 if (result.type == Result::Done) {
@@ -2250,19 +2259,18 @@ static Result parse_expression_(Context* context,
                                           "Expected close parenthesis (`)`) here");
                     return {Result::ErrorInvalidInput};
                 }
+
+                (*eout)->span.start = sizeof_source_span_start;
+                (*eout)->span.end = pair.source_span.end;
             } else {
             sizeof_expression:
                 result = parse_expression_(context, parser, eout, 4);
                 CZ_TRY_VAR(result);
 
-                if (result.type == Result::Done) {
-                    context->report_error(pair.token.span, pair.source_span,
-                                          "Unmatched parenthesis (`(`)");
-                    return {Result::ErrorInvalidInput};
-                }
-
                 Expression_Sizeof_Expression* expression =
                     parser->buffer_array.allocator().create<Expression_Sizeof_Expression>();
+                expression->span.start = pair.source_span.start;
+                expression->span.end = (*eout)->span.end;
                 expression->expression = *eout;
                 *eout = expression;
             }
@@ -2332,6 +2340,8 @@ static Result parse_expression_(Context* context,
 
                     Expression_Cast* expression =
                         parser->buffer_array.allocator().create<Expression_Cast>();
+                    expression->span.start = open_paren_pair.source_span.start;
+                    expression->span.end = value->span.end;
                     expression->type = type;
                     expression->value = value;
                     *eout = expression;
@@ -2363,6 +2373,9 @@ static Result parse_expression_(Context* context,
                                               "Expected close parenthesis (`)`) here");
                         return {Result::ErrorInvalidInput};
                     }
+
+                    (*eout)->span.start = open_paren_pair.source_span.start;
+                    (*eout)->span.end = pair.source_span.end;
                 } break;
             }
         } break;
@@ -2430,6 +2443,8 @@ static Result parse_expression_(Context* context,
 
                 Expression_Ternary* ternary =
                     parser->buffer_array.allocator().create<Expression_Ternary>();
+                ternary->span.start = (*eout)->span.start;
+                ternary->span.end = otherwise->span.end;
                 ternary->condition = *eout;
                 ternary->then = then;
                 ternary->otherwise = otherwise;
@@ -2500,6 +2515,8 @@ static Result parse_expression_(Context* context,
         }
 
         Expression_Binary* binary = parser->buffer_array.allocator().create<Expression_Binary>();
+        binary->span.start = (*eout)->span.start;
+        binary->span.end = right->span.end;
         binary->op = pair.token.type;
         binary->left = *eout;
         binary->right = right;
@@ -2594,7 +2611,12 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             Block block;
             CZ_TRY(parse_block(context, parser, &block));
 
+            Token_Source_Span_Pair end_pair;
+            previous_token(parser, &end_pair);
+
             Statement_Block* statement = parser->buffer_array.allocator().create<Statement_Block>();
+            statement->span.start = pair.source_span.start;
+            statement->span.end = end_pair.source_span.end;
             statement->block = block;
             *sout = statement;
             return Result::ok();
@@ -2648,6 +2670,8 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             }
 
             Statement_While* statement = parser->buffer_array.allocator().create<Statement_While>();
+            statement->span.start = while_pair.source_span.start;
+            statement->span.end = body->span.end;
             statement->condition = condition;
             statement->body = body;
             *sout = statement;
@@ -2762,6 +2786,8 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             }
 
             Statement_For* statement = parser->buffer_array.allocator().create<Statement_For>();
+            statement->span.start = for_pair.source_span.start;
+            statement->span.end = body->span.end;
             statement->initializer = initializer;
             statement->condition = condition;
             statement->increment = increment;
@@ -2771,6 +2797,8 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
         }
 
         case Token::Return: {
+            Location return_source_span_start = pair.source_span.start;
+
             next_token_after_peek(parser);
             result = peek_token(context, parser, &pair);
             CZ_TRY_VAR(result);
@@ -2805,6 +2833,8 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
 
             Statement_Return* statement =
                 parser->buffer_array.allocator().create<Statement_Return>();
+            statement->span.start = return_source_span_start;
+            statement->span.end = pair.source_span.end;
             statement->o_value = value;
             *sout = statement;
             return Result::ok();
@@ -2823,9 +2853,16 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
                                       "Expected semicolon here to end expression statement");
                 return {Result::ErrorInvalidInput};
             }
+            if (pair.token.type != Token::Semicolon) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected semicolon here to end expression statement");
+                return {Result::ErrorInvalidInput};
+            }
 
             Statement_Expression* statement =
                 parser->buffer_array.allocator().create<Statement_Expression>();
+            statement->span.start = expression->span.start;
+            statement->span.end = pair.source_span.end;
             statement->expression = expression;
             *sout = statement;
             return Result::ok();

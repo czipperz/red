@@ -1055,6 +1055,8 @@ TEST_CASE("parse_expression defined variable") {
     REQUIRE(expression->tag == Expression::Variable);
     Expression_Variable* e = (Expression_Variable*)expression;
     CHECK(e->variable.str == "abc");
+    CHECK(e->span.start.index == 9);
+    CHECK(e->span.end.index == 12);
 
     CHECK(context.errors.len() == 0);
 }
@@ -1151,12 +1153,18 @@ TEST_CASE("parse_expression binary expression left to right parenthesis") {
     REQUIRE(expression->tag == Expression::Binary);
     Expression_Binary* e = (Expression_Binary*)expression;
     CHECK(e->op == Token::Plus);
+    CHECK(e->span.start.index == 0);
+    CHECK(e->span.end.index == 11);
 
     REQUIRE(e->left);
     CHECK(e->left->tag == Expression::Integer);
+    CHECK(e->left->span.start.index == 0);
+    CHECK(e->left->span.end.index == 1);
 
     REQUIRE(e->right);
     CHECK(e->right->tag == Expression::Binary);
+    CHECK(e->right->span.start.index == 4);
+    CHECK(e->right->span.end.index == 11);
 
     CHECK(context.errors.len() == 0);
 }
@@ -1264,6 +1272,8 @@ TEST_CASE("parse_expression ternary operator comma breaks otherwise") {
     REQUIRE(expression->tag == Expression::Binary);
 
     Expression_Binary* e = (Expression_Binary*)expression;
+    CHECK(e->span.start.index == 0);
+    CHECK(e->span.end.index == 12);
     CHECK(e->op == Token::Comma);
     REQUIRE(e->left);
     CHECK(e->left->tag == Expression::Ternary);
@@ -1271,6 +1281,8 @@ TEST_CASE("parse_expression ternary operator comma breaks otherwise") {
     CHECK(e->right->tag == Expression::Integer);
 
     Expression_Ternary* ternary = (Expression_Ternary*)e->left;
+    CHECK(ternary->span.start.index == 0);
+    CHECK(ternary->span.end.index == 9);
     REQUIRE(ternary->condition);
     CHECK(ternary->condition->tag == Expression::Integer);
 
@@ -1475,15 +1487,29 @@ TEST_CASE("parse_declaration two variables first has initializer") {
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
+    CHECK(abc->span.start.index == 4);
+    CHECK(abc->span.end.index == 7);
     CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
+    CHECK(abc->v.initializer == initializers[0]);
+    REQUIRE(initializers[0]);
+    CHECK(initializers[0]->span.start.index == 4);
+    CHECK(initializers[0]->span.end.index == 12);
+
     Declaration* def = parser.declaration_stack[0].get_hash("def");
     REQUIRE(def);
+    CHECK(def->span.start.index == 14);
+    CHECK(def->span.end.index == 17);
     CHECK(def->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
+
+    CHECK(def->v.initializer == initializers[1]);
+    REQUIRE(initializers[1]);
+    CHECK(initializers[1]->span.start.index == 14);
+    CHECK(initializers[1]->span.end.index == 17);
 
     CHECK(context.errors.len() == 0);
 }
@@ -1497,6 +1523,8 @@ TEST_CASE("parse_statement block with defined variable and expression usage") {
     REQUIRE(statement->tag == Statement::Block);
 
     Statement_Block* body = (Statement_Block*)statement;
+    CHECK(body->span.start.index == 0);
+    CHECK(body->span.end.index == 17);
     REQUIRE(body->block.statements.len == 2);
 
     REQUIRE(body->block.statements[0]);
@@ -1531,6 +1559,8 @@ TEST_CASE("parse_statement for loop") {
     REQUIRE(statement->tag == Statement::For);
 
     Statement_For* sfor = (Statement_For*)statement;
+    CHECK(sfor->span.start.index == 9);
+    CHECK(sfor->span.end.index == 49);
     REQUIRE(sfor->initializer);
     REQUIRE(sfor->initializer->tag == Expression::Binary);
 
@@ -1557,6 +1587,8 @@ TEST_CASE("parse_statement while loop") {
     REQUIRE(statement->tag == Statement::While);
 
     Statement_While* swhile = (Statement_While*)statement;
+    CHECK(swhile->span.start.index == 0);
+    CHECK(swhile->span.end.index == 12);
     REQUIRE(swhile->condition);
     REQUIRE(swhile->condition->tag == Expression::Integer);
     Expression_Integer* condition = (Expression_Integer*)swhile->condition;
@@ -1577,6 +1609,8 @@ TEST_CASE("parse_statement return no expression") {
     REQUIRE(statement->tag == Statement::Return);
 
     Statement_Return* sreturn = (Statement_Return*)statement;
+    CHECK(sreturn->span.start.index == 0);
+    CHECK(sreturn->span.end.index == 7);
     CHECK_FALSE(sreturn->o_value);
 }
 
@@ -1589,6 +1623,8 @@ TEST_CASE("parse_statement return expression") {
     REQUIRE(statement->tag == Statement::Return);
 
     Statement_Return* sreturn = (Statement_Return*)statement;
+    CHECK(sreturn->span.start.index == 0);
+    CHECK(sreturn->span.end.index == 10);
     REQUIRE(sreturn->o_value);
     CHECK(sreturn->o_value->tag == Expression::Integer);
 }

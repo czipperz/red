@@ -199,6 +199,7 @@ struct Statement {
         Function,
     };
 
+    Span span;
     Tag tag;
 
     Statement(Tag tag) : tag(tag) {}
@@ -260,7 +261,8 @@ struct Statement_Initializer_Copy : Statement_Initializer {
 
 struct Function_Definition {
     cz::Slice<cz::Str> parameter_names;
-    struct Block block;
+    Block block;
+    Span block_span;
 };
 
 struct Declaration {
