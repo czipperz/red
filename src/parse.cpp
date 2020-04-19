@@ -10,20 +10,22 @@
 namespace red {
 namespace parse {
 
-#define TYPE_TOKEN_CASES \
-    case Token::Char:    \
-    case Token::Double:  \
-    case Token::Float:   \
-    case Token::Int:     \
-    case Token::Long:    \
-    case Token::Short:   \
-    case Token::Void:    \
-    case Token::Extern:  \
-    case Token::Enum:    \
-    case Token::Struct:  \
-    case Token::Union:   \
-    case Token::Typedef: \
-    case Token::Const:   \
+#define TYPE_TOKEN_CASES  \
+    case Token::Char:     \
+    case Token::Double:   \
+    case Token::Float:    \
+    case Token::Int:      \
+    case Token::Long:     \
+    case Token::Short:    \
+    case Token::Signed:   \
+    case Token::Unsigned: \
+    case Token::Void:     \
+    case Token::Extern:   \
+    case Token::Enum:     \
+    case Token::Struct:   \
+    case Token::Union:    \
+    case Token::Typedef:  \
+    case Token::Const:    \
     case Token::Volatile
 
 static bool evaluate_expression(Expression* e, int64_t* value) {
