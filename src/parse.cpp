@@ -118,6 +118,10 @@ static bool evaluate_expression(Expression* e, int64_t* value) {
         case Expression::Sizeof_Expression: {
             CZ_PANIC("evaluate_expression unhandled case sizeof(expression)");
         }
+
+        case Expression::Function_Call: {
+            CZ_PANIC("evaluate_expression unhandled case function call");
+        }
     }
 
     CZ_PANIC("evaluate_expression unhandled case");
@@ -2400,6 +2404,75 @@ static Result parse_expression_(Context* context,
             case Token::Semicolon:
             case Token::Colon:
                 return Result::ok();
+
+            case Token::OpenParen: {
+                precedence = 2;
+                ltr = false;
+
+                if (precedence >= max_precedence) {
+                    return Result::ok();
+                }
+
+                next_token_after_peek(parser);
+
+                cz::Vector<Expression*> arguments = {};
+                CZ_DEFER(arguments.drop(cz::heap_allocator()));
+
+                Token_Source_Span_Pair peek_pair;
+                result = peek_token(context, parser, &peek_pair);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Success && peek_pair.token.type == Token::CloseParen) {
+                    next_token_after_peek(parser);
+                    goto end_of_function_call;
+                }
+
+                while (1) {
+                    Expression* argument;
+                    result = parse_expression_(context, parser, &argument, 17);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        context->report_error(pair.token.span, pair.source_span,
+                                              "Unmatched parenthesis here (`(`)");
+                        return {Result::ErrorInvalidInput};
+                    }
+
+                    arguments.reserve(cz::heap_allocator(), 1);
+                    arguments.push(argument);
+
+                    result = peek_token(context, parser, &peek_pair);
+                    CZ_TRY_VAR(result);
+                    if (result.type == Result::Done) {
+                        context->report_error(pair.token.span, pair.source_span,
+                                              "Unmatched parenthesis here (`(`)");
+                        return {Result::ErrorInvalidInput};
+                    }
+
+                    if (peek_pair.token.type == Token::Comma) {
+                        next_token_after_peek(parser);
+                    } else if (peek_pair.token.type == Token::CloseParen) {
+                        next_token_after_peek(parser);
+                        break;
+                    } else {
+                        context->report_error(pair.token.span, pair.source_span,
+                                              "Unmatched parenthesis here (`(`)");
+                        context->report_error(
+                            peek_pair.token.span, peek_pair.source_span,
+                            "Expected close paren (`)`) here to end argument list");
+                        return {Result::ErrorInvalidInput};
+                    }
+                }
+
+            end_of_function_call:
+                Expression_Function_Call* function_call =
+                    parser->buffer_array.allocator().create<Expression_Function_Call>();
+                function_call->function = *eout;
+                function_call->arguments =
+                    parser->buffer_array.allocator().duplicate(arguments.as_slice());
+                function_call->span.start = (*eout)->span.start;
+                function_call->span.end = peek_pair.source_span.end;
+                *eout = function_call;
+                return Result::ok();
+            } break;
 
             case Token::QuestionMark: {
                 precedence = 16;

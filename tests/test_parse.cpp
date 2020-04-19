@@ -1368,6 +1368,35 @@ TEST_CASE("parse_expression sizeof unparenthesized expression") {
     CHECK(se->expression->tag == Expression::Integer);
 }
 
+TEST_CASE("parse_expression function call") {
+    SETUP("void f(int); int abc; f(abc);");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Function_Call);
+
+    Expression_Function_Call* se = (Expression_Function_Call*)expression;
+    CHECK(se->span.start.index == 22);
+    CHECK(se->span.end.index == 28);
+    REQUIRE(se->function);
+    REQUIRE(se->function->tag == Expression::Variable);
+    Expression_Variable* fun = (Expression_Variable*)se->function;
+    CHECK(fun->variable.str == "f");
+
+    REQUIRE(se->arguments.len == 1);
+    REQUIRE(se->arguments[0]);
+    REQUIRE(se->arguments[0]->tag == Expression::Variable);
+    Expression_Variable* arg0 = (Expression_Variable*)se->arguments[0];
+    CHECK(arg0->variable.str == "abc");
+}
+
 TEST_CASE("parse_expression type cast user defined typedef") {
     SETUP("typedef int A; (A)2 + 3;");
     cz::Vector<Statement*> initializers = {};

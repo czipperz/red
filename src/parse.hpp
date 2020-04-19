@@ -132,6 +132,7 @@ struct Expression {
         Cast,
         Sizeof_Type,
         Sizeof_Expression,
+        Function_Call,
     };
 
     Span span;
@@ -185,6 +186,13 @@ struct Expression_Sizeof_Expression : Expression {
     Expression_Sizeof_Expression() : Expression(Sizeof_Expression) {}
 
     Expression* expression;
+};
+
+struct Expression_Function_Call : Expression {
+    Expression_Function_Call() : Expression(Function_Call) {}
+
+    Expression* function;
+    cz::Slice<Expression*> arguments;
 };
 
 struct Statement {
