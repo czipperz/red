@@ -80,12 +80,16 @@ TEST_CASE("parse_declaration two variables same type") {
 
     Declaration* abc = parser.declaration_stack[0].get_hash("abc");
     REQUIRE(abc);
+    CHECK(abc->span.start.index == 4);
+    CHECK(abc->span.end.index == 7);
     CHECK(abc->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(abc->type.is_const());
     CHECK_FALSE(abc->type.is_volatile());
 
     Declaration* def = parser.declaration_stack[0].get_hash("def");
     REQUIRE(def);
+    CHECK(def->span.start.index == 9);
+    CHECK(def->span.end.index == 12);
     CHECK(def->type.get_type() == parser.type_signed_int);
     CHECK_FALSE(def->type.is_const());
     CHECK_FALSE(def->type.is_volatile());
@@ -301,6 +305,8 @@ TEST_CASE("parse_declaration function pointer one parameter") {
 
     Declaration* f = parser.declaration_stack[0].get_hash("f");
     REQUIRE(f);
+    CHECK(f->span.start.index == 5);
+    CHECK(f->span.end.index == 16);
     CHECK_FALSE(f->type.is_const());
     CHECK_FALSE(f->type.is_volatile());
     REQUIRE(f->type.get_type());
@@ -365,6 +371,8 @@ TEST_CASE("parse_declaration function definition one parameter and its used") {
 
     Declaration* f = parser.declaration_stack[0].get_hash("f");
     REQUIRE(f);
+    CHECK(f->span.start.index == 5);
+    CHECK(f->span.end.index == 13);
     REQUIRE(f->type.get_type());
     REQUIRE(f->type.get_type()->tag == Type::Function);
 
@@ -673,6 +681,8 @@ TEST_CASE("parse_declaration struct named empty body") {
     REQUIRE(*type);
     REQUIRE((*type)->tag == Type::Struct);
     Type_Struct* ts = (Type_Struct*)*type;
+    CHECK(ts->span.start.index == 0);
+    CHECK(ts->span.end.index == 11);
     CHECK(ts->types.count == 0);
     CHECK(ts->typedefs.count == 0);
     CHECK(ts->declarations.count == 0);
