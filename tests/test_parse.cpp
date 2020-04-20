@@ -1658,6 +1658,48 @@ TEST_CASE("parse_expression logical not") {
     CHECK(inte->value == 2);
 }
 
+TEST_CASE("parse_expression dot operator") {
+    SETUP("struct { int b; } a; a.b;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Member_Access);
+
+    Expression_Member_Access* mae = (Expression_Member_Access*)expression;
+    REQUIRE(mae->object);
+    REQUIRE(mae->object->tag == Expression::Variable);
+    Expression_Variable* obj = (Expression_Variable*)mae->object;
+    CHECK(obj->variable.str == "a");
+    REQUIRE(mae->field.str == "b");
+}
+
+TEST_CASE("parse_expression arrow operator") {
+    SETUP("struct { int b; }* a; a->b;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Dereference_Member_Access);
+
+    Expression_Dereference_Member_Access* mae = (Expression_Dereference_Member_Access*)expression;
+    REQUIRE(mae->pointer);
+    REQUIRE(mae->pointer->tag == Expression::Variable);
+    Expression_Variable* ptr = (Expression_Variable*)mae->pointer;
+    CHECK(ptr->variable.str == "a");
+    REQUIRE(mae->field.str == "b");
+}
+
 TEST_CASE("parse_expression type cast user defined typedef") {
     SETUP("typedef int A; (A)2 + 3;");
     cz::Vector<Statement*> initializers = {};

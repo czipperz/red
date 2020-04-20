@@ -138,6 +138,8 @@ struct Expression {
         Dereference,
         Bit_Not,
         Logical_Not,
+        Member_Access,
+        Dereference_Member_Access,
     };
 
     Span span;
@@ -229,6 +231,20 @@ struct Expression_Logical_Not : Expression {
     Expression_Logical_Not() : Expression(Logical_Not) {}
 
     Expression* value;
+};
+
+struct Expression_Member_Access : Expression {
+    Expression_Member_Access() : Expression(Member_Access) {}
+
+    Expression* object;
+    Hashed_Str field;
+};
+
+struct Expression_Dereference_Member_Access : Expression {
+    Expression_Dereference_Member_Access() : Expression(Dereference_Member_Access) {}
+
+    Expression* pointer;
+    Hashed_Str field;
 };
 
 struct Statement {

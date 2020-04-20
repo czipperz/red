@@ -152,6 +152,14 @@ static bool evaluate_expression(Expression* e, int64_t* value) {
             *value = !*value;
             return true;
         }
+
+        case Expression::Member_Access: {
+            CZ_PANIC("evaluate_expression unhandled case member access");
+        }
+
+        case Expression::Dereference_Member_Access: {
+            CZ_PANIC("evaluate_expression unhandled case dereference member access");
+        }
     }
 
     CZ_PANIC("evaluate_expression unhandled case");
@@ -2694,6 +2702,68 @@ static Result parse_expression_continuation(Context* context,
                 ternary->then = then;
                 ternary->otherwise = otherwise;
                 *eout = ternary;
+                continue;
+            }
+
+            case Token::Dot: {
+                next_token_after_peek(parser);
+
+                Token_Source_Span_Pair peek_pair;
+                result = peek_token(context, parser, &peek_pair);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Expected field name due to field access here");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (peek_pair.token.type != Token::Identifier) {
+                    context->report_error(peek_pair.token.span, peek_pair.source_span,
+                                          "Expected field name here");
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Due to field access here");
+                    return {Result::ErrorInvalidInput};
+                }
+
+                next_token_after_peek(parser);
+
+                Expression_Member_Access* member_access =
+                    parser->buffer_array.allocator().create<Expression_Member_Access>();
+                member_access->span.start = pair.source_span.start;
+                member_access->span.end = peek_pair.source_span.end;
+                member_access->object = *eout;
+                member_access->field = peek_pair.token.v.identifier;
+                *eout = member_access;
+                continue;
+            }
+
+            case Token::Arrow: {
+                next_token_after_peek(parser);
+
+                Token_Source_Span_Pair peek_pair;
+                result = peek_token(context, parser, &peek_pair);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Expected field name due to field access here");
+                    return {Result::ErrorInvalidInput};
+                }
+                if (peek_pair.token.type != Token::Identifier) {
+                    context->report_error(peek_pair.token.span, peek_pair.source_span,
+                                          "Expected field name here");
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Due to field access here");
+                    return {Result::ErrorInvalidInput};
+                }
+
+                next_token_after_peek(parser);
+
+                Expression_Dereference_Member_Access* member_access =
+                    parser->buffer_array.allocator().create<Expression_Dereference_Member_Access>();
+                member_access->span.start = pair.source_span.start;
+                member_access->span.end = peek_pair.source_span.end;
+                member_access->pointer = *eout;
+                member_access->field = peek_pair.token.v.identifier;
+                *eout = member_access;
                 continue;
             }
 
