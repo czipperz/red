@@ -2107,6 +2107,9 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
         }
 
         return Result::ok();
+    } else if (result.type == Result::Success && pair.token.type == Token::Semicolon) {
+        next_token_after_peek(parser);
+        return Result::ok();
     } else {
         uint32_t flags = 0;
         while (result.type == Result::Success) {

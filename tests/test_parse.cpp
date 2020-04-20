@@ -31,6 +31,19 @@ static void setup(Context* context, Parser* parser, cz::Str contents) {
         context.destroy();              \
     })
 
+TEST_CASE("parse_declaration just semicolon") {
+    SETUP(";");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parser.declaration_stack.len() == 1);
+    CHECK(parser.declaration_stack[0].count == 0);
+    CHECK(initializers.len() == 0);
+
+    CHECK(context.errors.len() == 0);
+}
+
 TEST_CASE("parse_declaration type but no identifier") {
     SETUP("int;");
     cz::Vector<Statement*> initializers = {};
