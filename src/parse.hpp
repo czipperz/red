@@ -260,6 +260,7 @@ struct Statement {
         While,
         Return,
         Empty,
+        If,
         Initializer_Default,
         Initializer_Copy,
     };
@@ -310,6 +311,14 @@ struct Statement_Return : Statement {
 
 struct Statement_Empty : Statement {
     Statement_Empty() : Statement(Empty) {}
+};
+
+struct Statement_If : Statement {
+    Statement_If() : Statement(If) {}
+
+    struct Expression* condition;
+    Statement* then;
+    Statement* otherwise;
 };
 
 struct Statement_Initializer : Statement {

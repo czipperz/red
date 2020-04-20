@@ -2974,6 +2974,80 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             *sout = statement;
         } break;
 
+        case Token::If: {
+            Token_Source_Span_Pair if_pair = pair;
+            next_token_after_peek(parser);
+
+            result = next_token(context, parser, &pair);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(if_pair.token.span, if_pair.source_span,
+                                      "Expected open parenthesis here");
+                return {Result::ErrorInvalidInput};
+            }
+            if (pair.token.type != Token::OpenParen) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected open parenthesis here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Expression* condition;
+            result = parse_expression(context, parser, &condition);
+            if (result.type == Result::Done) {
+                context->report_error(if_pair.token.span, if_pair.source_span,
+                                      "Expected condition expression here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            result = next_token(context, parser, &pair);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(if_pair.token.span, if_pair.source_span,
+                                      "Expected `)` to end condition expression");
+                return {Result::ErrorInvalidInput};
+            }
+            if (pair.token.type != Token::CloseParen) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected `)` here to end condition expression");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Statement* then;
+            result = parse_statement(context, parser, &then);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(if_pair.token.span, if_pair.source_span,
+                                      "Expected body statement");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Location end_location = then->span.end;
+
+            Statement* otherwise = nullptr;
+            Token_Source_Span_Pair else_pair;
+            result = peek_token(context, parser, &else_pair);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Success && else_pair.token.type == Token::Else) {
+                next_token_after_peek(parser);
+                result = parse_statement(context, parser, &otherwise);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(if_pair.token.span, if_pair.source_span,
+                                          "Expected body statement");
+                    return {Result::ErrorInvalidInput};
+                }
+                end_location = otherwise->span.end;
+            }
+
+            Statement_If* statement = parser->buffer_array.allocator().create<Statement_If>();
+            statement->span.start = if_pair.source_span.start;
+            statement->span.end = end_location;
+            statement->condition = condition;
+            statement->then = then;
+            statement->otherwise = otherwise;
+            *sout = statement;
+        } break;
+
         case Token::While: {
             Token_Source_Span_Pair while_pair = pair;
             next_token_after_peek(parser);

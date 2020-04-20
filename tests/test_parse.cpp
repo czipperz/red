@@ -1900,6 +1900,68 @@ TEST_CASE("parse_statement empty statement") {
     CHECK(statement->tag == Statement::Empty);
 }
 
+TEST_CASE("parse_statement if statement") {
+    SETUP("if (1) 2;");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(statement);
+    CHECK(statement->span.start.index == 0);
+    CHECK(statement->span.end.index == 9);
+    CHECK(statement->tag == Statement::If);
+
+    Statement_If* sif = (Statement_If*)statement;
+    REQUIRE(sif->condition);
+    CHECK(sif->condition->tag == Expression::Integer);
+    Expression_Integer* cond = (Expression_Integer*)sif->condition;
+    CHECK(cond->value == 1);
+
+    REQUIRE(sif->then);
+    CHECK(sif->then->tag == Statement::Expression);
+    Statement_Expression* thens = (Statement_Expression*)sif->then;
+    REQUIRE(thens->expression);
+    REQUIRE(thens->expression->tag == Expression::Integer);
+    Expression_Integer* thene = (Expression_Integer*)thens->expression;
+    CHECK(thene->value == 2);
+
+    CHECK_FALSE(sif->otherwise);
+}
+
+TEST_CASE("parse_statement if else statement") {
+    SETUP("if (1) 2; else 3;");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(statement);
+    CHECK(statement->span.start.index == 0);
+    CHECK(statement->span.end.index == 17);
+    CHECK(statement->tag == Statement::If);
+
+    Statement_If* sif = (Statement_If*)statement;
+    REQUIRE(sif->condition);
+    CHECK(sif->condition->tag == Expression::Integer);
+    Expression_Integer* cond = (Expression_Integer*)sif->condition;
+    CHECK(cond->value == 1);
+
+    REQUIRE(sif->then);
+    CHECK(sif->then->tag == Statement::Expression);
+    Statement_Expression* thens = (Statement_Expression*)sif->then;
+    REQUIRE(thens->expression);
+    REQUIRE(thens->expression->tag == Expression::Integer);
+    Expression_Integer* thene = (Expression_Integer*)thens->expression;
+    CHECK(thene->value == 2);
+
+    REQUIRE(sif->otherwise);
+    CHECK(sif->otherwise->tag == Statement::Expression);
+    Statement_Expression* otherwises = (Statement_Expression*)sif->otherwise;
+    REQUIRE(otherwises->expression);
+    REQUIRE(otherwises->expression->tag == Expression::Integer);
+    Expression_Integer* otherwisee = (Expression_Integer*)otherwises->expression;
+    CHECK(otherwisee->value == 3);
+}
+
 TEST_CASE("parse_statement for loop") {
     SETUP("int abc; for (abc = 0; abc < 5; abc = abc + 1) {}");
     cz::Vector<Statement*> initializers = {};
