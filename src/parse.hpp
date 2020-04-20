@@ -261,7 +261,6 @@ struct Statement {
         Return,
         Initializer_Default,
         Initializer_Copy,
-        Function,
     };
 
     Span span;
