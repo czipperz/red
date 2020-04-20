@@ -259,6 +259,7 @@ struct Statement {
         For,
         While,
         Return,
+        Empty,
         Initializer_Default,
         Initializer_Copy,
     };
@@ -305,6 +306,10 @@ struct Statement_Return : Statement {
     Statement_Return() : Statement(Return) {}
 
     struct Expression* o_value;
+};
+
+struct Statement_Empty : Statement {
+    Statement_Empty() : Statement(Empty) {}
 };
 
 struct Statement_Initializer : Statement {

@@ -1891,6 +1891,15 @@ TEST_CASE("parse_statement block with defined variable and expression usage") {
     CHECK(context.errors.len() == 0);
 }
 
+TEST_CASE("parse_statement empty statement") {
+    SETUP(";");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    REQUIRE(statement);
+    CHECK(statement->tag == Statement::Empty);
+}
+
 TEST_CASE("parse_statement for loop") {
     SETUP("int abc; for (abc = 0; abc < 5; abc = abc + 1) {}");
     cz::Vector<Statement*> initializers = {};

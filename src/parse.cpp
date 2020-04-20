@@ -2954,6 +2954,13 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
     }
 
     switch (pair.token.type) {
+        case Token::Semicolon: {
+            Statement_Empty* statement = parser->buffer_array.allocator().create<Statement_Empty>();
+            statement->span = pair.source_span;
+            *sout = statement;
+            return Result::ok();
+        }
+
         case Token::OpenCurly: {
             Block block;
             CZ_TRY(parse_block(context, parser, &block));
