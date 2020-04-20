@@ -22,6 +22,7 @@ struct Token {
         Equals,
         NotEquals,
         Dot,
+        Arrow,
         Comma,
 
         Set,

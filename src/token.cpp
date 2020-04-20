@@ -67,6 +67,8 @@ Result write(Writer writer, red::Token token) {
             return write(writer, "!=");
         case Token::Dot:
             return write(writer, '.');
+        case Token::Arrow:
+            return write(writer, "->");
         case Token::Comma:
             return write(writer, ',');
 

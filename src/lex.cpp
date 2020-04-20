@@ -583,8 +583,15 @@ top:
         case '-': {
             *location = point;
             char next;
-            if (next_character(file_contents, &point, &next) && next == '=') {
-                token_out->type = Token::MinusSet;
+            if (next_character(file_contents, &point, &next)) {
+                if (next == '=') {
+                    token_out->type = Token::MinusSet;
+                } else if (next == '>') {
+                    token_out->type = Token::Arrow;
+                } else {
+                    token_out->type = Token::Minus;
+                    point = *location;
+                }
             } else {
                 token_out->type = Token::Minus;
                 point = *location;
