@@ -126,6 +126,10 @@ static bool evaluate_expression(Expression* e, int64_t* value) {
         case Expression::Index: {
             CZ_PANIC("evaluate_expression unhandled case index");
         }
+
+        case Expression::Address_Of: {
+            CZ_PANIC("evaluate_expression unhandled case address of");
+        }
     }
 
     CZ_PANIC("evaluate_expression unhandled case");
@@ -2186,6 +2190,26 @@ static Result parse_expression_atomic(Context* context, Parser* parser, Expressi
             }
         }
 
+        case Token::Ampersand: {
+            int precedence = 3;
+            bool ltr = false;
+
+            result = parse_expression_(context, parser, eout, precedence + !ltr);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected expression to take the address of here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Expression_Address_Of* address_of =
+                parser->buffer_array.allocator().create<Expression_Address_Of>();
+            address_of->value = *eout;
+            address_of->span.start = pair.source_span.start;
+            address_of->span.end = (*eout)->span.end;
+            *eout = address_of;
+        } break;
+
         case Token::Sizeof: {
             Token_Source_Span_Pair open_paren_pair;
             result = peek_token(context, parser, &open_paren_pair);
@@ -2269,7 +2293,10 @@ static Result parse_expression_atomic(Context* context, Parser* parser, Expressi
                 (*eout)->span.end = pair.source_span.end;
             } else {
             sizeof_expression:
-                result = parse_expression_(context, parser, eout, 4);
+                int precedence = 3;
+                bool ltr = false;
+
+                result = parse_expression_(context, parser, eout, precedence + !ltr);
                 CZ_TRY_VAR(result);
 
                 Expression_Sizeof_Expression* expression =
@@ -2334,8 +2361,11 @@ static Result parse_expression_atomic(Context* context, Parser* parser, Expressi
                         return {Result::ErrorInvalidInput};
                     }
 
+                    int precedence = 3;
+                    bool ltr = false;
+
                     Expression* value;
-                    result = parse_expression_(context, parser, &value, 4);
+                    result = parse_expression_(context, parser, &value, precedence + !ltr);
                     CZ_TRY_VAR(result);
                     if (result.type == Result::Done) {
                         context->report_error(pair.token.span, pair.source_span,

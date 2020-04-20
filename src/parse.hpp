@@ -134,6 +134,7 @@ struct Expression {
         Sizeof_Expression,
         Function_Call,
         Index,
+        Address_Of,
     };
 
     Span span;
@@ -201,6 +202,12 @@ struct Expression_Index : Expression {
 
     Expression* array;
     Expression* index;
+};
+
+struct Expression_Address_Of : Expression {
+    Expression_Address_Of() : Expression(Address_Of) {}
+
+    Expression* value;
 };
 
 struct Statement {
