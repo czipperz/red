@@ -2958,8 +2958,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             Statement_Empty* statement = parser->buffer_array.allocator().create<Statement_Empty>();
             statement->span = pair.source_span;
             *sout = statement;
-            return Result::ok();
-        }
+        } break;
 
         case Token::OpenCurly: {
             Block block;
@@ -2973,8 +2972,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             statement->span.end = end_pair.source_span.end;
             statement->block = block;
             *sout = statement;
-            return Result::ok();
-        }
+        } break;
 
         case Token::While: {
             Token_Source_Span_Pair while_pair = pair;
@@ -3029,8 +3027,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             statement->condition = condition;
             statement->body = body;
             *sout = statement;
-            return Result::ok();
-        }
+        } break;
 
         case Token::For: {
             Token_Source_Span_Pair for_pair = pair;
@@ -3147,8 +3144,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             statement->increment = increment;
             statement->body = body;
             *sout = statement;
-            return Result::ok();
-        }
+        } break;
 
         case Token::Return: {
             Location return_source_span_start = pair.source_span.start;
@@ -3191,8 +3187,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             statement->span.end = pair.source_span.end;
             statement->o_value = value;
             *sout = statement;
-            return Result::ok();
-        }
+        } break;
 
         default: {
             Expression* expression;
@@ -3219,9 +3214,10 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             statement->span.end = pair.source_span.end;
             statement->expression = expression;
             *sout = statement;
-            return Result::ok();
-        }
+        } break;
     }
+
+    return Result::ok();
 }
 
 }
