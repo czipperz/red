@@ -425,11 +425,11 @@ static Declaration* lookup_declaration(Parser* parser, Hashed_Str id) {
     return nullptr;
 }
 
-static TypeP* lookup_typedef(Parser* parser, Hashed_Str id) {
+static Type_Definition* lookup_typedef(Parser* parser, Hashed_Str id) {
     for (size_t i = parser->typedef_stack.len(); i-- > 0;) {
-        TypeP* type = parser->typedef_stack[i].get(id.str, id.hash);
-        if (type) {
-            return type;
+        Type_Definition* type_def = parser->typedef_stack[i].get(id.str, id.hash);
+        if (type_def) {
+            return type_def;
         }
     }
     return nullptr;
@@ -1611,10 +1611,10 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                 }
 
                 Declaration* declaration = lookup_declaration(parser, pair.token.v.identifier);
-                TypeP* type = lookup_typedef(parser, pair.token.v.identifier);
+                Type_Definition* type_def = lookup_typedef(parser, pair.token.v.identifier);
                 if (declaration) {
-                    if (type) {
-                        Type* t = type->get_type();
+                    if (type_def) {
+                        Type* t = type_def->type.get_type();
                         if (t->tag == Type::Enum) {
                             context->report_error(
                                 pair.token.span, pair.source_span,
@@ -1641,7 +1641,7 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
 
                 next_token_after_peek(parser);
 
-                if (!type) {
+                if (!type_def) {
                     context->report_error(pair.token.span, pair.source_span, "Undefined type `",
                                           pair.token.v.identifier.str, "`");
                     Type** tagged_type = lookup_type(parser, pair.token.v.identifier);
@@ -1653,7 +1653,7 @@ static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type
                     }
                 }
 
-                base_type->merge_typedef(*type);
+                base_type->merge_typedef(type_def->type);
                 break;
             }
 
@@ -2078,7 +2078,7 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
 
         result = parse_declaration_(context, parser, initializers, 0);
 
-        cz::Str_Map<TypeP>* typedefs = &parser->typedef_stack.last();
+        cz::Str_Map<Type_Definition>* typedefs = &parser->typedef_stack.last();
         typedefs->reserve(cz::heap_allocator(), initializers->len() - len);
         for (size_t i = len; i < initializers->len(); ++i) {
             Statement* init = (*initializers)[i];
@@ -2091,11 +2091,18 @@ Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*
             Declaration* declaration =
                 parser->declaration_stack.last().get(in->identifier.str, in->identifier.hash);
             CZ_DEBUG_ASSERT(declaration);
-            if (!typedefs->get(in->identifier.str, in->identifier.hash)) {
-                typedefs->insert(in->identifier.str, in->identifier.hash, declaration->type);
+            Type_Definition* existing_type_def =
+                typedefs->get(in->identifier.str, in->identifier.hash);
+            if (!existing_type_def) {
+                Type_Definition type_definition;
+                type_definition.type = declaration->type;
+                type_definition.span = declaration->span;
+                typedefs->insert(in->identifier.str, in->identifier.hash, type_definition);
             } else {
                 context->report_error(pair.token.span, pair.source_span, "Typedef `",
                                       in->identifier.str, "` has already been created");
+                context->report_error(existing_type_def->span, existing_type_def->span,
+                                      "Note: it was created here");
             }
         }
 
@@ -2152,7 +2159,7 @@ Result parse_declaration_or_statement(Context* context,
 
     case Token::Identifier: {
         Declaration* declaration = lookup_declaration(parser, pair.token.v.identifier);
-        TypeP* type = lookup_typedef(parser, pair.token.v.identifier);
+        Type_Definition* type = lookup_typedef(parser, pair.token.v.identifier);
         if (declaration) {
             *which = Declaration_Or_Statement::Statement;
 
@@ -2327,8 +2334,9 @@ static Result parse_expression_atomic(Context* context, Parser* parser, Expressi
                     case Token::Identifier: {
                         Declaration* declaration =
                             lookup_declaration(parser, peek_pair.token.v.identifier);
-                        TypeP* typedef_ = lookup_typedef(parser, peek_pair.token.v.identifier);
-                        if (declaration || !typedef_) {
+                        Type_Definition* type =
+                            lookup_typedef(parser, peek_pair.token.v.identifier);
+                        if (declaration || !type) {
                             goto sizeof_open_paren_expression;
                         }
                     }  // fallthrough
@@ -2410,8 +2418,8 @@ static Result parse_expression_atomic(Context* context, Parser* parser, Expressi
                 case Token::Identifier: {
                     Declaration* declaration =
                         lookup_declaration(parser, peek_pair.token.v.identifier);
-                    TypeP* typedef_ = lookup_typedef(parser, peek_pair.token.v.identifier);
-                    if (declaration || !typedef_) {
+                    Type_Definition* type = lookup_typedef(parser, peek_pair.token.v.identifier);
+                    if (declaration || !type) {
                         goto open_paren_expression;
                     }
                 }  // fallthrough

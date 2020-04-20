@@ -977,12 +977,12 @@ TEST_CASE(
     REQUIRE(parser.declaration_stack[0].count == 1);
     Declaration* s = parser.declaration_stack[0].get_hash("s");
     Type** type_s = parser.type_stack[0].get_hash("S");
-    TypeP* typedef_s = parser.typedef_stack[0].get_hash("S");
+    Type_Definition* typedef_s = parser.typedef_stack[0].get_hash("S");
     REQUIRE(s);
     REQUIRE(type_s);
     REQUIRE(typedef_s);
     CHECK(s->type.get_type() == *type_s);
-    CHECK(typedef_s->get_type() != *type_s);
+    CHECK(typedef_s->type.get_type() != *type_s);
 }
 
 TEST_CASE("parse_declaration enum with no values does nothing") {

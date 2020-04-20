@@ -63,6 +63,11 @@ struct TypeP {
     void set_volatile() { value |= 2; }
 };
 
+struct Type_Definition {
+    TypeP type;
+    Span span;
+};
+
 struct Type_Enum : Type {
     Type_Enum() : Type(Enum) {}
 
@@ -80,7 +85,7 @@ struct Type_Composite : Type {
 
     Span span;
     cz::Str_Map<Type*> types;
-    cz::Str_Map<TypeP> typedefs;
+    cz::Str_Map<Type_Definition> typedefs;
     cz::Str_Map<Declaration> declarations;
 
     size_t size;
@@ -355,7 +360,7 @@ struct Parser {
     lex::Lexer lexer;
 
     cz::Vector<cz::Str_Map<Type*> > type_stack;
-    cz::Vector<cz::Str_Map<TypeP> > typedef_stack;
+    cz::Vector<cz::Str_Map<Type_Definition> > typedef_stack;
     cz::Vector<cz::Str_Map<Declaration> > declaration_stack;
 
     cz::Buffer_Array buffer_array;
