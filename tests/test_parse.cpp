@@ -1620,6 +1620,44 @@ TEST_CASE("parse_expression dereference value") {
     CHECK(inte->value == 2);
 }
 
+TEST_CASE("parse_expression bitwise not") {
+    SETUP("~2;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Bit_Not);
+
+    Expression_Bit_Not* bne = (Expression_Bit_Not*)expression;
+    REQUIRE(bne->value);
+    REQUIRE(bne->value->tag == Expression::Integer);
+
+    Expression_Integer* inte = (Expression_Integer*)bne->value;
+    CHECK(inte->value == 2);
+}
+
+TEST_CASE("parse_expression logical not") {
+    SETUP("!2;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Logical_Not);
+
+    Expression_Logical_Not* lne = (Expression_Logical_Not*)expression;
+    REQUIRE(lne->value);
+    REQUIRE(lne->value->tag == Expression::Integer);
+
+    Expression_Integer* inte = (Expression_Integer*)lne->value;
+    CHECK(inte->value == 2);
+}
+
 TEST_CASE("parse_expression type cast user defined typedef") {
     SETUP("typedef int A; (A)2 + 3;");
     cz::Vector<Statement*> initializers = {};

@@ -134,6 +134,24 @@ static bool evaluate_expression(Expression* e, int64_t* value) {
         case Expression::Dereference: {
             CZ_PANIC("evaluate_expression unhandled case dereference");
         }
+
+        case Expression::Bit_Not: {
+            Expression_Bit_Not* expression = (Expression_Bit_Not*)e;
+            if (!evaluate_expression(expression->value, value)) {
+                return false;
+            }
+            *value = ~*value;
+            return true;
+        }
+
+        case Expression::Logical_Not: {
+            Expression_Logical_Not* expression = (Expression_Logical_Not*)e;
+            if (!evaluate_expression(expression->value, value)) {
+                return false;
+            }
+            *value = !*value;
+            return true;
+        }
     }
 
     CZ_PANIC("evaluate_expression unhandled case");
@@ -2232,6 +2250,46 @@ static Result parse_expression_atomic(Context* context, Parser* parser, Expressi
             dereference->span.start = pair.source_span.start;
             dereference->span.end = (*eout)->span.end;
             *eout = dereference;
+        } break;
+
+        case Token::Tilde: {
+            int precedence = 3;
+            bool ltr = false;
+
+            result = parse_expression_(context, parser, eout, precedence + !ltr);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected expression to apply bitwise not to here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Expression_Bit_Not* bit_not =
+                parser->buffer_array.allocator().create<Expression_Bit_Not>();
+            bit_not->value = *eout;
+            bit_not->span.start = pair.source_span.start;
+            bit_not->span.end = (*eout)->span.end;
+            *eout = bit_not;
+        } break;
+
+        case Token::Not: {
+            int precedence = 3;
+            bool ltr = false;
+
+            result = parse_expression_(context, parser, eout, precedence + !ltr);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected expression to apply logical not to here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Expression_Logical_Not* logical_not =
+                parser->buffer_array.allocator().create<Expression_Logical_Not>();
+            logical_not->value = *eout;
+            logical_not->span.start = pair.source_span.start;
+            logical_not->span.end = (*eout)->span.end;
+            *eout = logical_not;
         } break;
 
         case Token::Sizeof: {

@@ -136,6 +136,8 @@ struct Expression {
         Index,
         Address_Of,
         Dereference,
+        Bit_Not,
+        Logical_Not,
     };
 
     Span span;
@@ -213,6 +215,18 @@ struct Expression_Address_Of : Expression {
 
 struct Expression_Dereference : Expression {
     Expression_Dereference() : Expression(Dereference) {}
+
+    Expression* value;
+};
+
+struct Expression_Bit_Not : Expression {
+    Expression_Bit_Not() : Expression(Bit_Not) {}
+
+    Expression* value;
+};
+
+struct Expression_Logical_Not : Expression {
+    Expression_Logical_Not() : Expression(Logical_Not) {}
 
     Expression* value;
 };
