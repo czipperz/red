@@ -2646,6 +2646,15 @@ static Result parse_expression_continuation(Context* context,
                 precedence = 9;
                 break;
             case Token::Set:
+            case Token::PlusSet:
+            case Token::MinusSet:
+            case Token::DivideSet:
+            case Token::MultiplySet:
+            case Token::BitAndSet:
+            case Token::BitOrSet:
+            case Token::BitXorSet:
+            case Token::LeftShiftSet:
+            case Token::RightShiftSet:
                 precedence = 16;
                 ltr = false;
                 break;
