@@ -1534,6 +1534,32 @@ TEST_CASE("parse_expression function call order of operations") {
     CHECK(se->arguments[1]->tag == Expression::Integer);
 }
 
+TEST_CASE("parse_expression index") {
+    SETUP("int a[3]; a[0];");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Index);
+
+    Expression_Index* ie = (Expression_Index*)expression;
+    REQUIRE(ie->array);
+    REQUIRE(ie->array->tag == Expression::Variable);
+    REQUIRE(ie->index);
+    REQUIRE(ie->index->tag == Expression::Integer);
+
+    Expression_Variable* arr = (Expression_Variable*)ie->array;
+    CHECK(arr->variable.str == "a");
+
+    Expression_Integer* integer = (Expression_Integer*)ie->index;
+    CHECK(integer->value == 0);
+}
+
 TEST_CASE("parse_expression type cast user defined typedef") {
     SETUP("typedef int A; (A)2 + 3;");
     cz::Vector<Statement*> initializers = {};

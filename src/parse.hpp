@@ -133,6 +133,7 @@ struct Expression {
         Sizeof_Type,
         Sizeof_Expression,
         Function_Call,
+        Index,
     };
 
     Span span;
@@ -193,6 +194,13 @@ struct Expression_Function_Call : Expression {
 
     Expression* function;
     cz::Slice<Expression*> arguments;
+};
+
+struct Expression_Index : Expression {
+    Expression_Index() : Expression(Index) {}
+
+    Expression* array;
+    Expression* index;
 };
 
 struct Statement {

@@ -122,6 +122,10 @@ static bool evaluate_expression(Expression* e, int64_t* value) {
         case Expression::Function_Call: {
             CZ_PANIC("evaluate_expression unhandled case function call");
         }
+
+        case Expression::Index: {
+            CZ_PANIC("evaluate_expression unhandled case index");
+        }
     }
 
     CZ_PANIC("evaluate_expression unhandled case");
@@ -2478,7 +2482,57 @@ static Result parse_expression_continuation(Context* context,
                 *eout = function_call;
 
                 return parse_expression_continuation(context, parser, eout, max_precedence);
-            } break;
+            }
+
+            case Token::OpenSquare: {
+                precedence = 2;
+                ltr = false;
+
+                if (precedence >= max_precedence) {
+                    return Result::ok();
+                }
+
+                next_token_after_peek(parser);
+
+                Expression* index;
+                result = parse_expression(context, parser, &index);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Unmatched square brace here (`[`)");
+                    return {Result::ErrorInvalidInput};
+                }
+
+                Token_Source_Span_Pair peek_pair;
+                result = peek_token(context, parser, &peek_pair);
+                CZ_TRY_VAR(result);
+                if (result.type == Result::Done) {
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Unmatched square brace here (`[`)");
+                    return {Result::ErrorInvalidInput};
+                }
+
+                if (peek_pair.token.type != Token::CloseSquare) {
+                    context->report_error(pair.token.span, pair.source_span,
+                                          "Unmatched square brace here (`[`)");
+                    context->report_error(
+                        peek_pair.token.span, peek_pair.source_span,
+                        "Expected closing square brace (`]`) here to end index expression");
+                    return {Result::ErrorInvalidInput};
+                }
+
+                next_token_after_peek(parser);
+
+                Expression_Index* expression =
+                    parser->buffer_array.allocator().create<Expression_Index>();
+                expression->array = *eout;
+                expression->index = index;
+                expression->span.start = (*eout)->span.start;
+                expression->span.end = peek_pair.source_span.end;
+                *eout = expression;
+
+                return parse_expression_continuation(context, parser, eout, max_precedence);
+            }
 
             case Token::QuestionMark: {
                 precedence = 16;
