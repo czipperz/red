@@ -130,6 +130,10 @@ static bool evaluate_expression(Expression* e, int64_t* value) {
         case Expression::Address_Of: {
             CZ_PANIC("evaluate_expression unhandled case address of");
         }
+
+        case Expression::Dereference: {
+            CZ_PANIC("evaluate_expression unhandled case dereference");
+        }
     }
 
     CZ_PANIC("evaluate_expression unhandled case");
@@ -2208,6 +2212,26 @@ static Result parse_expression_atomic(Context* context, Parser* parser, Expressi
             address_of->span.start = pair.source_span.start;
             address_of->span.end = (*eout)->span.end;
             *eout = address_of;
+        } break;
+
+        case Token::Star: {
+            int precedence = 3;
+            bool ltr = false;
+
+            result = parse_expression_(context, parser, eout, precedence + !ltr);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected expression to dereference here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Expression_Dereference* dereference =
+                parser->buffer_array.allocator().create<Expression_Dereference>();
+            dereference->value = *eout;
+            dereference->span.start = pair.source_span.start;
+            dereference->span.end = (*eout)->span.end;
+            *eout = dereference;
         } break;
 
         case Token::Sizeof: {

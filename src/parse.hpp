@@ -135,6 +135,7 @@ struct Expression {
         Function_Call,
         Index,
         Address_Of,
+        Dereference,
     };
 
     Span span;
@@ -206,6 +207,12 @@ struct Expression_Index : Expression {
 
 struct Expression_Address_Of : Expression {
     Expression_Address_Of() : Expression(Address_Of) {}
+
+    Expression* value;
+};
+
+struct Expression_Dereference : Expression {
+    Expression_Dereference() : Expression(Dereference) {}
 
     Expression* value;
 };
