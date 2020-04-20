@@ -2149,10 +2149,7 @@ Result parse_declaration_or_statement(Context* context,
     }
 }
 
-static Result parse_expression_(Context* context,
-                                Parser* parser,
-                                Expression** eout,
-                                int max_precedence) {
+static Result parse_expression_atomic(Context* context, Parser* parser, Expression** eout) {
     Token_Source_Span_Pair pair;
     Result result = next_token(context, parser, &pair);
     if (result.type != Result::Success) {
@@ -2389,8 +2386,16 @@ static Result parse_expression_(Context* context,
             return {Result::ErrorInvalidInput};
     }
 
+    return Result::ok();
+}
+
+static Result parse_expression_continuation(Context* context,
+                                            Parser* parser,
+                                            Expression** eout,
+                                            int max_precedence) {
     while (1) {
-        result = peek_token(context, parser, &pair);
+        Token_Source_Span_Pair pair;
+        Result result = peek_token(context, parser, &pair);
         CZ_TRY_VAR(result);
         if (result.type == Result::Done) {
             return Result::ok();
@@ -2471,7 +2476,8 @@ static Result parse_expression_(Context* context,
                 function_call->span.start = (*eout)->span.start;
                 function_call->span.end = peek_pair.source_span.end;
                 *eout = function_call;
-                return Result::ok();
+
+                return parse_expression_continuation(context, parser, eout, max_precedence);
             } break;
 
             case Token::QuestionMark: {
@@ -2597,6 +2603,18 @@ static Result parse_expression_(Context* context,
     }
 
     return Result::ok();
+}
+
+static Result parse_expression_(Context* context,
+                                Parser* parser,
+                                Expression** eout,
+                                int max_precedence) {
+    Result result = parse_expression_atomic(context, parser, eout);
+    if (result.type != Result::Success) {
+        return result;
+    }
+
+    return parse_expression_continuation(context, parser, eout, max_precedence);
 }
 
 Result parse_expression(Context* context, Parser* parser, Expression** eout) {

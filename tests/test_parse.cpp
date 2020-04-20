@@ -1368,7 +1368,7 @@ TEST_CASE("parse_expression sizeof unparenthesized expression") {
     CHECK(se->expression->tag == Expression::Integer);
 }
 
-TEST_CASE("parse_expression function call") {
+TEST_CASE("parse_expression function call one argument") {
     SETUP("void f(int); int abc; f(abc);");
     cz::Vector<Statement*> initializers = {};
     CZ_DEFER(initializers.drop(cz::heap_allocator()));
@@ -1395,6 +1395,143 @@ TEST_CASE("parse_expression function call") {
     REQUIRE(se->arguments[0]->tag == Expression::Variable);
     Expression_Variable* arg0 = (Expression_Variable*)se->arguments[0];
     CHECK(arg0->variable.str == "abc");
+}
+
+TEST_CASE("parse_expression function call no arguments") {
+    SETUP("void f(); int abc; f();");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Function_Call);
+
+    Expression_Function_Call* se = (Expression_Function_Call*)expression;
+    CHECK(se->span.start.index == 19);
+    CHECK(se->span.end.index == 22);
+    REQUIRE(se->function);
+    REQUIRE(se->function->tag == Expression::Variable);
+    Expression_Variable* fun = (Expression_Variable*)se->function;
+    CHECK(fun->variable.str == "f");
+
+    CHECK(se->arguments.len == 0);
+}
+
+TEST_CASE("parse_expression function call multiple arguments") {
+    SETUP("void f(); int abc; f(abc + 2, 3);");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Function_Call);
+
+    Expression_Function_Call* se = (Expression_Function_Call*)expression;
+    CHECK(se->span.start.index == 19);
+    CHECK(se->span.end.index == 32);
+    REQUIRE(se->function);
+    REQUIRE(se->function->tag == Expression::Variable);
+    Expression_Variable* fun = (Expression_Variable*)se->function;
+    CHECK(fun->variable.str == "f");
+
+    REQUIRE(se->arguments.len == 2);
+    REQUIRE(se->arguments[0]);
+    CHECK(se->arguments[0]->tag == Expression::Binary);
+    REQUIRE(se->arguments[1]);
+    CHECK(se->arguments[1]->tag == Expression::Integer);
+}
+
+TEST_CASE("parse_expression function call repeated calls") {
+    SETUP("void f(int, int); int abc; f(abc + 2, 3)() + 1;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+
+    Expression_Binary* be = (Expression_Binary*)expression;
+    REQUIRE(be->left);
+    REQUIRE(be->left->tag == Expression::Function_Call);
+    REQUIRE(be->right);
+    REQUIRE(be->right->tag == Expression::Integer);
+
+    Expression_Function_Call* fne = (Expression_Function_Call*)be->left;
+    REQUIRE(fne->function);
+    REQUIRE(fne->function->tag == Expression::Function_Call);
+    CHECK(fne->arguments.len == 0);
+
+    Expression_Function_Call* se = (Expression_Function_Call*)fne->function;
+    CHECK(se->span.start.index == 27);
+    CHECK(se->span.end.index == 40);
+    REQUIRE(se->function);
+    REQUIRE(se->function->tag == Expression::Variable);
+    Expression_Variable* fun = (Expression_Variable*)se->function;
+    CHECK(fun->variable.str == "f");
+
+    REQUIRE(se->arguments.len == 2);
+    REQUIRE(se->arguments[0]);
+    CHECK(se->arguments[0]->tag == Expression::Binary);
+    REQUIRE(se->arguments[1]);
+    CHECK(se->arguments[1]->tag == Expression::Integer);
+}
+
+TEST_CASE("parse_expression function call order of operations") {
+    SETUP("void f(int, int); int g(); int abc; f(abc + 2, 3) + g();");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Binary);
+
+    Expression_Binary* be = (Expression_Binary*)expression;
+    REQUIRE(be->left);
+    REQUIRE(be->left->tag == Expression::Function_Call);
+    REQUIRE(be->right);
+    REQUIRE(be->right->tag == Expression::Function_Call);
+
+    Expression_Function_Call* gne = (Expression_Function_Call*)be->right;
+    CHECK(gne->span.start.index == 52);
+    CHECK(gne->span.end.index == 55);
+    REQUIRE(gne->function);
+    REQUIRE(gne->function->tag == Expression::Variable);
+    CHECK(gne->arguments.len == 0);
+
+    Expression_Function_Call* se = (Expression_Function_Call*)be->left;
+    CHECK(se->span.start.index == 36);
+    CHECK(se->span.end.index == 49);
+    REQUIRE(se->function);
+    REQUIRE(se->function->tag == Expression::Variable);
+    Expression_Variable* fun = (Expression_Variable*)se->function;
+    CHECK(fun->variable.str == "f");
+
+    REQUIRE(se->arguments.len == 2);
+    REQUIRE(se->arguments[0]);
+    CHECK(se->arguments[0]->tag == Expression::Binary);
+    REQUIRE(se->arguments[1]);
+    CHECK(se->arguments[1]->tag == Expression::Integer);
 }
 
 TEST_CASE("parse_expression type cast user defined typedef") {
