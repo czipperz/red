@@ -128,6 +128,10 @@ Result write(Writer writer, red::Token token) {
             return write(writer, '?');
         case Token::Tilde:
             return write(writer, '~');
+        case Token::Increment:
+            return write(writer, "++");
+        case Token::Decrement:
+            return write(writer, "--");
         case Token::Colon:
             return write(writer, ':');
         case Token::ColonColon:

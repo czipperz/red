@@ -572,8 +572,15 @@ top:
         case '+': {
             *location = point;
             char next;
-            if (next_character(file_contents, &point, &next) && next == '=') {
-                token_out->type = Token::PlusSet;
+            if (next_character(file_contents, &point, &next)) {
+                if (next == '=') {
+                    token_out->type = Token::PlusSet;
+                } else if (next == '+') {
+                    token_out->type = Token::Increment;
+                } else {
+                    token_out->type = Token::Plus;
+                    point = *location;
+                }
             } else {
                 token_out->type = Token::Plus;
                 point = *location;
@@ -588,6 +595,8 @@ top:
                     token_out->type = Token::MinusSet;
                 } else if (next == '>') {
                     token_out->type = Token::Arrow;
+                } else if (next == '-') {
+                    token_out->type = Token::Decrement;
                 } else {
                     token_out->type = Token::Minus;
                     point = *location;

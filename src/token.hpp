@@ -54,6 +54,8 @@ struct Token {
         Not,
         QuestionMark,
         Tilde,
+        Increment,
+        Decrement,
         Colon,
         ColonColon,
         Hash,
