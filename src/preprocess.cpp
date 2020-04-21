@@ -1556,37 +1556,144 @@ Result next_token(Context* context,
     if (result.type == Result::Success && token->type == Token::Identifier) {
         ZoneScopedN("cpp::next_token keyword");
 
-        struct Keyword {
-            cz::Str value;
-            Token::Type type;
-        };
-        Keyword keywords[] = {
-            {"auto", Token::Auto},         {"break", Token::Break},
-            {"case", Token::Case},         {"char", Token::Char},
-            {"const", Token::Const},       {"continue", Token::Continue},
-            {"default", Token::Default},   {"do", Token::Do},
-            {"double", Token::Double},     {"else", Token::Else},
-            {"enum", Token::Enum},         {"extern", Token::Extern},
-            {"float", Token::Float},       {"for", Token::For},
-            {"goto", Token::Goto},         {"if", Token::If},
-            {"int", Token::Int},           {"long", Token::Long},
-            {"register", Token::Register}, {"return", Token::Return},
-            {"short", Token::Short},       {"signed", Token::Signed},
-            {"sizeof", Token::Sizeof},     {"static", Token::Static},
-            {"struct", Token::Struct},     {"switch", Token::Switch},
-            {"typedef", Token::Typedef},   {"union", Token::Union},
-            {"unsigned", Token::Unsigned}, {"void", Token::Void},
-            {"volatile", Token::Volatile}, {"while", Token::While},
-        };
-
         cz::Str value = token->v.identifier.str;
-        for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords); ++i) {
-            if (value == keywords[i].value) {
-                token->type = keywords[i].type;
-                return Result::ok();
-            }
+
+        switch (value.len) {
+#define STRING_CASE(S, T)       \
+    if (value == S) {           \
+        token->type = Token::T; \
+        return Result::ok();    \
+    }
+
+            case 2:
+                switch (value[0]) {
+                    case 'd':
+                        STRING_CASE("do", Do);
+                        break;
+                    case 'i':
+                        STRING_CASE("if", If);
+                        break;
+                }
+                break;
+
+            case 3:
+                switch (value[0]) {
+                    case 'f':
+                        STRING_CASE("for", For);
+                        break;
+                    case 'i':
+                        STRING_CASE("int", Int);
+                        break;
+                }
+                break;
+
+            case 4:
+                switch (value[0]) {
+                    case 'a':
+                        STRING_CASE("auto", Auto);
+                        break;
+                    case 'c':
+                        STRING_CASE("case", Case);
+                        STRING_CASE("char", Char);
+                        break;
+                    case 'e':
+                        STRING_CASE("else", Else);
+                        STRING_CASE("enum", Enum);
+                        break;
+                    case 'g':
+                        STRING_CASE("goto", Goto);
+                        break;
+                    case 'l':
+                        STRING_CASE("long", Long);
+                        break;
+                    case 'v':
+                        STRING_CASE("void", Void);
+                        break;
+                }
+                break;
+
+            case 5:
+                switch (value[0]) {
+                    case 'b':
+                        STRING_CASE("break", Break);
+                        break;
+                    case 'c':
+                        STRING_CASE("const", Const);
+                        break;
+                    case 'f':
+                        STRING_CASE("float", Float);
+                        break;
+                    case 's':
+                        STRING_CASE("short", Short);
+                        break;
+                    case 'u':
+                        STRING_CASE("union", Union);
+                        break;
+                    case 'w':
+                        STRING_CASE("while", While);
+                        break;
+                }
+                break;
+
+            case 6:
+                switch (value[2]) {
+                    case 'u':
+                        STRING_CASE("double", Double);
+                        break;
+                    case 't':
+                        STRING_CASE("extern", Extern);
+                        STRING_CASE("return", Return);
+                        break;
+                    case 'g':
+                        STRING_CASE("signed", Signed);
+                        break;
+                    case 'z':
+                        STRING_CASE("sizeof", Sizeof);
+                        break;
+                    case 'a':
+                        STRING_CASE("static", Static);
+                        break;
+                    case 'r':
+                        STRING_CASE("struct", Struct);
+                        break;
+                    case 'i':
+                        STRING_CASE("switch", Switch);
+                        break;
+                }
+                break;
+
+            case 7:
+                switch (value[0]) {
+                    case 'd':
+                        STRING_CASE("default", Default);
+                        break;
+                    case 't':
+                        STRING_CASE("typedef", Typedef);
+                        break;
+                }
+                break;
+
+            case 8:
+                switch (value[0]) {
+                    case 'c':
+                        STRING_CASE("continue", Continue);
+                        break;
+                    case 'r':
+                        STRING_CASE("register", Register);
+                        break;
+                    case 'u':
+                        STRING_CASE("unsigned", Unsigned);
+                        break;
+                    case 'v':
+                        STRING_CASE("volatile", Volatile);
+                        break;
+                }
+                break;
+
+#undef STRING_CASE
         }
     }
+
     return result;
 }
 
