@@ -748,12 +748,15 @@ static Result parse_declaration_initializer(Context* context,
         declarations->reserve(cz::heap_allocator(), 1);
         declarations->insert(identifier.str, identifier.hash, declaration);
     } else if (existing_declaration &&
-               typeps_equal(declaration.type, existing_declaration->type, true) &&
-               declaration.type.get_type()->tag == Type::Function) {
-        if (existing_declaration->v.function_definition && declaration.v.function_definition) {
+               typeps_equal(declaration.type, existing_declaration->type, true)) {
+        if (declaration.type.get_type()->tag == Type::Function) {
+            if (existing_declaration->v.function_definition && declaration.v.function_definition) {
+                goto error_declaration_already_created;
+            } else if (declaration.v.function_definition) {
+                existing_declaration->v.function_definition = declaration.v.function_definition;
+            }
+        } else {
             goto error_declaration_already_created;
-        } else if (declaration.v.function_definition) {
-            existing_declaration->v.function_definition = declaration.v.function_definition;
         }
     } else {
     error_declaration_already_created:
