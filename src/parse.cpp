@@ -550,6 +550,92 @@ static Result parse_parameters(Context* context,
 
 static Result parse_block(Context* context, Parser* parser, Block* block);
 
+static bool typeps_equal(TypeP left, TypeP right, bool default_);
+static bool types_equal(Type* left, Type* right, bool default_) {
+    if (left == right) {
+        return true;
+    }
+
+    if (default_ && (left->tag == Type::Builtin_Error || right->tag == Type::Builtin_Error)) {
+        return true;
+    }
+
+    if (left->tag != right->tag) {
+        return false;
+    }
+
+    switch (left->tag) {
+        case Type::Builtin_Char:
+        case Type::Builtin_Signed_Char:
+        case Type::Builtin_Unsigned_Char:
+
+        case Type::Builtin_Float:
+        case Type::Builtin_Double:
+        case Type::Builtin_Long_Double:
+
+        case Type::Builtin_Signed_Short:
+        case Type::Builtin_Signed_Int:
+        case Type::Builtin_Signed_Long:
+        case Type::Builtin_Signed_Long_Long:
+        case Type::Builtin_Unsigned_Short:
+        case Type::Builtin_Unsigned_Int:
+        case Type::Builtin_Unsigned_Long:
+        case Type::Builtin_Unsigned_Long_Long:
+
+        case Type::Builtin_Void:
+        case Type::Builtin_Error:
+
+        case Type::Enum:
+        case Type::Struct:
+        case Type::Union:
+            return true;
+
+        case Type::Pointer: {
+            Type_Pointer* l = (Type_Pointer*)left;
+            Type_Pointer* r = (Type_Pointer*)right;
+            return typeps_equal(l->inner, r->inner, default_);
+        }
+
+        case Type::Array: {
+            Type_Array* l = (Type_Array*)left;
+            Type_Array* r = (Type_Array*)right;
+            return typeps_equal(l->inner, r->inner, default_);
+        }
+
+        case Type::Function: {
+            Type_Function* l = (Type_Function*)left;
+            Type_Function* r = (Type_Function*)right;
+            if (l->parameter_types.len != r->parameter_types.len) {
+                return false;
+            }
+            if (l->has_varargs != r->has_varargs) {
+                return false;
+            }
+
+            if (!typeps_equal(l->return_type, r->return_type, default_)) {
+                return false;
+            }
+
+            for (size_t i = 0; i < l->parameter_types.len; ++i) {
+                if (!typeps_equal(l->parameter_types[i], r->parameter_types[i], default_)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    CZ_PANIC("");
+}
+
+static bool typeps_equal(TypeP left, TypeP right, bool default_) {
+    if (left.is_const() != right.is_const() || left.is_volatile() != right.is_volatile()) {
+        return false;
+    }
+
+    return types_equal(left.get_type(), right.get_type(), default_);
+}
+
 static Result parse_declaration_initializer(Context* context,
                                             Parser* parser,
                                             Declaration declaration,
@@ -615,6 +701,7 @@ static Result parse_declaration_initializer(Context* context,
             } break;
 
             default:
+                declaration.v.function_definition = nullptr;
                 break;
         }
     } else {
@@ -656,10 +743,20 @@ static Result parse_declaration_initializer(Context* context,
     }
 
     cz::Str_Map<Declaration>* declarations = &parser->declaration_stack.last();
-    if (!declarations->get(identifier.str, identifier.hash)) {
+    Declaration* existing_declaration = declarations->get(identifier.str, identifier.hash);
+    if (!existing_declaration) {
         declarations->reserve(cz::heap_allocator(), 1);
         declarations->insert(identifier.str, identifier.hash, declaration);
+    } else if (existing_declaration &&
+               typeps_equal(declaration.type, existing_declaration->type, true) &&
+               declaration.type.get_type()->tag == Type::Function) {
+        if (existing_declaration->v.function_definition && declaration.v.function_definition) {
+            goto error_declaration_already_created;
+        } else if (declaration.v.function_definition) {
+            existing_declaration->v.function_definition = declaration.v.function_definition;
+        }
     } else {
+    error_declaration_already_created:
         context->report_error(previous_span, previous_source_span,
                               "Declaration with same name also in scope");
     }

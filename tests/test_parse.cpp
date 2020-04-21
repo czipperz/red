@@ -1055,6 +1055,59 @@ TEST_CASE("parse_declaration unnamed struct no body") {
     CHECK(initializers.len() == 1);
 }
 
+TEST_CASE("parse_declaration ignore second forward declaration of function") {
+    SETUP("int f(); int f();");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(parser.declaration_stack.len() == 1);
+    REQUIRE(parser.declaration_stack[0].count == 1);
+    Declaration* f = parser.declaration_stack[0].get_hash("f");
+    REQUIRE(f);
+    REQUIRE(f->type.get_type());
+    CHECK(f->type.get_type()->tag == Type::Function);
+    CHECK(f->v.function_definition == nullptr);
+}
+
+TEST_CASE("parse_declaration error on second declaration of variable") {
+    SETUP("int x; int x;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 1);
+
+    REQUIRE(parser.declaration_stack.len() == 1);
+    REQUIRE(parser.declaration_stack[0].count == 1);
+    Declaration* x = parser.declaration_stack[0].get_hash("x");
+    REQUIRE(x);
+    CHECK(x->type.get_type() == parser.type_signed_int);
+}
+
+TEST_CASE("parse_declaration ignore forward declaration of function after definition") {
+    SETUP("int f() {} int f();");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+
+    REQUIRE(parser.declaration_stack.len() == 1);
+    REQUIRE(parser.declaration_stack[0].count == 1);
+    Declaration* f = parser.declaration_stack[0].get_hash("f");
+    REQUIRE(f);
+    REQUIRE(f->type.get_type());
+    CHECK(f->type.get_type()->tag == Type::Function);
+    REQUIRE(f->v.function_definition);
+    CHECK(f->v.function_definition->block.statements.len == 0);
+}
+
 TEST_CASE("parse_expression defined variable") {
     SETUP("int abc; abc;");
     cz::Vector<Statement*> initializers = {};
