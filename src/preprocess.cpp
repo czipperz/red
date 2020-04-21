@@ -83,18 +83,15 @@ static Result read_include(const File_Contents& contents,
     }
 }
 
-static Result process_include(Context* context,
-                              Preprocessor* preprocessor,
-                              lex::Lexer* lexer,
-                              Token* token) {
-    ZoneScoped;
+static Result process_include(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer) {
+    ZoneScopedN("preprocessor #include");
     Location* point = &preprocessor->include_stack.last().span.end;
     advance_over_whitespace(context->files.files[point->file].contents, point);
 
     Location backup = *point;
     char ch;
     if (!lex::next_character(context->files.files[point->file].contents, point, &ch)) {
-        return next_token(context, preprocessor, lexer, token);
+        return Result::ok();
     }
 
     if (ch != '<' && ch != '"') {
@@ -143,7 +140,7 @@ static Result process_include(Context* context,
 
         if (include_file(&context->files, preprocessor, file_name).is_ok()) {
             relative_path.drop(context->temp_buffer_array.allocator());
-            return next_token(context, preprocessor, lexer, token);
+            return Result::ok();
         }
     }
 
@@ -152,19 +149,6 @@ static Result process_include(Context* context,
     relative_path.drop(context->temp_buffer_array.allocator());
     return {Result::ErrorInvalidInput};
 }
-
-static Result process_token(Context* context,
-                            Preprocessor* preprocessor,
-                            lex::Lexer* lexer,
-                            Token* token,
-                            bool at_bol);
-
-static Result process_next(Context* context,
-                           Preprocessor* preprocessor,
-                           lex::Lexer* lexer,
-                           Token* token,
-                           bool at_bol,
-                           bool has_next);
 
 static bool skip_until_eol(Context* context,
                            Preprocessor* preprocessor,
@@ -184,155 +168,12 @@ static bool skip_until_eol(Context* context,
     }
 }
 
-#define SKIP_UNTIL_EOL                                                            \
-    ([&]() {                                                                      \
-        bool at_bol = skip_until_eol(context, preprocessor, lexer, token);        \
-        return process_next(context, preprocessor, lexer, token, at_bol, at_bol); \
-    })
-
-static Result process_pragma(Context* context,
-                             Preprocessor* preprocessor,
-                             lex::Lexer* lexer,
-                             Token* token) {
-    ZoneScoped;
-    Location* point = &preprocessor->include_stack.last().span.end;
-    bool at_bol = false;
-    if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
-                         &at_bol)) {
-        // #pragma is ignored and we are at eof.
-        return next_token(context, preprocessor, lexer, token);
-    }
-
-    if (at_bol) {
-        // #pragma is ignored and we are harboring a token.
-        return process_token(context, preprocessor, lexer, token, at_bol);
-    }
-
-    if (token->type == Token::Identifier && token->v.identifier.str == "once") {
-        preprocessor->file_pragma_once[point->file] = true;
-
-        at_bol = false;
-        if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                             token, &at_bol)) {
-            // #pragma once \EOF
-            return next_token(context, preprocessor, lexer, token);
-        }
-
-        if (!at_bol) {
-            context->report_lex_error(token->span, "#pragma once has trailing tokens");
-            return SKIP_UNTIL_EOL();
-        }
-
-        // done processing the #pragma once so get the next token
-        return process_token(context, preprocessor, lexer, token, at_bol);
-    }
-
-    context->report_lex_error(token->span, "Unknown #pragma");
-    return SKIP_UNTIL_EOL();
-}
-
-static Result process_if_true(Context* context,
-                              Preprocessor* preprocessor,
-                              lex::Lexer* lexer,
-                              Token* token) {
-    ZoneScoped;
-    Location* point = &preprocessor->include_stack.last().span.end;
-    bool at_bol = true;
-    if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
-                         &at_bol)) {
-        context->report_lex_error({*point, *point}, "Unterminated preprocessing branch");
-        return {Result::ErrorInvalidInput};
-    }
-
-    return process_token(context, preprocessor, lexer, token, at_bol);
-}
-
-static Result process_if(Context* context,
-                         Preprocessor* preprocessor,
-                         lex::Lexer* lexer,
-                         Token* token);
-
-static Result process_if_false(Context* context,
-                               Preprocessor* preprocessor,
-                               lex::Lexer* lexer,
-                               Token* token,
-                               bool start_at_bol,
-                               bool allow_else) {
-    ZoneScoped;
-    size_t skip_depth = 0;
-
-    bool at_bol;
-    if (start_at_bol) {
-        Location* point = &preprocessor->include_stack.last().span.end;
-        at_bol = true;
-        at_bol = lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                                 token, &at_bol);
-        goto check_token_exists;
-    }
-
-    while (1) {
-        at_bol = skip_until_eol(context, preprocessor, lexer, token);
-
-    check_token_exists:
-        if (!at_bol) {
-            Include_Info entry = preprocessor->include_stack.last();
-            for (size_t i = 0; i < entry.if_stack.len(); ++i) {
-                context->report_lex_error(entry.if_stack[i], "Unterminated #if");
-            }
-            return {Result::ErrorInvalidInput};
-        }
-
-    check_hash:
-        if (token->type == Token::Hash) {
-            at_bol = false;
-            Include_Info* info = &preprocessor->include_stack.last();
-            if (!lex::next_token(context, lexer, context->files.files[info->span.end.file].contents,
-                                 &info->span.end, token, &at_bol)) {
-                Include_Info entry = preprocessor->include_stack.last();
-                for (size_t i = 0; i < entry.if_stack.len(); ++i) {
-                    context->report_lex_error(entry.if_stack[i], "Unterminated #if");
-                }
-                return {Result::ErrorInvalidInput};
-            }
-
-            if (at_bol) {
-                goto check_hash;
-            }
-
-            if (token->type == Token::Identifier) {
-                if (token->v.identifier.str == "ifdef" || token->v.identifier.str == "ifndef" ||
-                    token->v.identifier.str == "if") {
-                    ++skip_depth;
-                } else if (token->v.identifier.str == "else") {
-                    if (allow_else && skip_depth == 0) {
-                        break;
-                    }
-                } else if (token->v.identifier.str == "elif") {
-                    if (allow_else && skip_depth == 0) {
-                        info->if_stack.pop();
-                        return process_if(context, preprocessor, lexer, token);
-                    }
-                } else if (token->v.identifier.str == "endif") {
-                    if (skip_depth > 0) {
-                        --skip_depth;
-                    } else {
-                        info->if_stack.pop();
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    return next_token(context, preprocessor, lexer, token);
-}
-
 static Result process_ifdef(Context* context,
                             Preprocessor* preprocessor,
                             lex::Lexer* lexer,
                             Token* token,
-                            bool want_present) {
-    ZoneScoped;
+                            bool* present) {
+    ZoneScopedN("preprocessor #ifdef");
     Span ifdef_span = token->span;
 
     Include_Info* point = &preprocessor->include_stack.last();
@@ -356,12 +197,8 @@ static Result process_ifdef(Context* context,
     point->if_stack.reserve(cz::heap_allocator(), 1);
     point->if_stack.push(ifdef_span);
 
-    if (!!preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash) ==
-        want_present) {
-        return process_if_true(context, preprocessor, lexer, token);
-    } else {
-        return process_if_false(context, preprocessor, lexer, token, false, true);
-    }
+    *present = preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
+    return Result::ok();
 }
 
 static Result process_defined_identifier(Context* context,
@@ -622,423 +459,101 @@ static Result process_defined_macro(Context* context,
 static Result process_if(Context* context,
                          Preprocessor* preprocessor,
                          lex::Lexer* lexer,
-                         Token* token) {
-    ZoneScoped;
+                         Token* token,
+                         int64_t& value) {
+    ZoneScopedN("preprocessor #if");
 
-    int64_t value;
-    {
-        Span if_span = token->span;
+    Span if_span = token->span;
 
-        // Todo: make this more efficient by not storing all the tokens.
-        cz::Vector<Token_Source_Span_Pair> tokens = {};
-        CZ_DEFER(tokens.drop(context->temp_buffer_array.allocator()));
-        tokens.reserve(context->temp_buffer_array.allocator(), 8);
+    // Todo: make this more efficient by not storing all the tokens.
+    cz::Vector<Token_Source_Span_Pair> tokens = {};
+    CZ_DEFER(tokens.drop(context->temp_buffer_array.allocator()));
+    tokens.reserve(context->temp_buffer_array.allocator(), 8);
 
-        Include_Info* point;
-        while (1) {
-            Result ntid_result =
-                next_token_in_definition(context, preprocessor, lexer, token, true, 1);
-            Span source_span;
-            if (ntid_result.type == Result::Done) {
-                bool at_bol = false;
-                point = &preprocessor->include_stack.last();
-                Location backup_point = point->span.end;
-                if (!lex::next_token(context, lexer,
-                                     context->files.files[point->span.end.file].contents,
-                                     &point->span.end, token, &at_bol)) {
-                    break;
-                }
-                if (at_bol) {
-                    point->span.end = backup_point;
-                    break;
-                }
-                preprocessor->include_stack.last().span = token->span;
-
-                source_span = token->span;
-            } else {
-                source_span = preprocessor->include_stack.last().span;
-            }
-
-        retest:
-            if (token->type == Token::Identifier) {
-                if (token->v.identifier.str == "defined") {
-                    CZ_TRY(process_defined_macro(context, preprocessor, lexer, token));
-                    goto add_token;
-                }
-
-                if (preprocessor->definition_stack.len() > 0) {
-                    // This identifier is either undefined or currently expanded and treated as
-                    // undefined because otherwise the ntid would've eaten it.
-                    goto undefined_identifier;
-                }
-
-                Definition* definition;
-                definition = preprocessor->definitions.get(token->v.identifier.str,
-                                                           token->v.identifier.hash);
-                if (definition) {
-                    Result pdi_result = process_defined_identifier(context, preprocessor, lexer,
-                                                                   token, definition, true);
-                    if (pdi_result.is_err()) {
-                        return pdi_result;
-                    } else if (pdi_result.type == Result::Done) {
-                        // Empty definition.
-                        continue;
-                    } else {
-                        goto retest;
-                    }
-                } else {
-                undefined_identifier:
-                    // According to the C standard, undefined tokens are converted to 0.
-                    token->type = Token::Integer;
-                    token->v.integer.value = 0;
-                    token->v.integer.suffix = 0;
-                }
-            }
-
-        add_token:
-            tokens.reserve(context->temp_buffer_array.allocator(), 1);
-            tokens.push({*token, source_span});
-        }
-
-        point->if_stack.reserve(cz::heap_allocator(), 1);
-        point->if_stack.push(if_span);
-
-        size_t index = 0;
-        if (index == tokens.len()) {
-            context->report_lex_error(if_span, "No expression to test");
-            return {Result::ErrorInvalidInput};
-        }
-
-        CZ_TRY(parse_and_eval_expression(context, tokens, &index, &value, 100));
-
-        if (index < tokens.len()) {
-            CZ_DEBUG_ASSERT(tokens[index].token.type == Token::CloseParen);
-            context->report_error(tokens[index].token.span, tokens[index].source_span,
-                                  "Unmatched closing parenthesis (`)`)");
-            return {Result::ErrorInvalidInput};
-        }
-    }
-
-    if (value) {
-        return process_if_true(context, preprocessor, lexer, token);
-    } else {
-        return process_if_false(context, preprocessor, lexer, token, true, true);
-    }
-}
-
-static Result process_else(Context* context,
-                           Preprocessor* preprocessor,
-                           lex::Lexer* lexer,
-                           Token* token) {
-    ZoneScoped;
-    // We just produced x and are skipping over y
-    // #if 1
-    // x
-    // |#else
-    // y
-    // #endif
-
-    Include_Info* point = &preprocessor->include_stack.last();
-    if (point->if_stack.len() == 0) {
-        context->report_lex_error(token->span, "#else without #if");
-        return {Result::ErrorInvalidInput};
-    }
-
-    return process_if_false(context, preprocessor, lexer, token, false, true);
-}
-
-static Result process_elif(Context* context,
-                           Preprocessor* preprocessor,
-                           lex::Lexer* lexer,
-                           Token* token) {
-    ZoneScoped;
-    // We just produced x and are skipping over y and z
-    // #if 1
-    // x
-    // |#elif 2
-    // y
-    // #else
-    // z
-    // #endif
-
-    Include_Info* point = &preprocessor->include_stack.last();
-    if (point->if_stack.len() == 0) {
-        context->report_lex_error(token->span, "#else without #if");
-        return {Result::ErrorInvalidInput};
-    }
-
-    return process_if_false(context, preprocessor, lexer, token, false, false);
-}
-
-static Result process_endif(Context* context,
-                            Preprocessor* preprocessor,
-                            lex::Lexer* lexer,
-                            Token* token) {
-    ZoneScoped;
-    Include_Info* point = &preprocessor->include_stack.last();
-    if (point->if_stack.len() == 0) {
-        context->report_lex_error(token->span, "#endif without #if");
-        return {Result::ErrorInvalidInput};
-    }
-
-    point->if_stack.pop();
-    return SKIP_UNTIL_EOL();
-}
-
-static Result process_define(Context* context,
-                             Preprocessor* preprocessor,
-                             lex::Lexer* lexer,
-                             Token* token) {
-    ZoneScoped;
-    Span define_span = token->span;
-
-    Location* point = &preprocessor->include_stack.last().span.end;
-    bool at_bol = false;
-    if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
-                         &at_bol)) {
-        context->report_lex_error(define_span, "Must give the macro a name");
-        return next_token(context, preprocessor, lexer, token);
-    }
-    if (at_bol) {
-        context->report_lex_error(define_span, "Must give the macro a name");
-        return process_token(context, preprocessor, lexer, token, at_bol);
-    }
-    if (token->type != Token::Identifier) {
-        context->report_lex_error(token->span, "Must give the macro a name");
-        return SKIP_UNTIL_EOL();
-    }
-
-    Hashed_Str identifier = token->v.identifier;
-    Location identifier_end = token->span.end;
-
-    Definition definition = {};
-    definition.is_function = false;
-
-    at_bol = false;
-    if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
-                         &at_bol)) {
-        at_bol = false;
-        goto end_definition;
-    }
-    if (at_bol) {
-        goto end_definition;
-    }
-
-    {
-        // We map the parameters names to indexes and then look them up while parsing the body of
-        // the macro.  This makes macro expansion much simpler and faster, which is the more common
-        // case.
-        cz::Str_Map<size_t> parameters = {};
-        CZ_DEFER(parameters.drop(cz::heap_allocator()));
-
-        if (token->span.start == identifier_end && token->type == Token::OpenParen) {
-            // Functional macro
-            Span open_paren_span = token->span;
-            if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                                 token, &at_bol)) {
-                context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                return next_token(context, preprocessor, lexer, token);
+    Include_Info* point;
+    while (1) {
+        Result ntid_result = next_token_in_definition(context, preprocessor, lexer, token, true, 1);
+        Span source_span;
+        if (ntid_result.type == Result::Done) {
+            bool at_bol = false;
+            point = &preprocessor->include_stack.last();
+            Location backup_point = point->span.end;
+            if (!lex::next_token(context, lexer,
+                                 context->files.files[point->span.end.file].contents,
+                                 &point->span.end, token, &at_bol)) {
+                break;
             }
             if (at_bol) {
-                context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                return process_token(context, preprocessor, lexer, token, at_bol);
+                point->span.end = backup_point;
+                break;
             }
+            preprocessor->include_stack.last().span = token->span;
 
-            definition.has_varargs = false;
-
-            // We have to do this crazy thing to deal with erroring on trailing `,`s.
-            // Basically in `(a, b, c)` we are at `a` and need to process it then continue into `,`
-            // and identifier pairs.
-            if (token->type == Token::Identifier) {
-                parameters.reserve(cz::heap_allocator(), 1);
-                parameters.insert(token->v.identifier.str, token->v.identifier.hash,
-                                  parameters.count);
-                while (1) {
-                    // In `(a, b, c)`, we are at `,` or `)`.
-                    if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
-                                         point, token, &at_bol)) {
-                        context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                        return next_token(context, preprocessor, lexer, token);
-                    }
-                    if (at_bol) {
-                        context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                        return process_token(context, preprocessor, lexer, token, at_bol);
-                    }
-
-                    if (token->type == Token::CloseParen) {
-                        break;
-                    }
-                    if (definition.has_varargs) {
-                        context->report_lex_error(
-                            open_paren_span, "Varargs specifier (`...`) must be last parameter");
-                        return SKIP_UNTIL_EOL();
-                    }
-                    if (token->type != Token::Comma) {
-                        context->report_lex_error(open_paren_span,
-                                                  "Must have comma between parameters");
-                        return SKIP_UNTIL_EOL();
-                    }
-
-                    // In `(a, b, c)`, we are at `b` or `c`.
-                    if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
-                                         point, token, &at_bol)) {
-                        context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                        return next_token(context, preprocessor, lexer, token);
-                    }
-                    if (at_bol) {
-                        context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                        return process_token(context, preprocessor, lexer, token, at_bol);
-                    }
-
-                    if (token->type == Token::Identifier) {
-                        parameters.reserve(cz::heap_allocator(), 1);
-                        if (parameters.get(token->v.identifier.str, token->v.identifier.hash)) {
-                            context->report_lex_error(token->span, "Parameter already used");
-                            return SKIP_UNTIL_EOL();
-                        }
-                        parameters.insert(token->v.identifier.str, token->v.identifier.hash,
-                                          parameters.count);
-                    } else if (token->type == Token::Preprocessor_Varargs_Parameter_Indicator) {
-                        definition.has_varargs = true;
-                    } else {
-                        context->report_lex_error(token->span, "Must have parameter name here");
-                        return SKIP_UNTIL_EOL();
-                    }
-                }
-            } else if (token->type == Token::Preprocessor_Varargs_Parameter_Indicator) {
-                definition.has_varargs = true;
-
-                if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
-                                     point, token, &at_bol)) {
-                    context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                    return next_token(context, preprocessor, lexer, token);
-                }
-                if (at_bol) {
-                    context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                    return process_token(context, preprocessor, lexer, token, at_bol);
-                }
-
-                if (token->type != Token::CloseParen) {
-                    context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                    return SKIP_UNTIL_EOL();
-                }
-            } else if (token->type == Token::CloseParen) {
-            } else {
-                context->report_lex_error(open_paren_span, "Unpaired parenthesis (`(`)");
-                return SKIP_UNTIL_EOL();
-            }
-
-            definition.parameter_len = parameters.count;
-            definition.is_function = true;
+            source_span = token->span;
         } else {
-            definition.tokens.reserve(cz::heap_allocator(), 1);
-            definition.tokens.push(*token);
+            source_span = preprocessor->include_stack.last().span;
         }
 
-        // Process the definition body.
-        while (1) {
-            if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point,
-                                 token, &at_bol)) {
-                at_bol = false;
-                break;
-            }
-            if (at_bol) {
-                break;
+    retest:
+        if (token->type == Token::Identifier) {
+            if (token->v.identifier.str == "defined") {
+                CZ_TRY(process_defined_macro(context, preprocessor, lexer, token));
+                goto add_token;
             }
 
-            // If the token matches a parameter, mark it as a parameter and replace its string value
-            // with its index.
-            if (token->type == Token::Identifier) {
-                uint64_t* parameter =
-                    parameters.get(token->v.identifier.str, token->v.identifier.hash);
-                if (parameter) {
-                    token->type = Token::Preprocessor_Parameter;
-                    token->v.integer.value = *parameter;
-                } else if (token->v.identifier.str == "__VAR_ARGS__") {
-                    token->type = Token::Preprocessor_Parameter;
-                    token->v.integer.value = parameters.count;
-                }
-            } else if (token->type == Token::HashHash) {
-                if (definition.tokens.len() == 0) {
-                    // :ConcatErrors ## errors are assumed to be eliminated in
-                    // next_token_in_definition
-                    context->report_lex_error(
-                        token->span, "Token concatenation (`##`) must have a token before it");
+            if (preprocessor->definition_stack.len() > 0) {
+                // This identifier is either undefined or currently expanded and treated as
+                // undefined because otherwise the ntid would've eaten it.
+                goto undefined_identifier;
+            }
+
+            Definition* definition;
+            definition =
+                preprocessor->definitions.get(token->v.identifier.str, token->v.identifier.hash);
+            if (definition) {
+                Result pdi_result = process_defined_identifier(context, preprocessor, lexer, token,
+                                                               definition, true);
+                if (pdi_result.is_err()) {
+                    return pdi_result;
+                } else if (pdi_result.type == Result::Done) {
+                    // Empty definition.
                     continue;
+                } else {
+                    goto retest;
                 }
-            }
-
-            definition.tokens.reserve(cz::heap_allocator(), 1);
-            definition.tokens.push(*token);
-        }
-
-        if (definition.tokens.len() > 0) {
-            Token* last_token = &definition.tokens.last();
-            if (last_token->type == Token::HashHash) {
-                // :ConcatErrors ## errors are assumed to be eliminated in next_token_in_definition
-                context->report_lex_error(last_token->span,
-                                          "Token concatenation (`##`) must have a token after it");
-                definition.tokens.pop();
+            } else {
+            undefined_identifier:
+                // According to the C standard, undefined tokens are converted to 0.
+                token->type = Token::Integer;
+                token->v.integer.value = 0;
+                token->v.integer.suffix = 0;
             }
         }
 
-        // kill parameters
+    add_token:
+        tokens.reserve(context->temp_buffer_array.allocator(), 1);
+        tokens.push({*token, source_span});
     }
 
-end_definition:
-    preprocessor->definitions.reserve(cz::heap_allocator(), 1);
+    point->if_stack.reserve(cz::heap_allocator(), 1);
+    point->if_stack.push(if_span);
 
-    Definition* dd = preprocessor->definitions.get(identifier.str, identifier.hash);
-    if (dd) {
-        dd->drop(cz::heap_allocator());
-        *dd = definition;
-    } else {
-        preprocessor->definitions.insert(identifier.str, identifier.hash, definition);
+    size_t index = 0;
+    if (index == tokens.len()) {
+        context->report_lex_error(if_span, "No expression to test");
+        return {Result::ErrorInvalidInput};
     }
 
-    return process_next(context, preprocessor, lexer, token, at_bol, at_bol);
-}
+    CZ_TRY(parse_and_eval_expression(context, tokens, &index, &value, 100));
 
-static Result process_undef(Context* context,
-                            Preprocessor* preprocessor,
-                            lex::Lexer* lexer,
-                            Token* token) {
-    ZoneScoped;
-    Span undef_span = token->span;
-
-    Include_Info* point = &preprocessor->include_stack.last();
-    bool at_bol = false;
-    if (!lex::next_token(context, lexer, context->files.files[point->span.end.file].contents,
-                         &point->span.end, token, &at_bol)) {
-        context->report_lex_error(undef_span, "Must specify the macro to undefine");
-        return next_token(context, preprocessor, lexer, token);
-    }
-    if (at_bol) {
-        context->report_lex_error(undef_span, "Must specify the macro to undefine");
-        return process_token(context, preprocessor, lexer, token, at_bol);
-    }
-    if (token->type != Token::Identifier) {
-        context->report_lex_error(token->span, "Must specify the macro to undefine");
-        return SKIP_UNTIL_EOL();
+    if (index < tokens.len()) {
+        CZ_DEBUG_ASSERT(tokens[index].token.type == Token::CloseParen);
+        context->report_error(tokens[index].token.span, tokens[index].source_span,
+                              "Unmatched closing parenthesis (`)`)");
+        return {Result::ErrorInvalidInput};
     }
 
-    size_t index;
-    if (preprocessor->definitions.index_of(token->v.identifier.str, token->v.identifier.hash,
-                                           &index)) {
-        preprocessor->definitions.values[index].drop(cz::heap_allocator());
-        preprocessor->definitions.set_tombstone(index);
-    }
-
-    return SKIP_UNTIL_EOL();
-}
-
-static Result process_error(Context* context,
-                            Preprocessor* preprocessor,
-                            lex::Lexer* lexer,
-                            Token* token) {
-    ZoneScoped;
-    context->report_lex_error(token->span, "Explicit error");
-    return SKIP_UNTIL_EOL();
+    return Result::ok();
 }
 
 static Result peek_token_in_definition_no_expansion(Context* context,
@@ -1189,62 +704,458 @@ static Result process_identifier(Context* context,
     }
 }
 
-static Result process_token(Context* context,
-                            Preprocessor* preprocessor,
-                            lex::Lexer* lexer,
-                            Token* token,
-                            bool at_bol) {
+Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer, Token* token) {
     ZoneScoped;
-top:
-    preprocessor->include_stack.last().span = token->span;
+
+next_token_:
+    Result result = next_token_in_definition(context, preprocessor, lexer, token, false, true);
+    if (result.type != Result::Done) {
+        return result;
+    }
+
+    if (preprocessor->include_stack.len() == 0) {
+        return Result::done();
+    }
+
     Location* point = &preprocessor->include_stack.last().span.end;
+    while (point->index == context->files.files[point->file].contents.len) {
+        Include_Info entry = preprocessor->include_stack.pop();
+
+        for (size_t i = 0; i < entry.if_stack.len(); ++i) {
+            context->report_lex_error(entry.if_stack[i], "Unterminated #if");
+        }
+
+        entry.if_stack.drop(cz::heap_allocator());
+
+        if (preprocessor->include_stack.len() == 0) {
+            return Result::done();
+        }
+
+        point = &preprocessor->include_stack.last().span.end;
+    }
+
+    bool at_bol = point->index == 0;
+    if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
+                         &at_bol)) {
+        goto next_token_;
+    }
+
+    bool start_at_bol;
+    bool allow_else;
+
+process_token:
+    preprocessor->include_stack.last().span = token->span;
+    point = &preprocessor->include_stack.last().span.end;
     if (at_bol && token->type == Token::Hash) {
         at_bol = false;
         if (lex::next_token(context, lexer, context->files.files[point->file].contents, point,
                             token, &at_bol)) {
             if (at_bol) {
                 // #\n is ignored
-                goto top;
+                goto process_token;
             }
 
             if (token->type == Token::Identifier) {
                 if (token->v.identifier.str == "include") {
-                    return process_include(context, preprocessor, lexer, token);
+                    CZ_TRY(process_include(context, preprocessor, lexer));
+                    goto next_token_;
                 }
                 if (token->v.identifier.str == "pragma") {
-                    return process_pragma(context, preprocessor, lexer, token);
+                    ZoneScopedN("preprocessor #pragma");
+                    Location* point = &preprocessor->include_stack.last().span.end;
+                    at_bol = false;
+                    if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
+                                         point, token, &at_bol)) {
+                        // #pragma is ignored and we are at eof.
+                        goto next_token_;
+                    }
+
+                    if (at_bol) {
+                        // #pragma is ignored and we are harboring a token.
+                        goto process_token;
+                    }
+
+                    if (token->type == Token::Identifier && token->v.identifier.str == "once") {
+                        preprocessor->file_pragma_once[point->file] = true;
+
+                        at_bol = false;
+                        if (!lex::next_token(context, lexer,
+                                             context->files.files[point->file].contents, point,
+                                             token, &at_bol)) {
+                            // #pragma once \EOF
+                            goto next_token_;
+                        }
+
+                        if (!at_bol) {
+                            context->report_lex_error(token->span,
+                                                      "#pragma once has trailing tokens");
+                            goto skip_until_eol_and_continue;
+                        }
+
+                        // done processing the #pragma once so get the next token
+                        goto process_token;
+                    }
+
+                    context->report_lex_error(token->span, "Unknown #pragma");
+                    goto skip_until_eol_and_continue;
                 }
                 if (token->v.identifier.str == "ifdef") {
-                    return process_ifdef(context, preprocessor, lexer, token, true);
+                    bool present;
+                    CZ_TRY(process_ifdef(context, preprocessor, lexer, token, &present));
+                    if (present) {
+                        goto process_if_true;
+                    } else {
+                        start_at_bol = false;
+                        allow_else = true;
+                        goto process_if_false;
+                    }
                 }
                 if (token->v.identifier.str == "ifndef") {
-                    return process_ifdef(context, preprocessor, lexer, token, false);
+                    bool present;
+                    CZ_TRY(process_ifdef(context, preprocessor, lexer, token, &present));
+                    if (!present) {
+                        goto process_if_true;
+                    } else {
+                        start_at_bol = false;
+                        allow_else = true;
+                        goto process_if_false;
+                    }
                 }
                 if (token->v.identifier.str == "if") {
-                    return process_if(context, preprocessor, lexer, token);
+                    goto run_process_if;
                 }
                 if (token->v.identifier.str == "else") {
-                    return process_else(context, preprocessor, lexer, token);
+                    ZoneScopedN("preprocessor #else");
+                    // We just produced x and are skipping over y
+                    // #if 1
+                    // x
+                    // |#else
+                    // y
+                    // #endif
+
+                    Include_Info* point = &preprocessor->include_stack.last();
+                    if (point->if_stack.len() == 0) {
+                        context->report_lex_error(token->span, "#else without #if");
+                        return {Result::ErrorInvalidInput};
+                    }
+
+                    start_at_bol = false;
+                    allow_else = true;
+                    goto process_if_false;
                 }
                 if (token->v.identifier.str == "elif") {
-                    return process_elif(context, preprocessor, lexer, token);
+                    ZoneScopedN("preprocessor #elif");
+                    // We just produced x and are skipping over y and z
+                    // #if 1
+                    // x
+                    // |#elif 2
+                    // y
+                    // #else
+                    // z
+                    // #endif
+
+                    Include_Info* point = &preprocessor->include_stack.last();
+                    if (point->if_stack.len() == 0) {
+                        context->report_lex_error(token->span, "#else without #if");
+                        return {Result::ErrorInvalidInput};
+                    }
+
+                    start_at_bol = false;
+                    allow_else = false;
+                    goto process_if_false;
                 }
                 if (token->v.identifier.str == "endif") {
-                    return process_endif(context, preprocessor, lexer, token);
+                    ZoneScopedN("preprocessor #endif");
+                    Include_Info* point = &preprocessor->include_stack.last();
+                    if (point->if_stack.len() == 0) {
+                        context->report_lex_error(token->span, "#endif without #if");
+                        return {Result::ErrorInvalidInput};
+                    }
+
+                    point->if_stack.pop();
+                    goto skip_until_eol_and_continue;
                 }
                 if (token->v.identifier.str == "define") {
-                    return process_define(context, preprocessor, lexer, token);
+                    ZoneScopedN("preprocessor #define");
+                    Span define_span = token->span;
+
+                    Location* point = &preprocessor->include_stack.last().span.end;
+                    at_bol = false;
+                    if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
+                                         point, token, &at_bol)) {
+                        context->report_lex_error(define_span, "Must give the macro a name");
+                        goto next_token_;
+                    }
+                    if (at_bol) {
+                        context->report_lex_error(define_span, "Must give the macro a name");
+                        goto process_token;
+                    }
+                    if (token->type != Token::Identifier) {
+                        context->report_lex_error(token->span, "Must give the macro a name");
+                        goto skip_until_eol_and_continue;
+                    }
+
+                    Hashed_Str identifier = token->v.identifier;
+                    Location identifier_end = token->span.end;
+
+                    Definition definition = {};
+                    definition.is_function = false;
+
+                    at_bol = false;
+                    if (!lex::next_token(context, lexer, context->files.files[point->file].contents,
+                                         point, token, &at_bol)) {
+                        at_bol = false;
+                        goto end_definition;
+                    }
+                    if (at_bol) {
+                        goto end_definition;
+                    }
+
+                    {
+                        // We map the parameters names to indexes and then look them up while
+                        // parsing the body of the macro.  This makes macro expansion much simpler
+                        // and faster, which is the more common case.
+                        cz::Str_Map<size_t> parameters = {};
+                        CZ_DEFER(parameters.drop(cz::heap_allocator()));
+
+                        if (token->span.start == identifier_end &&
+                            token->type == Token::OpenParen) {
+                            // Functional macro
+                            Span open_paren_span = token->span;
+                            if (!lex::next_token(context, lexer,
+                                                 context->files.files[point->file].contents, point,
+                                                 token, &at_bol)) {
+                                context->report_lex_error(open_paren_span,
+                                                          "Unpaired parenthesis (`(`)");
+                                goto next_token_;
+                            }
+                            if (at_bol) {
+                                context->report_lex_error(open_paren_span,
+                                                          "Unpaired parenthesis (`(`)");
+                                goto process_token;
+                            }
+
+                            definition.has_varargs = false;
+
+                            // We have to do this crazy thing to deal with erroring on trailing
+                            // `,`s. Basically in `(a, b, c)` we are at `a` and need to process it
+                            // then continue into `,` and identifier pairs.
+                            if (token->type == Token::Identifier) {
+                                parameters.reserve(cz::heap_allocator(), 1);
+                                parameters.insert(token->v.identifier.str, token->v.identifier.hash,
+                                                  parameters.count);
+                                while (1) {
+                                    // In `(a, b, c)`, we are at `,` or `)`.
+                                    if (!lex::next_token(context, lexer,
+                                                         context->files.files[point->file].contents,
+                                                         point, token, &at_bol)) {
+                                        context->report_lex_error(open_paren_span,
+                                                                  "Unpaired parenthesis (`(`)");
+                                        goto next_token_;
+                                    }
+                                    if (at_bol) {
+                                        context->report_lex_error(open_paren_span,
+                                                                  "Unpaired parenthesis (`(`)");
+                                        goto process_token;
+                                    }
+
+                                    if (token->type == Token::CloseParen) {
+                                        break;
+                                    }
+                                    if (definition.has_varargs) {
+                                        context->report_lex_error(
+                                            open_paren_span,
+                                            "Varargs specifier (`...`) must be last parameter");
+                                        goto skip_until_eol_and_continue;
+                                    }
+                                    if (token->type != Token::Comma) {
+                                        context->report_lex_error(
+                                            open_paren_span, "Must have comma between parameters");
+                                        goto skip_until_eol_and_continue;
+                                    }
+
+                                    // In `(a, b, c)`, we are at `b` or `c`.
+                                    if (!lex::next_token(context, lexer,
+                                                         context->files.files[point->file].contents,
+                                                         point, token, &at_bol)) {
+                                        context->report_lex_error(open_paren_span,
+                                                                  "Unpaired parenthesis (`(`)");
+                                        goto next_token_;
+                                    }
+                                    if (at_bol) {
+                                        context->report_lex_error(open_paren_span,
+                                                                  "Unpaired parenthesis (`(`)");
+                                        goto process_token;
+                                    }
+
+                                    if (token->type == Token::Identifier) {
+                                        parameters.reserve(cz::heap_allocator(), 1);
+                                        if (parameters.get(token->v.identifier.str,
+                                                           token->v.identifier.hash)) {
+                                            context->report_lex_error(token->span,
+                                                                      "Parameter already used");
+                                            goto skip_until_eol_and_continue;
+                                        }
+                                        parameters.insert(token->v.identifier.str,
+                                                          token->v.identifier.hash,
+                                                          parameters.count);
+                                    } else if (token->type ==
+                                               Token::Preprocessor_Varargs_Parameter_Indicator) {
+                                        definition.has_varargs = true;
+                                    } else {
+                                        context->report_lex_error(token->span,
+                                                                  "Must have parameter name here");
+                                        goto skip_until_eol_and_continue;
+                                    }
+                                }
+                            } else if (token->type ==
+                                       Token::Preprocessor_Varargs_Parameter_Indicator) {
+                                definition.has_varargs = true;
+
+                                if (!lex::next_token(context, lexer,
+                                                     context->files.files[point->file].contents,
+                                                     point, token, &at_bol)) {
+                                    context->report_lex_error(open_paren_span,
+                                                              "Unpaired parenthesis (`(`)");
+                                    goto next_token_;
+                                }
+                                if (at_bol) {
+                                    context->report_lex_error(open_paren_span,
+                                                              "Unpaired parenthesis (`(`)");
+                                    goto process_token;
+                                }
+
+                                if (token->type != Token::CloseParen) {
+                                    context->report_lex_error(open_paren_span,
+                                                              "Unpaired parenthesis (`(`)");
+                                    goto skip_until_eol_and_continue;
+                                }
+                            } else if (token->type == Token::CloseParen) {
+                            } else {
+                                context->report_lex_error(open_paren_span,
+                                                          "Unpaired parenthesis (`(`)");
+                                goto skip_until_eol_and_continue;
+                            }
+
+                            definition.parameter_len = parameters.count;
+                            definition.is_function = true;
+                        } else {
+                            definition.tokens.reserve(cz::heap_allocator(), 1);
+                            definition.tokens.push(*token);
+                        }
+
+                        // Process the definition body.
+                        while (1) {
+                            if (!lex::next_token(context, lexer,
+                                                 context->files.files[point->file].contents, point,
+                                                 token, &at_bol)) {
+                                at_bol = false;
+                                break;
+                            }
+                            if (at_bol) {
+                                break;
+                            }
+
+                            // If the token matches a parameter, mark it as a parameter and replace
+                            // its string value with its index.
+                            if (token->type == Token::Identifier) {
+                                uint64_t* parameter = parameters.get(token->v.identifier.str,
+                                                                     token->v.identifier.hash);
+                                if (parameter) {
+                                    token->type = Token::Preprocessor_Parameter;
+                                    token->v.integer.value = *parameter;
+                                } else if (token->v.identifier.str == "__VAR_ARGS__") {
+                                    token->type = Token::Preprocessor_Parameter;
+                                    token->v.integer.value = parameters.count;
+                                }
+                            } else if (token->type == Token::HashHash) {
+                                if (definition.tokens.len() == 0) {
+                                    // :ConcatErrors ## errors are assumed to be eliminated in
+                                    // next_token_in_definition
+                                    context->report_lex_error(
+                                        token->span,
+                                        "Token concatenation (`##`) must have a token before it");
+                                    continue;
+                                }
+                            }
+
+                            definition.tokens.reserve(cz::heap_allocator(), 1);
+                            definition.tokens.push(*token);
+                        }
+
+                        if (definition.tokens.len() > 0) {
+                            Token* last_token = &definition.tokens.last();
+                            if (last_token->type == Token::HashHash) {
+                                // :ConcatErrors ## errors are assumed to be eliminated in
+                                // next_token_in_definition
+                                context->report_lex_error(
+                                    last_token->span,
+                                    "Token concatenation (`##`) must have a token after it");
+                                definition.tokens.pop();
+                            }
+                        }
+
+                        // kill parameters
+                    }
+
+                end_definition:
+                    preprocessor->definitions.reserve(cz::heap_allocator(), 1);
+
+                    Definition* dd = preprocessor->definitions.get(identifier.str, identifier.hash);
+                    if (dd) {
+                        dd->drop(cz::heap_allocator());
+                        *dd = definition;
+                    } else {
+                        preprocessor->definitions.insert(identifier.str, identifier.hash,
+                                                         definition);
+                    }
+
+                    if (at_bol) {
+                        goto process_token;
+                    } else {
+                        goto next_token_;
+                    }
                 }
                 if (token->v.identifier.str == "undef") {
-                    return process_undef(context, preprocessor, lexer, token);
+                    ZoneScopedN("preprocessor #undef");
+                    Span undef_span = token->span;
+
+                    Include_Info* point = &preprocessor->include_stack.last();
+                    at_bol = false;
+                    if (!lex::next_token(context, lexer,
+                                         context->files.files[point->span.end.file].contents,
+                                         &point->span.end, token, &at_bol)) {
+                        context->report_lex_error(undef_span, "Must specify the macro to undefine");
+                        goto next_token_;
+                    }
+                    if (at_bol) {
+                        context->report_lex_error(undef_span, "Must specify the macro to undefine");
+                        goto process_token;
+                    }
+                    if (token->type != Token::Identifier) {
+                        context->report_lex_error(token->span,
+                                                  "Must specify the macro to undefine");
+                        goto skip_until_eol_and_continue;
+                    }
+
+                    size_t index;
+                    if (preprocessor->definitions.index_of(token->v.identifier.str,
+                                                           token->v.identifier.hash, &index)) {
+                        preprocessor->definitions.values[index].drop(cz::heap_allocator());
+                        preprocessor->definitions.set_tombstone(index);
+                    }
+
+                    goto skip_until_eol_and_continue;
                 }
                 if (token->v.identifier.str == "error") {
-                    return process_error(context, preprocessor, lexer, token);
+                    ZoneScopedN("preprocessor #error");
+                    context->report_lex_error(token->span, "Explicit error");
+                    goto skip_until_eol_and_continue;
                 }
             }
 
             context->report_lex_error(token->span, "Unknown preprocessor directive");
-            return SKIP_UNTIL_EOL();
+            goto skip_until_eol_and_continue;
         }
     } else if (token->type == Token::Identifier) {
         return process_identifier(context, preprocessor, lexer, token);
@@ -1252,18 +1163,108 @@ top:
 
     preprocessor->include_stack.last().span = token->span;
     return Result::ok();
+
+run_process_if : {
+    int64_t value;
+    CZ_TRY(process_if(context, preprocessor, lexer, token, value));
+
+    if (value) {
+        goto process_if_true;
+    } else {
+        start_at_bol = true;
+        allow_else = true;
+        goto process_if_false;
+    }
 }
 
-static Result process_next(Context* context,
-                           Preprocessor* preprocessor,
-                           lex::Lexer* lexer,
-                           Token* token,
-                           bool at_bol,
-                           bool has_next) {
-    if (has_next) {
-        return process_token(context, preprocessor, lexer, token, at_bol);
+process_if_true : {
+    ZoneScopedN("preprocessor #if true");
+    Location* point = &preprocessor->include_stack.last().span.end;
+    at_bol = true;
+    if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
+                         &at_bol)) {
+        context->report_lex_error({*point, *point}, "Unterminated preprocessing branch");
+        return {Result::ErrorInvalidInput};
+    }
+
+    goto process_token;
+}
+
+process_if_false : {
+    ZoneScopedN("preprocessor process #if false");
+    size_t skip_depth = 0;
+
+    if (start_at_bol) {
+        Location* point = &preprocessor->include_stack.last().span.end;
+        at_bol = true;
+        at_bol = lex::next_token(context, lexer, context->files.files[point->file].contents, point,
+                                 token, &at_bol);
+        goto check_token_exists;
+    }
+
+    while (1) {
+        at_bol = skip_until_eol(context, preprocessor, lexer, token);
+
+    check_token_exists:
+        if (!at_bol) {
+            Include_Info entry = preprocessor->include_stack.last();
+            for (size_t i = 0; i < entry.if_stack.len(); ++i) {
+                context->report_lex_error(entry.if_stack[i], "Unterminated #if");
+            }
+            return {Result::ErrorInvalidInput};
+        }
+
+    check_hash:
+        if (token->type == Token::Hash) {
+            at_bol = false;
+            Include_Info* info = &preprocessor->include_stack.last();
+            if (!lex::next_token(context, lexer, context->files.files[info->span.end.file].contents,
+                                 &info->span.end, token, &at_bol)) {
+                Include_Info entry = preprocessor->include_stack.last();
+                for (size_t i = 0; i < entry.if_stack.len(); ++i) {
+                    context->report_lex_error(entry.if_stack[i], "Unterminated #if");
+                }
+                return {Result::ErrorInvalidInput};
+            }
+
+            if (at_bol) {
+                goto check_hash;
+            }
+
+            if (token->type == Token::Identifier) {
+                if (token->v.identifier.str == "ifdef" || token->v.identifier.str == "ifndef" ||
+                    token->v.identifier.str == "if") {
+                    ++skip_depth;
+                } else if (token->v.identifier.str == "else") {
+                    if (allow_else && skip_depth == 0) {
+                        break;
+                    }
+                } else if (token->v.identifier.str == "elif") {
+                    if (allow_else && skip_depth == 0) {
+                        info->if_stack.pop();
+                        goto run_process_if;
+                    }
+                } else if (token->v.identifier.str == "endif") {
+                    if (skip_depth > 0) {
+                        --skip_depth;
+                    } else {
+                        info->if_stack.pop();
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    goto next_token_;
+}
+
+skip_until_eol_and_continue:
+    at_bol = skip_until_eol(context, preprocessor, lexer, token);
+    if (at_bol) {
+        goto process_token;
     } else {
-        return next_token(context, preprocessor, lexer, token);
+        goto next_token_;
     }
 }
 
@@ -1499,41 +1500,6 @@ static Result next_token_in_definition(Context* context,
     }
 
     return Result::done();
-}
-
-Result next_token(Context* context, Preprocessor* preprocessor, lex::Lexer* lexer, Token* token) {
-    ZoneScoped;
-
-    Result result = next_token_in_definition(context, preprocessor, lexer, token, false, true);
-    if (result.type != Result::Done) {
-        return result;
-    }
-
-    if (preprocessor->include_stack.len() == 0) {
-        return Result::done();
-    }
-
-    Location* point = &preprocessor->include_stack.last().span.end;
-    while (point->index == context->files.files[point->file].contents.len) {
-        Include_Info entry = preprocessor->include_stack.pop();
-
-        for (size_t i = 0; i < entry.if_stack.len(); ++i) {
-            context->report_lex_error(entry.if_stack[i], "Unterminated #if");
-        }
-
-        entry.if_stack.drop(cz::heap_allocator());
-
-        if (preprocessor->include_stack.len() == 0) {
-            return Result::done();
-        }
-
-        point = &preprocessor->include_stack.last().span.end;
-    }
-
-    bool at_bol = point->index == 0;
-    bool has_next = lex::next_token(context, lexer, context->files.files[point->file].contents,
-                                    point, token, &at_bol);
-    return process_next(context, preprocessor, lexer, token, at_bol, has_next);
 }
 
 }
