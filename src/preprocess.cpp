@@ -804,7 +804,7 @@ process_token:
                     bool present;
                     CZ_TRY(process_ifdef(context, preprocessor, lexer, token, &present));
                     if (present) {
-                        goto process_if_true;
+                        goto next_token_;
                     } else {
                         start_at_bol = false;
                         allow_else = true;
@@ -815,7 +815,7 @@ process_token:
                     bool present;
                     CZ_TRY(process_ifdef(context, preprocessor, lexer, token, &present));
                     if (!present) {
-                        goto process_if_true;
+                        goto next_token_;
                     } else {
                         start_at_bol = false;
                         allow_else = true;
@@ -870,7 +870,7 @@ process_token:
                     Include_Info* point = &preprocessor->include_stack.last();
                     if (point->if_stack.len() == 0) {
                         context->report_lex_error(token->span, "#endif without #if");
-                        return {Result::ErrorInvalidInput};
+                        goto skip_until_eol_and_continue;
                     }
 
                     point->if_stack.pop();
@@ -1170,25 +1170,12 @@ run_process_if : {
     CZ_TRY(process_if(context, preprocessor, lexer, token, value));
 
     if (value) {
-        goto process_if_true;
+        goto next_token_;
     } else {
         start_at_bol = true;
         allow_else = true;
         goto process_if_false;
     }
-}
-
-process_if_true : {
-    ZoneScopedN("preprocessor #if true");
-    Location* point = &preprocessor->include_stack.last().span.end;
-    at_bol = true;
-    if (!lex::next_token(context, lexer, context->files.files[point->file].contents, point, token,
-                         &at_bol)) {
-        context->report_lex_error({*point, *point}, "Unterminated preprocessing branch");
-        return {Result::ErrorInvalidInput};
-    }
-
-    goto process_token;
 }
 
 process_if_false : {
@@ -1212,7 +1199,8 @@ process_if_false : {
             for (size_t i = 0; i < entry.if_stack.len(); ++i) {
                 context->report_lex_error(entry.if_stack[i], "Unterminated #if");
             }
-            return {Result::ErrorInvalidInput};
+            preprocessor->include_stack.pop();
+            goto next_token_;
         }
 
     check_hash:
@@ -1225,7 +1213,8 @@ process_if_false : {
                 for (size_t i = 0; i < entry.if_stack.len(); ++i) {
                     context->report_lex_error(entry.if_stack[i], "Unterminated #if");
                 }
-                return {Result::ErrorInvalidInput};
+                preprocessor->include_stack.pop();
+                goto next_token_;
             }
 
             if (at_bol) {

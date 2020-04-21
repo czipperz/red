@@ -193,7 +193,7 @@ TEST_CASE(
 TEST_CASE("cpp::next_token random #endif is error") {
     SETUP("#endif");
 
-    REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
+    CHECK(EAT_NEXT().type == Result::Done);
 
     REQUIRE(context.errors.len() > 0);
 }
@@ -201,7 +201,7 @@ TEST_CASE("cpp::next_token random #endif is error") {
 TEST_CASE("cpp::next_token unterminated untaken #if is error") {
     SETUP("#ifdef x");
 
-    REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
+    CHECK(EAT_NEXT().type == Result::Done);
 
     REQUIRE(context.errors.len() > 0);
 }
@@ -209,7 +209,7 @@ TEST_CASE("cpp::next_token unterminated untaken #if is error") {
 TEST_CASE("cpp::next_token unterminated taken #if is error") {
     SETUP("#ifndef x");
 
-    REQUIRE(EAT_NEXT().type == Result::ErrorInvalidInput);
+    CHECK(EAT_NEXT().type == Result::Done);
 
     REQUIRE(context.errors.len() > 0);
 }
