@@ -145,6 +145,10 @@ struct Expression {
         Logical_Not,
         Member_Access,
         Dereference_Member_Access,
+        Pre_Increment,
+        Post_Increment,
+        Pre_Decrement,
+        Post_Decrement,
     };
 
     Span span;
@@ -250,6 +254,30 @@ struct Expression_Dereference_Member_Access : Expression {
 
     Expression* pointer;
     Hashed_Str field;
+};
+
+struct Expression_Pre_Increment : Expression {
+    Expression_Pre_Increment() : Expression(Pre_Increment) {}
+
+    Expression* value;
+};
+
+struct Expression_Post_Increment : Expression {
+    Expression_Post_Increment() : Expression(Post_Increment) {}
+
+    Expression* value;
+};
+
+struct Expression_Pre_Decrement : Expression {
+    Expression_Pre_Decrement() : Expression(Pre_Decrement) {}
+
+    Expression* value;
+};
+
+struct Expression_Post_Decrement : Expression {
+    Expression_Post_Decrement() : Expression(Post_Decrement) {}
+
+    Expression* value;
 };
 
 struct Statement {

@@ -160,6 +160,22 @@ static bool evaluate_expression(Expression* e, int64_t* value) {
         case Expression::Dereference_Member_Access: {
             CZ_PANIC("evaluate_expression unhandled case dereference member access");
         }
+
+        case Expression::Pre_Increment: {
+            CZ_PANIC("evaluate_expression unhandled case pre-increment");
+        }
+
+        case Expression::Post_Increment: {
+            CZ_PANIC("evaluate_expression unhandled case post-increment");
+        }
+
+        case Expression::Pre_Decrement: {
+            CZ_PANIC("evaluate_expression unhandled case pre-decrement");
+        }
+
+        case Expression::Post_Decrement: {
+            CZ_PANIC("evaluate_expression unhandled case post-decrement");
+        }
     }
 
     CZ_PANIC("evaluate_expression unhandled case");
@@ -2410,6 +2426,46 @@ static Result parse_expression_atomic(Context* context, Parser* parser, Expressi
             *eout = logical_not;
         } break;
 
+        case Token::Increment: {
+            int precedence = 3;
+            bool ltr = false;
+
+            result = parse_expression_(context, parser, eout, precedence + !ltr);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected expression to increment here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Expression_Pre_Increment* increment =
+                parser->buffer_array.allocator().create<Expression_Pre_Increment>();
+            increment->value = *eout;
+            increment->span.start = pair.source_span.start;
+            increment->span.end = (*eout)->span.end;
+            *eout = increment;
+        } break;
+
+        case Token::Decrement: {
+            int precedence = 3;
+            bool ltr = false;
+
+            result = parse_expression_(context, parser, eout, precedence + !ltr);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected expression to apply logical not to here");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Expression_Pre_Decrement* decrement =
+                parser->buffer_array.allocator().create<Expression_Pre_Decrement>();
+            decrement->value = *eout;
+            decrement->span.start = pair.source_span.start;
+            decrement->span.end = (*eout)->span.end;
+            *eout = decrement;
+        } break;
+
         case Token::Sizeof: {
             Token_Source_Span_Pair open_paren_pair;
             result = peek_token(context, parser, &open_paren_pair);
@@ -2647,7 +2703,6 @@ static Result parse_expression_continuation(Context* context,
 
             case Token::OpenParen: {
                 precedence = 2;
-                ltr = false;
 
                 if (precedence >= max_precedence) {
                     return Result::ok();
@@ -2876,6 +2931,42 @@ static Result parse_expression_continuation(Context* context,
                 member_access->field = peek_pair.token.v.identifier;
                 *eout = member_access;
                 continue;
+            }
+
+            case Token::Increment: {
+                precedence = 2;
+
+                if (precedence >= max_precedence) {
+                    return Result::ok();
+                }
+
+                next_token_after_peek(parser);
+                Expression_Post_Increment* expression =
+                    parser->buffer_array.allocator().create<Expression_Post_Increment>();
+                expression->value = *eout;
+                expression->span.start = (*eout)->span.start;
+                expression->span.end = pair.source_span.end;
+                *eout = expression;
+
+                return parse_expression_continuation(context, parser, eout, max_precedence);
+            }
+
+            case Token::Decrement: {
+                precedence = 2;
+
+                if (precedence >= max_precedence) {
+                    return Result::ok();
+                }
+
+                next_token_after_peek(parser);
+                Expression_Post_Decrement* expression =
+                    parser->buffer_array.allocator().create<Expression_Post_Decrement>();
+                expression->value = *eout;
+                expression->span.start = (*eout)->span.start;
+                expression->span.end = pair.source_span.end;
+                *eout = expression;
+
+                return parse_expression_continuation(context, parser, eout, max_precedence);
             }
 
             case Token::LessThan:

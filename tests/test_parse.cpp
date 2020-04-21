@@ -1724,6 +1724,86 @@ TEST_CASE("parse_expression logical not") {
     CHECK(inte->value == 2);
 }
 
+TEST_CASE("parse_expression pre increment") {
+    SETUP("int a; ++a;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Pre_Increment);
+
+    Expression_Pre_Increment* lne = (Expression_Pre_Increment*)expression;
+    REQUIRE(lne->value);
+    REQUIRE(lne->value->tag == Expression::Variable);
+
+    Expression_Variable* var = (Expression_Variable*)lne->value;
+    CHECK(var->variable.str == "a");
+}
+
+TEST_CASE("parse_expression post increment") {
+    SETUP("int a; a++;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Post_Increment);
+
+    Expression_Post_Increment* lne = (Expression_Post_Increment*)expression;
+    REQUIRE(lne->value);
+    REQUIRE(lne->value->tag == Expression::Variable);
+
+    Expression_Variable* var = (Expression_Variable*)lne->value;
+    CHECK(var->variable.str == "a");
+}
+
+TEST_CASE("parse_expression pre decrement") {
+    SETUP("int a; --a;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Pre_Decrement);
+
+    Expression_Pre_Decrement* lne = (Expression_Pre_Decrement*)expression;
+    REQUIRE(lne->value);
+    REQUIRE(lne->value->tag == Expression::Variable);
+
+    Expression_Variable* var = (Expression_Variable*)lne->value;
+    CHECK(var->variable.str == "a");
+}
+
+TEST_CASE("parse_expression post decrement") {
+    SETUP("int a; a--;");
+    cz::Vector<Statement*> initializers = {};
+    CZ_DEFER(initializers.drop(cz::heap_allocator()));
+    REQUIRE(parse_declaration(&context, &parser, &initializers).type == Result::Success);
+
+    Expression* expression;
+    REQUIRE(parse_expression(&context, &parser, &expression).type == Result::Success);
+    CHECK(context.errors.len() == 0);
+    REQUIRE(expression);
+    REQUIRE(expression->tag == Expression::Post_Decrement);
+
+    Expression_Post_Decrement* lne = (Expression_Post_Decrement*)expression;
+    REQUIRE(lne->value);
+    REQUIRE(lne->value->tag == Expression::Variable);
+
+    Expression_Variable* var = (Expression_Variable*)lne->value;
+    CHECK(var->variable.str == "a");
+}
+
 TEST_CASE("parse_expression dot operator") {
     SETUP("struct { int b; } a; a.b;");
     cz::Vector<Statement*> initializers = {};
