@@ -70,6 +70,8 @@ static void add_parse_definition(Context* context,
     add_parse_definition(context, parser, Hashed_Str::from_str(#x), CZ_STRINGIFY(x));
 
 static void add_builtin_definitions(Context* context, parse::Parser* parser) {
+    ZoneScoped;
+
     parser->preprocessor.definitions.reserve(cz::heap_allocator(), 1024);
 
     ADD_BUILTIN_DEFINITION(__CHAR_UNSIGNED__);

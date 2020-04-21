@@ -1,5 +1,6 @@
 #include "parse.hpp"
 
+#include <Tracy.hpp>
 #include <cz/defer.hpp>
 #include <cz/heap.hpp>
 #include <cz/try.hpp>
@@ -29,6 +30,8 @@ namespace parse {
     case Token::Volatile
 
 static bool evaluate_expression(Expression* e, int64_t* value) {
+    ZoneScoped;
+
     switch (e->tag) {
         case Expression::Integer: {
             Expression_Integer* expression = (Expression_Integer*)e;
@@ -182,6 +185,8 @@ static bool evaluate_expression(Expression* e, int64_t* value) {
 }
 
 bool get_type_size_alignment(const Type* type, size_t* size, size_t* alignment) {
+    ZoneScoped;
+
     switch (type->tag) {
         case Type::Builtin_Char:
             *size = 1;
@@ -432,6 +437,8 @@ static void previous_token(Parser* parser, Token_Source_Span_Pair* pair) {
 }
 
 static Declaration* lookup_declaration(Parser* parser, Hashed_Str id) {
+    ZoneScoped;
+
     for (size_t i = parser->declaration_stack.len(); i-- > 0;) {
         Declaration* declaration = parser->declaration_stack[i].get(id.str, id.hash);
         if (declaration) {
@@ -442,6 +449,8 @@ static Declaration* lookup_declaration(Parser* parser, Hashed_Str id) {
 }
 
 static Type_Definition* lookup_typedef(Parser* parser, Hashed_Str id) {
+    ZoneScoped;
+
     for (size_t i = parser->typedef_stack.len(); i-- > 0;) {
         Type_Definition* type_def = parser->typedef_stack[i].get(id.str, id.hash);
         if (type_def) {
@@ -452,6 +461,8 @@ static Type_Definition* lookup_typedef(Parser* parser, Hashed_Str id) {
 }
 
 static Type** lookup_type(Parser* parser, Hashed_Str id) {
+    ZoneScoped;
+
     for (size_t i = parser->type_stack.len(); i-- > 0;) {
         Type** type = parser->type_stack[i].get(id.str, id.hash);
         if (type) {
@@ -494,6 +505,8 @@ static Result parse_parameters(Context* context,
                                cz::Vector<TypeP>* parameter_types,
                                cz::Vector<cz::Str>* parameter_names,
                                bool* has_varargs) {
+    ZoneScoped;
+
     Token_Source_Span_Pair pair;
     next_token(context, parser, &pair);
     Span previous_span = pair.token.span;
@@ -568,6 +581,8 @@ static Result parse_block(Context* context, Parser* parser, Block* block);
 
 static bool typeps_equal(TypeP left, TypeP right, bool default_);
 static bool types_equal(Type* left, Type* right, bool default_) {
+    ZoneScoped;
+
     if (left == right) {
         return true;
     }
@@ -659,6 +674,8 @@ static Result parse_declaration_initializer(Context* context,
                                             cz::Vector<Statement*>* initializers,
                                             cz::Slice<cz::Str> parameter_names,
                                             bool* force_terminate) {
+    ZoneScoped;
+
     // Todo: support arrays
     Token_Source_Span_Pair pair;
     previous_token(parser, &pair);
@@ -788,6 +805,8 @@ static Result parse_declaration_identifier_and_type(Context* context,
                                                     TypeP* overall_type,
                                                     TypeP** inner_type_out,
                                                     cz::Slice<cz::Str>* parameter_names_out) {
+    ZoneScoped;
+
     /// We need to parse `(*function)(params)` to `Pointer(Function([params], base type))`.
     /// To do this we need to have the pointer (`*function`) apply after the function (`(params)`).
     /// We do this by storing pointers to inside the data structures and fixing them later.
@@ -996,6 +1015,8 @@ static Result parse_composite_body(Context* context,
                                    uint32_t* flags,
                                    Span composite_span,
                                    Span composite_source_span) {
+    ZoneScoped;
+
     while (1) {
         Token_Source_Span_Pair pair;
         Result result = peek_token(context, parser, &pair);
@@ -1020,6 +1041,8 @@ static Result parse_enum_body(Context* context,
                               uint32_t* flags,
                               Span enum_span,
                               Span enum_source_span) {
+    ZoneScoped;
+
     for (int64_t value = 0;; ++value) {
         Token_Source_Span_Pair pair;
         Result result = next_token(context, parser, &pair);
@@ -1122,6 +1145,8 @@ struct Numeric_Base {
 static Result parse_base_type(Context* context, Parser* parser, TypeP* base_type) {
     // Todo: dealloc anonymous structures.  This will probably work by copying the type information
     // into the buffer array.
+
+    ZoneScoped;
 
     Token_Source_Span_Pair pair;
     Result result;
@@ -2099,6 +2124,8 @@ Result parse_declaration_(Context* context,
                           Parser* parser,
                           cz::Vector<Statement*>* initializers,
                           uint32_t flags) {
+    ZoneScoped;
+
     // Parse base type and then parse a series of declarations.
     // Example 1: int const a, b;
     //            base_type = const int
@@ -2178,6 +2205,8 @@ Result parse_declaration_(Context* context,
 }
 
 Result parse_declaration(Context* context, Parser* parser, cz::Vector<Statement*>* initializers) {
+    ZoneScoped;
+
     Token_Source_Span_Pair pair;
     Result result = peek_token(context, parser, &pair);
     CZ_TRY_VAR(result);
@@ -2264,6 +2293,8 @@ Result parse_declaration_or_statement(Context* context,
                                       Parser* parser,
                                       cz::Vector<Statement*>* statements,
                                       Declaration_Or_Statement* which) {
+    ZoneScoped;
+
     Token_Source_Span_Pair pair;
     Result result = peek_token(context, parser, &pair);
     if (result.type != Result::Success) {
@@ -2314,6 +2345,8 @@ Result parse_declaration_or_statement(Context* context,
 }
 
 static Result parse_expression_atomic(Context* context, Parser* parser, Expression** eout) {
+    ZoneScoped;
+
     Token_Source_Span_Pair pair;
     Result result = next_token(context, parser, &pair);
     if (result.type != Result::Success) {
@@ -2684,6 +2717,8 @@ static Result parse_expression_continuation(Context* context,
                                             Parser* parser,
                                             Expression** eout,
                                             int max_precedence) {
+    ZoneScoped;
+
     while (1) {
         Token_Source_Span_Pair pair;
         Result result = peek_token(context, parser, &pair);
@@ -3056,6 +3091,8 @@ static Result parse_expression_(Context* context,
                                 Parser* parser,
                                 Expression** eout,
                                 int max_precedence) {
+    ZoneScoped;
+
     Result result = parse_expression_atomic(context, parser, eout);
     if (result.type != Result::Success) {
         return result;
@@ -3069,6 +3106,8 @@ Result parse_expression(Context* context, Parser* parser, Expression** eout) {
 }
 
 static Result parse_block(Context* context, Parser* parser, Block* block) {
+    ZoneScoped;
+
     Result result;
     Token_Source_Span_Pair open_curly_pair;
     next_token(context, parser, &open_curly_pair);
@@ -3138,6 +3177,8 @@ finish_block:
 }
 
 Result parse_statement(Context* context, Parser* parser, Statement** sout) {
+    ZoneScoped;
+
     Token_Source_Span_Pair pair;
     Result result = peek_token(context, parser, &pair);
     if (result.type != Result::Success) {
@@ -3495,8 +3536,7 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
                 return {Result::ErrorInvalidInput};
             }
 
-            Statement_Break* statement =
-                parser->buffer_array.allocator().create<Statement_Break>();
+            Statement_Break* statement = parser->buffer_array.allocator().create<Statement_Break>();
             statement->span.start = break_pair.source_span.start;
             statement->span.end = pair.source_span.end;
             *sout = statement;
