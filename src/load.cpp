@@ -1,5 +1,10 @@
 #include "load.hpp"
 
+#define PRINT_INCLUDE_STACK 0
+#if PRINT_INCLUDE_STACK
+#include <stdio.h>
+#endif
+
 #include <Tracy.hpp>
 #include <cz/heap.hpp>
 #include <cz/try.hpp>
@@ -47,6 +52,14 @@ Result include_file(Files* files, pre::Preprocessor* preprocessor, cz::String fi
     for (size_t index = 0; index < files->file_path_hashes.len(); ++index) {
         // Todo: Maybe use a Str_Map<size_t> here?
         if (files->file_path_hashes[index] == hash && files->files[index].path == file_path) {
+#if PRINT_INCLUDE_STACK
+            for (size_t i = 0; i < preprocessor->include_stack.len(); ++i) {
+                putchar(' ');
+            }
+            fwrite(file_path.buffer(), 1, file_path.len(), stdout);
+            putchar('\n');
+#endif
+
             // We've already included this file.
             file_path.drop(files->file_path_buffer_array.allocator());
             if (!preprocessor->file_pragma_once[index]) {
@@ -70,6 +83,14 @@ Result include_file(Files* files, pre::Preprocessor* preprocessor, cz::String fi
 
         File_Contents file_contents;
         CZ_TRY(file_contents.read(file_path.buffer(), files->file_array_buffer_array.allocator()));
+
+#if PRINT_INCLUDE_STACK
+        for (size_t i = 0; i < preprocessor->include_stack.len(); ++i) {
+            putchar(' ');
+        }
+        fwrite(file_path.buffer(), 1, file_path.len(), stdout);
+        putchar('\n');
+#endif
 
         file_path.realloc(files->file_path_buffer_array.allocator());
         force_include_file(files, preprocessor, {file_path, hash}, file_contents);
