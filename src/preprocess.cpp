@@ -756,6 +756,7 @@ process_token:
             }
 
             if (token->type == Token::Identifier) {
+                ZoneScopedN("preprocessor lookup directive");
                 if (token->v.identifier.str == "include") {
                     CZ_TRY(process_include(context, preprocessor, lexer));
                     goto next_token_;
