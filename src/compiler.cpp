@@ -70,7 +70,7 @@ static void add_parse_definition(Context* context,
     add_parse_definition(context, parser, Hashed_Str::from_str(#x), CZ_STRINGIFY(x));
 
 static void add_builtin_definitions(Context* context, parse::Parser* parser) {
-    parser->preprocessor.definitions.reserve(cz::heap_allocator(), 132);
+    parser->preprocessor.definitions.reserve(cz::heap_allocator(), 1024);
 
     ADD_BUILTIN_DEFINITION(__CHAR_UNSIGNED__);
     ADD_BUILTIN_DEFINITION(__WCHAR_UNSIGNED__);
@@ -83,10 +83,11 @@ static void add_builtin_definitions(Context* context, parse::Parser* parser) {
     ADD_BUILTIN_DEFINITION(__INTMAX_TYPE__);
     ADD_BUILTIN_DEFINITION(__UINTMAX_TYPE__);
     ADD_BUILTIN_DEFINITION(__SIG_ATOMIC_TYPE__);
-    ADD_BUILTIN_DEFINITION(__INT8_TYPE__);
-    ADD_BUILTIN_DEFINITION(__INT16_TYPE__);
-    ADD_BUILTIN_DEFINITION(__INT32_TYPE__);
-    ADD_BUILTIN_DEFINITION(__INT64_TYPE__);
+    /// These definitions cause int*_t to be typedef'd twice so I disabled them.
+    // ADD_BUILTIN_DEFINITION(__INT8_TYPE__);
+    // ADD_BUILTIN_DEFINITION(__INT16_TYPE__);
+    // ADD_BUILTIN_DEFINITION(__INT32_TYPE__);
+    // ADD_BUILTIN_DEFINITION(__INT64_TYPE__);
     ADD_BUILTIN_DEFINITION(__UINT8_TYPE__);
     ADD_BUILTIN_DEFINITION(__UINT16_TYPE__);
     ADD_BUILTIN_DEFINITION(__UINT32_TYPE__);
