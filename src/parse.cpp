@@ -3454,6 +3454,54 @@ Result parse_statement(Context* context, Parser* parser, Statement** sout) {
             *sout = statement;
         } break;
 
+        case Token::Continue: {
+            Token_Source_Span_Pair continue_pair = pair;
+            next_token_after_peek(parser);
+
+            result = next_token(context, parser, &pair);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(continue_pair.token.span, continue_pair.source_span,
+                                      "Expected semicolon here to continue statement");
+                return {Result::ErrorInvalidInput};
+            }
+            if (pair.token.type != Token::Semicolon) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected semicolon here to continue statement");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Statement_Continue* statement =
+                parser->buffer_array.allocator().create<Statement_Continue>();
+            statement->span.start = continue_pair.source_span.start;
+            statement->span.end = pair.source_span.end;
+            *sout = statement;
+        } break;
+
+        case Token::Break: {
+            Token_Source_Span_Pair break_pair = pair;
+            next_token_after_peek(parser);
+
+            result = next_token(context, parser, &pair);
+            CZ_TRY_VAR(result);
+            if (result.type == Result::Done) {
+                context->report_error(break_pair.token.span, break_pair.source_span,
+                                      "Expected semicolon here to break statement");
+                return {Result::ErrorInvalidInput};
+            }
+            if (pair.token.type != Token::Semicolon) {
+                context->report_error(pair.token.span, pair.source_span,
+                                      "Expected semicolon here to break statement");
+                return {Result::ErrorInvalidInput};
+            }
+
+            Statement_Break* statement =
+                parser->buffer_array.allocator().create<Statement_Break>();
+            statement->span.start = break_pair.source_span.start;
+            statement->span.end = pair.source_span.end;
+            *sout = statement;
+        } break;
+
         default: {
             Expression* expression;
             CZ_TRY(parse_expression(context, parser, &expression));

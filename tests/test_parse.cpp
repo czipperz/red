@@ -2149,6 +2149,32 @@ TEST_CASE("parse_statement while loop") {
     CHECK(body->block.statements.len == 0);
 }
 
+TEST_CASE("parse_statement continue") {
+    SETUP("continue;");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    REQUIRE(statement);
+    REQUIRE(statement->tag == Statement::Continue);
+
+    Statement_Continue* scontinue = (Statement_Continue*)statement;
+    CHECK(scontinue->span.start.index == 0);
+    CHECK(scontinue->span.end.index == 9);
+}
+
+TEST_CASE("parse_statement break") {
+    SETUP("break;");
+
+    Statement* statement;
+    REQUIRE(parse_statement(&context, &parser, &statement).type == Result::Success);
+    REQUIRE(statement);
+    REQUIRE(statement->tag == Statement::Break);
+
+    Statement_Break* sbreak = (Statement_Break*)statement;
+    CHECK(sbreak->span.start.index == 0);
+    CHECK(sbreak->span.end.index == 6);
+}
+
 TEST_CASE("parse_statement return no expression") {
     SETUP("return;");
 

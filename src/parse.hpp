@@ -289,6 +289,8 @@ struct Statement {
         Return,
         Empty,
         If,
+        Continue,
+        Break,
         Initializer_Default,
         Initializer_Copy,
     };
@@ -347,6 +349,14 @@ struct Statement_If : Statement {
     struct Expression* condition;
     Statement* then;
     Statement* otherwise;
+};
+
+struct Statement_Continue : Statement {
+    Statement_Continue() : Statement(Continue) {}
+};
+
+struct Statement_Break : Statement {
+    Statement_Break() : Statement(Break) {}
 };
 
 struct Statement_Initializer : Statement {
